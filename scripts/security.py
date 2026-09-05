@@ -58,9 +58,12 @@ def category(r):
 
 
 def print_group(title, group):
+    import shutil
+    room = shutil.get_terminal_size((100, 20)).columns - 63  # width left for the description after the fixed columns
     print(f"{title} ({len(group)})")
     for r in group:
-        print(f"  {r['id']:16s} {r['status']:14s} {r['component']:28s} {r['description'][:60]}")
+        desc = r["description"][:room] if room > 15 else ""
+        print(f"  {r['id']:16s} {r['status']:14s} {r['component']:28s} {desc}".rstrip())
     if not group:
         print("  none")
     print()
