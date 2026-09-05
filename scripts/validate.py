@@ -96,6 +96,21 @@ def check_field_dictionary():
                         warnings.append(f"{md.relative_to(ROOT)}: field '{name}' not in field-dictionary.md")
 
 
+def check_status_drift():
+    """A doc may not claim implemented/automated/mitigated unless code carries the marker (the coverage matrix's 'catch')."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import coverage_matrix
+    errors.extend(coverage_matrix.status_drift())
+
+
+def check_vul_evidence():
+    """Status beyond `expected` needs an audit report mentioning the VUL; `accepted` needs an ADR too."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import security
+    if security.REGISTER.exists():
+        errors.extend(security.problems())
+
+
 def check_vul_register():
     reg = DOCS / "security" / "vulnerability-register.md"
     if not reg.exists():
@@ -108,6 +123,8 @@ def check_vul_register():
 
 
 if __name__ == "__main__":
+    check_status_drift()
+    check_vul_evidence()
     check_skills(); check_indexes(); check_references(collect_ids()); check_field_dictionary(); check_vul_register()
     for w in warnings: print("WARN ", w)
     for e in errors: print("ERROR", e)

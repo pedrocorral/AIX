@@ -27,7 +27,7 @@ File name = `<ID>-<kebab-title>.md`. The ID also appears in front-matter `id:` (
 # @mitigates VUL-INJ-002                       (at the control that mitigates it)
 ```
 Rules: markers go on the *narrowest* symbol that fully realises the ID; one marker line may list several IDs;
-never mark generic helpers. `aix coverage` scans them (no LLM, no full read).
+never mark generic helpers. `aix coverage` scans them (no LLM, no full read), and `aix validate` fails any doc whose status claims `implemented` / `automated` / `mitigated` without the marker in code.
 
 ## Traceability chain
 `FR/NFR` ─covers─► `TS` ─@tests─► test code; `FR` ─@implements─► code; `VUL` ─@mitigates─► code; `ADR.affects` ─► anything.

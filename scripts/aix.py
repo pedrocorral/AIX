@@ -18,6 +18,8 @@ aix acts on the nearest project at or above the current folder (the one holding 
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
   aix coverage                        regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
+  aix security [open|validated]       vulnerability register: which VUL rows are validated (evidence) and which
+                                      are not, which audit skills still to run; --gate exits 1 if any row is open
   aix task new "Title" [--bucket next|backlog|ideas]
   aix task start|block|done TASK-0007 ["reason"]
   aix task list
@@ -192,6 +194,12 @@ Python 3.9+ and no third-party dependencies.
                             extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
                             validate = is what we wrote right; doctor = is the tooling around it right.
   aix coverage              regenerate docs/tests/coverage-matrix.md
+  aix security [open|validated] [--gate]
+                            state of the vulnerability register: rows not validated (expected, unverified,
+                            confirmed, mitigated; worst first) with the audit skill to run, rows validated
+                            (addressed, accepted, not-applicable), and rows whose status has no evidence (an
+                            audit report in docs/security/audits/, plus an ADR for `accepted`). The audits are
+                            done by the security-audit-* skills; this only reports. --gate is the release check.
 
   aix task new "Title" [--bucket next|backlog|ideas]
                             create pending/<bucket>/TASK-nnnn-title.md from the template
@@ -348,6 +356,9 @@ def main(argv):
         sys.exit(run_script("validate.py"))
     elif cmd == "doctor":
         sys.exit(run_script("doctor.py"))
+    elif cmd == "security":
+        import security
+        security.main(args)
     elif cmd == "coverage":
         sys.exit(run_script("coverage_matrix.py"))
     elif cmd == "task":

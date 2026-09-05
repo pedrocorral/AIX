@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- `aix security [open|validated] [--gate]`: register report (validated vs not, audit skills to run, missing evidence). `aix validate` fails a VUL status beyond `expected` without an audit report (and an ADR for `accepted`).
+- `aix validate` fails on status drift: FR/NFR/API `implemented`/`verified` without `@implements`, TS `automated` without `@tests`, VUL `mitigated` without `@mitigates` in code.
 - `aix doctor`: installation health with a fix per finding (validate = docs, doctor = tooling). Hand-off trigger unified at ~60 % context plus event triggers.
 - Single `aix` CLI (`aix` bash launcher, `aix.cmd` for Windows, logic in `scripts/aix.py`): `install`, `validate`, `coverage`, `task`, `version`. Replaces `install.sh`, `install.ps1` and the `Makefile`. `aix install` links itself into `~/.local/bin` when present.
 - `aix install --into` prompts on every existing item ([r]eplace/[s]kip/[m]erge, R/S/M for all, [a]bort); replace keeps a `.bak`; merge adds missing files only; `--replace-all`/`--skip-all`/`--merge-all` for non-interactive use.

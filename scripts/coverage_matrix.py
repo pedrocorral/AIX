@@ -23,6 +23,36 @@ def fm_ids(folder, prefix):
     return out
 
 
+def fm_status(folder, prefix):
+    """id -> front-matter status for every doc with that ID prefix."""
+    out = {}
+    for md in (ROOT / folder).rglob("*.md"):
+        t = md.read_text(encoding="utf-8", errors="replace")
+        m = re.search(rf"^id:\s*({prefix}-[A-Z0-9-]+)", t, re.M)
+        s = re.search(r"^status:\s*([a-z-]+)", t, re.M)
+        if m and s:
+            out[m.group(1)] = s.group(1)
+    return out
+
+
+def status_drift():
+    """Docs that claim more than the code shows. Errors: a status nobody can reach without a marker.
+    FR/NFR/API `implemented`|`verified` need @implements; TS `automated` needs @tests; VUL `mitigated` needs @mitigates."""
+    code = scan_code()
+    errs = []
+    for prefix in ("FR", "NFR", "API"):
+        for rid, st in fm_status("docs/requirements", prefix).items():
+            if st in ("implemented", "verified") and rid not in code:
+                errs.append(f"{rid} is `{st}` but no code carries `@implements {rid}`")
+    for tid, st in fm_status("docs/tests", "TS").items():
+        if st == "automated" and tid not in code:
+            errs.append(f"{tid} is `automated` but no test carries `@tests {tid}`")
+    for vid, st in fm_status("docs/security", "VUL").items():
+        if st == "mitigated" and vid not in code:
+            errs.append(f"{vid} is `mitigated` but no code carries `@mitigates {vid}`")
+    return errs
+
+
 def scan_code():
     hits = defaultdict(set)
     for root in CODE_ROOTS:

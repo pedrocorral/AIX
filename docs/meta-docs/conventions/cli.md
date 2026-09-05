@@ -18,8 +18,9 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 |---|---|---|
 | `aix install [--copy]` | Link every enabled skill into `.opencode/ .claude/ .github/ .agents/ .cursor/` skills dirs; write pointer files and `STATE.md` if missing; prune dangling links | After adding, removing or editing skills |
 | `aix install --into DIR` | Copy the kit into an existing project, asking per existing item ([r]eplace keeps `.bak`, [s]kip, [m]erge adds missing files only, R/S/M for all, [a]bort); `--replace-all` / `--skip-all` / `--merge-all` when no terminal | Bootstrapping a project |
-| `aix validate` | Doc integrity: front-matter, INDEX completeness, IDs exist, links resolve, TS → FR, VUL statuses, field dictionary. Exit 1 on errors | Closing any task; pre-commit / CI |
+| `aix validate` | Doc integrity: front-matter, INDEX completeness, IDs exist, links resolve, TS → FR, VUL statuses, field dictionary, **status drift** (`implemented`/`automated`/`mitigated` claimed without the matching code marker). Exit 1 on errors | Closing any task; pre-commit / CI |
 | `aix doctor` | Installation health: skill links in every runtime, dangling links, pointer files, always-on sections consistent, extern provenance, `STATE.md` vs `going-on/`, Python, PATH. Fix per problem, exit 1 | Session start when something seems off; after `aix install --into` |
+| `aix security [open\|validated] [--gate]` | Register state: rows not validated (worst first) with the audit skill to run, validated rows, rows whose status lacks evidence (audit report; ADR for `accepted`). `--gate` exits 1 if any row is open: the release check | Before an audit; closing a task with `security:` rows; release |
 | `aix coverage` | Regenerate `docs/tests/coverage-matrix.md` from FR files, TS `covers:` and `@implements` / `@tests` markers | Closing a task; before release |
 | `aix task new "T" [--bucket b]` / `start` / `block ID "why"` / `done` / `list` | Move `TASK-*` files through `pending → going-on ⇄ blocked → completed/YYYY-MM` and keep `STATE.md` in sync | `core-roadmap-task`, `core-session-handoff` |
 | `aix skills [general\|specific] [category]` | Catalogue (see below) | Choosing a skill; checking what is always on |
@@ -69,5 +70,6 @@ upstream docs. `skills/extern/` is committed with the project; `aix skills updat
 ## Rules for agents
 - Never edit files under `.opencode/ .claude/ .github/skills .agents/ .cursor/skills`: they are generated links.
 - Never move `TASK-*` files by hand; use `aix task`.
-- Run `aix validate` before every hand-off; `aix coverage` when a task closes.
+- Run `aix validate` before every hand-off; `aix coverage` when a task closes; `aix security --gate` at release.
+- Never change a VUL status without an audit report (`aix validate` fails); `accepted` also needs an ADR.
 - Do not add registry entries without evidence; do not make a second style skill always-on.

@@ -9,6 +9,7 @@ title: Definition of done
 - All `tests:` in the task are `status: automated`, green in CI, with `@tests` markers.
 - `security:` entries either `addressed` (audit report exists) or explicitly `accepted` by the user (ADR).
 - Every new/changed doc is in its folder INDEX; `aix validate` passes; `aix coverage` regenerated.
+  `aix validate` **fails** when a status outruns the code: FR/NFR/API `implemented`/`verified` without `@implements`, TS `automated` without `@tests`, VUL `mitigated` without `@mitigates`. Markers are not optional.
 - Task file has a final progress-log entry; moved to `completed/YYYY-MM/`; `STATE.md` updated.
 
 ## Feature (group of tasks)
