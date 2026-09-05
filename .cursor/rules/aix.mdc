@@ -1,0 +1,6 @@
+---
+description: AIX agent contract
+alwaysApply: true
+---
+Read and follow `AGENTS.md` at the repository root before doing anything. Skills are in `.cursor/skills/`.
+

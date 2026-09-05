@@ -1,0 +1,38 @@
+# AIX manifest. Tools and scripts read this; agents rarely need to.
+name: aix
+version: 1.3.0
+spec: https://agentskills.io   # skills follow the Agent Skills open format (SKILL.md + YAML front-matter)
+entrypoint: AGENTS.md
+paths:
+  docs: docs
+  meta_docs: docs/meta-docs
+  requirements: docs/requirements
+  tests: docs/tests
+  security: docs/security
+  roadmap: docs/road-map
+  conflicts: docs/conflicts
+  operations: docs/operations
+  skills_source: skills
+  templates: templates
+  code_roots: [backend, frontend, shared, infra]
+skill_targets:            # where `aix install` links every leaf skill (name = folder path joined with '-')
+  - .opencode/skills      # opencode (native)
+  - .claude/skills        # Claude Code, also read by opencode and VS Code
+  - .github/skills        # VS Code / GitHub Copilot
+  - .agents/skills        # agentskills.io generic location (VS Code, others)
+  - .cursor/skills        # Cursor (installer also writes .cursor/rules/aix.mdc pointer)
+id_prefixes:
+  requirement_functional: FR
+  requirement_non_functional: NFR
+  api: API
+  data_model: DM
+  decision: ADR
+  test_spec: TS
+  vulnerability: VUL
+  task: TASK
+  conflict: CONFLICT
+code_markers:
+  implements: "@implements"
+  tests: "@tests"
+  mitigates: "@mitigates"
+disabled_skills: []   # managed by `aix skills enable|disable`

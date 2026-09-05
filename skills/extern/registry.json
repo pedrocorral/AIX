@@ -1,0 +1,67 @@
+{
+  "_comment": "Known third-party skills for `aix skills add NAME`. Only entries with published evidence or wide, sustained adoption. Keep `evidence` honest: who measured, what, and the caveats. `group`: general = behaviour that applies to every session (style, method); specific = does one job when invoked. `recommended: true` lists the skill first with state `recommended` (be sparing).",
+  "caveman": {
+    "repo": "JuliusBrussee/caveman",
+    "path": "skills/caveman",
+    "kind": "style",
+    "license": "MIT (skill)",
+    "description": "Terse output: drops articles, filler, pleasantries and hedging while keeping all technical substance. Cuts output tokens.",
+    "evidence": "Author benchmarks: 22-87% fewer output tokens over ten prompts. Caveat: only output shrinks; the rules cost ~1-1.5k input tokens per turn, so whole-session savings are lower. ~94k GitHub stars (mid-2026).",
+    "also": [
+      "caveman-review",
+      "caveman-commit",
+      "caveman-compress"
+    ],
+    "group": "general"
+  },
+  "ponytail": {
+    "repo": "DietrichGebert/ponytail",
+    "path": "skills/ponytail",
+    "kind": "method",
+    "license": "MIT",
+    "description": "'Laziest senior dev' ladder before any code: does it need to exist, is it already in the codebase, reuse over rewrite, smallest change.",
+    "evidence": "Author agentic benchmark (12 feature tickets, FastAPI+React repo, n=4, Haiku 4.5): ~54% less code (up to 94%), ~20% cheaper, ~27% faster. Methodology in benchmarks/results/2026-06-18-agentic.md. ~124k stars.",
+    "also": [
+      "ponytail-review",
+      "ponytail-audit",
+      "ponytail-debt"
+    ],
+    "group": "general",
+    "recommended": true
+  },
+  "karpathy-guidelines": {
+    "repo": "forrestchang/andrej-karpathy-skills",
+    "path": "skills/karpathy-guidelines",
+    "kind": "method",
+    "license": "MIT",
+    "description": "Four principles against common LLM coding failures: think before coding, simplicity first, surgical changes, goal-driven execution.",
+    "evidence": "No controlled benchmark. Derived from Karpathy's Jan 2026 observations; ~109k stars by May 2026. Overlaps with ponytail; pick one.",
+    "also": [],
+    "group": "general"
+  },
+  "systematic-debugging": {
+    "repo": "obra/superpowers",
+    "path": "skills/systematic-debugging",
+    "kind": "method",
+    "license": "MIT",
+    "description": "Four-phase root-cause process for bugs (reproduce, hypothesise, test, fix) instead of guess-and-patch.",
+    "evidence": "No controlled benchmark. Part of obra/superpowers (~190k stars, MIT), the most adopted skills framework; widely reported to reduce debugging loops. Standalone, no other superpowers skill required.",
+    "also": [
+      "verification-before-completion",
+      "brainstorming",
+      "writing-plans",
+      "test-driven-development"
+    ],
+    "group": "specific"
+  },
+  "verification-before-completion": {
+    "repo": "obra/superpowers",
+    "path": "skills/verification-before-completion",
+    "kind": "method",
+    "license": "MIT",
+    "description": "Forbids claiming done without running the verification; evidence before completion claims.",
+    "evidence": "No controlled benchmark. Part of obra/superpowers (~190k stars). Complements AIX definition-of-done; cheap (short SKILL.md).",
+    "also": [],
+    "group": "specific"
+  }
+}
