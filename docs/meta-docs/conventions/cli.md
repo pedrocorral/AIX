@@ -21,7 +21,7 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 | `aix validate` | Doc integrity: front-matter, INDEX completeness, IDs exist, links resolve, TS → FR, VUL statuses, field dictionary, **status drift** (`implemented`/`automated`/`mitigated` claimed without the matching code marker). Exit 1 on errors | Closing any task; pre-commit / CI |
 | `aix doctor` | Installation health: skill links in every runtime, dangling links, pointer files, always-on sections consistent, extern provenance, `STATE.md` vs `going-on/`, Python, PATH. Fix per problem, exit 1 | Session start when something seems off; after `aix install --into` |
 | `aix security [open\|validated] [--gate]` | Register state: rows not validated (worst first) with the audit skill to run, validated rows, rows whose status lacks evidence (audit report; ADR for `accepted`). `--gate` exits 1 if any row is open: the release check | Before an audit; closing a task with `security:` rows; release |
-| `aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]` | The modularity metric: dependency graph (modules for Python/JS/TS/Rust/Java, `--functions` for Python calls) measured against its ground state (forest, N-P edges): excess %, leaf-adjusted excess (edges into leaves are free), cycles, hubs, propagation cost. `--gate` fails on any cycle or excess above the limit; `--report` writes `docs/tests/dependency-graph.md` | Design reviews; `review-code-review` on every diff; CI gate |
+| `aix graph` / `aix complexity` `[PATH...] [--functions] [--gate] [--max-excess PCT] [--report]` | The modularity metric: dependency graph (modules for Python/JS/TS/Rust/Java, `--functions` for Python calls) measured against its ground state (forest, N-P edges): excess %, leaf-adjusted excess (edges into leaves are free), cycles, hubs, propagation cost. `--gate` fails on any cycle or excess above the limit; `--report` writes `docs/tests/dependency-graph.md` | Design reviews; `review-code-review` on every diff; CI gate |
 | `aix coverage` | Regenerate `docs/tests/coverage-matrix.md` from FR files, TS `covers:` and `@implements` / `@tests` markers | Closing a task; before release |
 | `aix task new "T" [--bucket b]` / `start` / `block ID "why"` / `done` / `list` | Move `TASK-*` files through `pending → going-on ⇄ blocked → completed/YYYY-MM` and keep `STATE.md` in sync | `core-roadmap-task`, `core-session-handoff` |
 | `aix skills [general\|specific] [category]` | Catalogue (see below) | Choosing a skill; checking what is always on |
@@ -29,6 +29,8 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 | `aix skills enable\|disable NAME` | Link/unlink everywhere; recorded in `framework.yaml` `disabled_skills` | Trimming a project's skill set |
 | `aix skills registry` / `add NAME [--on-demand\|--always] [--extra a,b]` / `remove` / `update` | Third-party skills (below) | Adopting caveman, ponytail, … |
 | `aix skills always\|on-demand NAME` | Add/remove the always-on wiring for any skill | Making a behaviour permanent |
+
+`aix help COMMAND` (or `aix COMMAND --help`) prints the detailed help of one command; read it before using a command for the first time.
 
 ## Skill catalogue
 `aix skills` prints `SKILL`, `STATE`, `DESCRIPTION` (description truncated to the terminal width, dropped on narrow terminals).

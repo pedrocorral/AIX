@@ -22,7 +22,7 @@ aix acts on the nearest project at or above the current folder (the one holding 
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
   aix coverage                        regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
-  aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]
+  aix graph | complexity [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]
                                       measure the dependency graph against its ground state (a forest): excess %,
                                       leaf-adjusted excess, cycles, hubs, propagation cost. Modules for Python,
                                       JS/TS, Rust, Java; --functions for Python call graphs. --gate fails on cycles
@@ -41,7 +41,7 @@ aix acts on the nearest project at or above the current folder (the one holding 
                                       unless --on-demand; specific ones stay on-demand unless --always
   aix skills remove|update NAME       drop it / re-download it;  aix skills always|on-demand NAME
   aix version
-  aix help
+  aix help [COMMAND]                  detailed help for one command (e.g. aix help graph), or aix COMMAND --help
 
 Launchers: `aix` (bash, Linux/macOS) and `aix.cmd` (Windows) simply call this file with python3."""
 import os, subprocess, sys
@@ -275,7 +275,7 @@ def skill_count():
     return sum(1 for _ in (ROOT / "skills").rglob("SKILL.md"))
 
 
-ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version"}
+ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version"}  # need no project
 
 
 def reexec_in_project(argv):
@@ -293,6 +293,162 @@ def reexec_in_project(argv):
         os.execv(sys.executable, [sys.executable, str(own), *argv])
     if project != ROOT:
         sys.exit(f"aix: {project} has framework.yaml but no scripts/aix.py; run `aix install --into {project}`")
+
+
+
+TOPICS = {
+"install": """aix install [--copy] [--into DIR] [--replace-all|--skip-all|--merge-all]
+
+Links every enabled skill from skills/ into the folders each agent runtime reads (.opencode/skills, .claude/skills,
+.github/skills, .agents/skills, .cursor/skills), writes the pointer files for Copilot, Cursor and Gemini CLI if
+missing, creates docs/road-map/going-on/STATE.md if missing, prunes dangling links, and on Linux/macOS links `aix`
+into ~/.local/bin when that folder exists. Idempotent: run it after adding, removing or editing skills.
+  --copy         copy skill folders instead of symlinking (filesystems or Windows setups without symlinks)
+  --into DIR     first copy the kit payload (AGENTS.md, CLAUDE.md, GEMINI.md, framework.yaml, docs/, skills/,
+                 templates/, scripts/, aix, aix.cmd) into an existing project, asking per existing item:
+                 [r]eplace (yours kept as <item>.bak)  [s]kip  [m]erge (folders: add missing files only)
+                 [R]/[S]/[M] same answer for the rest  [a]bort
+  --replace-all | --skip-all | --merge-all   answer every collision without a terminal (CI)
+Related: aix upgrade (update an already installed project), aix doctor (check the result).""",
+
+"upgrade": """aix upgrade [PROJECT] [--dry-run] [--yes]   (experimental)
+
+Brings a project created with `aix install --into` up to the kit version of the `aix` you run. Run the KIT's aix
+(the one on PATH) from inside the project; the project's own copy refuses, because the newest logic must come
+from the kit. Ownership decides what happens:
+  kit-owned, overwritten, removed if gone from the kit:
+                 scripts/, aix, aix.cmd, templates/, docs/meta-docs/, skills/<built-in categories>/, CLAUDE.md
+  merged:        AGENTS.md and GEMINI.md (kit text + your "## Always-on skills" and "## Project notes"),
+                 framework.yaml (your disabled_skills line kept)
+  never touched: docs/requirements tests security conflicts operations road-map, skills/extern/, runtime folders,
+                 your code
+Prints the full plan, one line per file (line deltas, kept sections, removals), then warns and asks.
+  --dry-run      plan only, nothing written        --yes   skip the question (scripts)
+Afterwards it relinks skills; run `aix doctor` and `aix validate`. Your git history is the backup.""",
+
+"validate": """aix validate
+
+Are the DOCS right? Exit 1 on errors. Checks every markdown file under docs/ and skills/:
+  - front-matter present; skill `name` equals its folder path
+  - every folder has an INDEX.md and every file is listed in it
+  - every referenced ID (FR/NFR/API/DM/ADR/TS/VUL/TASK/CONFLICT) exists; relative links resolve
+  - test specs cover existing requirements; vulnerability statuses are valid
+  - API/DM field names appear in the field dictionary
+  - STATUS DRIFT: FR/NFR/API `implemented`/`verified` need an @implements marker in code, TS `automated` needs
+    @tests, VUL `mitigated` needs @mitigates, and any VUL status beyond `expected` needs an audit report
+    (`accepted` also an ADR). A doc may not claim more than the code and the evidence show.
+Run before every hand-off and in CI. `aix doctor` is the counterpart for the installation.""",
+
+"doctor": """aix doctor
+
+Is the INSTALL right? Exit 1 if anything is broken; every finding comes with its fix. Checks Python >= 3.9,
+`aix` on PATH, the pointer files (CLAUDE.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc, GEMINI.md)
+reaching AGENTS.md, every enabled skill linked in all runtime folders, dangling links, unknown names in
+disabled_skills, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini, extern skills with
+provenance, and STATE.md naming a task that exists in going-on/. `aix validate` is the counterpart for the docs.""",
+
+"coverage": """aix coverage
+
+Regenerates docs/tests/coverage-matrix.md: one row per requirement with the test specs that cover it (`covers:`
+in TS files), the code that implements it (@implements markers) and the tests that exercise it (@tests markers),
+plus a gap column: `no test spec`, `spec not automated`, `no code`. Pure regex scan, no model. Only as honest as
+the markers: `aix validate` fails a status that claims more than the markers show.""",
+
+"security": """aix security [open|validated] [--gate]
+
+Where does the vulnerability register stand? Reads docs/security/vulnerability-register.md and the audit reports.
+  NOT VALIDATED   rows still expected / unverified / confirmed / mitigated, worst first, with the audit skill to run
+  VALIDATED       addressed with evidence, accepted by ADR, or not-applicable
+  PROBLEM         a status beyond `expected` with no audit report mentioning the VUL (or `accepted` without ADR)
+  --gate          release check: exit 1 if any row is open or lacks evidence
+The audits themselves are done by the security-audit-* skills; this only reports and gates.""",
+
+"graph": """aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]     alias: aix complexity
+
+THE MODULARITY METRIC. Measures how far the codebase's dependency graph is from its ideal shape.
+
+What it builds
+  modules (default)   nodes = source files; edges = imports between project files. Python, JavaScript/TypeScript,
+                      Rust, Java. External packages are ignored; unresolved imports are ignored, never guessed.
+  --functions         nodes = functions and methods (Python only, stdlib parser); edges = calls resolved by name
+                      in the module, through imported names, and self.method(). Calls through typed objects
+                      (repo.save()) cannot be resolved statically and are absent: the function graph is a lower bound.
+  PATH...             restrict to these folders (default: backend frontend shared infra src app tests lib)
+
+What it measures (N nodes, E edges, P connected components)
+  ground state        N - P edges. A forest: every node except the roots has exactly one dependant. The theoretical
+                      minimum for a connected codebase; defined as 0 % excess.
+  circuit rank        E - N + P. Edges beyond the ground state. Berge's cyclomatic number of the graph; McCabe's
+                      1976 complexity is the same formula applied inside one function's control flow.
+  excess              circuit rank / ground state, in %. How far above the ideal the whole graph sits.
+  leaf-adjusted       the same on the sub-graph without leaves (nodes with no dependencies). Many callers pointing
+    excess            at a pure leaf is free reuse, not tangling (see docs/meta-docs/architecture/modularity.md),
+                      so edges INTO leaves are not counted. THIS is the number to watch.
+  cycles              strongly connected components with more than one node. Always a defect: two nodes that
+                      depend on each other are one node in disguise. Studies link cycles to bug density.
+  hubs                fan-in >= 3 AND fan-out >= 3: a change there propagates everywhere. Composition roots
+                      (composition.py, main.py, app.py, index.ts ...) are hubs by design and are labelled so.
+  propagation cost    average share of the graph reachable from a node (MacCormack, Rusnak & Baldwin 2006).
+                      Roughly: how much of the system one change can touch. Healthy systems sit low (~5-15 %).
+
+How to read the result
+  cycles > 0                     fix first; extract the shared part into a leaf, or merge the two nodes
+  leaf-adjusted excess rising    coupling is growing faster than the codebase; look at the top fan-out list
+  a hub that is not a root       split it: keep the pure part as a leaf, move the rest up to its callers
+  a diamond-rich DAG (high excess, no cycles, low propagation) is normal for layered apps; track the trend
+
+Options
+  --gate              exit 1 on any cycle, or when leaf-adjusted excess > --max-excess PCT (CI)
+  --report            also write docs/tests/dependency-graph.md (generated, git-ignored)
+
+Examples
+  aix graph                       whole project, module level
+  aix graph backend --functions   Python call graph of the backend
+  aix graph --gate --max-excess 80
+Used by: review-code-review on every diff (compare before/after), architecture-design-app, the definition of done.""",
+
+"task": """aix task new "Title" [--bucket next|backlog|ideas] | start ID | block ID "reason" | done ID | list
+
+Moves TASK-* files through the road-map and keeps docs/road-map/going-on/STATE.md in sync:
+  pending/{ideas,backlog,next}  ->  going-on  <->  blocked  ->  completed/YYYY-MM/
+  new     create pending/<bucket>/TASK-nnnn-title.md from templates/task.md
+  start   move to going-on/, status going-on, STATE.md active_task = ID
+  block   move to blocked/, note the reason, clear active_task
+  done    move to completed/YYYY-MM/ (creating the month INDEX), stamp the date, clear active_task
+  list    one line per task with status
+Never move task files by hand; agents use this through the core-roadmap-task skill.""",
+
+"skills": """aix skills [list|general|specific [category]] | info NAME | show NAME | enable|disable NAME...
+           | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] | remove NAME... | update [NAME...]
+           | always NAME | on-demand NAME
+
+Catalogue: SKILL, STATE, DESCRIPTION (cut at the terminal width). States:
+  recommended / available   known in skills/extern/registry.json, not downloaded (listed first)
+  (*) always                named in AGENTS.md: applied in every session
+  on-demand                 installed; invoked by name, by an orchestrator, or when its description matches
+  disabled                  listed in framework.yaml disabled_skills; linked into no runtime
+Groups (filters): general = behaviour that applies to every session (style, method); specific = one job.
+  info      group, level (always/orchestrator/on-demand), category, runtimes it is linked into, source
+  add       download a registry skill (GitHub tarball, no git) into skills/extern/NAME, bare name, linked
+            everywhere; general skills become always-on unless --on-demand; --extra adds siblings from the repo
+  always    write the "## Always-on skills" section into AGENTS.md, .github/copilot-instructions.md,
+            .cursor/rules/aix.mdc and GEMINI.md (no runtime has an always-apply switch; the instruction files are
+            the only mechanism every tool honours); on-demand removes it
+  registry  the known third-party skills with their evidence line (only entries with evidence belong there)""",
+
+"about": "aix about      prints the full description of the kit: purpose, workflow, folders, IDs, skills, every command.",
+"version": "aix version    prints the kit version from framework.yaml.",
+"help": "aix help [COMMAND]    this list, or the detailed help for one command (also: aix COMMAND --help).",
+}
+TOPICS["complexity"] = TOPICS["graph"]
+
+
+def topic_help(name: str):
+    text = TOPICS.get(name)
+    if not text:
+        print(f"aix: no help for '{name}'. Commands: " + ", ".join(k for k in TOPICS if k != "complexity"))
+        sys.exit(1)
+    print(text)
 
 
 def usage(code=0):
@@ -368,10 +524,16 @@ def cmd_task(args):
 
 
 def main(argv):
+    if len(argv) >= 2 and argv[0] == "help":
+        return topic_help(argv[1])
+    if len(argv) >= 2 and argv[1] in ("--help", "-h"):
+        return topic_help(argv[0])
     reexec_in_project(argv)
     if not argv or argv[0] in ("help", "-h", "--help"):
         usage(0)
     cmd, args = argv[0], argv[1:]
+    if cmd == "complexity":
+        cmd = "graph"
     if cmd == "about":
         print(ABOUT)
     elif cmd == "install":

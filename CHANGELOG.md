@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- `aix help COMMAND` / `aix COMMAND --help`: detailed per-command help written for agents; `aix complexity` alias of `aix graph`.
 - `aix graph`: the modularity metric. Module graph (Python, JS/TS, Rust, Java) or Python call graph measured against its ground state (forest): circuit rank, excess %, leaf-adjusted excess, cycles, hubs, propagation cost; `--gate`, `--report`. Wired into modularity.md and code-review. Applied to the kit itself: two import cycles in scripts/ removed by extracting the leaves catalog.py and project.py (leaf-adjusted excess 0 %, propagation cost halved).
 
 ## 1.4.0 — 2026-09-06
