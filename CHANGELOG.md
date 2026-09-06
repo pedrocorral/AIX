@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.1 — 2026-09-06
+- `aix code style` detects the target runtime (`scripts/runtime.py`: pyproject requires-python, .python-version, venv, tsconfig target, engines.node, Cargo.toml, pom/Gradle; source shown in the header) and adds a modernise tier with only what that version enables (match, `X | None`, builtin generics, `@dataclass`, pathlib, tomllib, `?.`, `??`, const/let, let-else, switch expressions). Advice, never gated. JS/TS function detection now handles typed arrow functions and destructured parameters.
+
 ## 1.7.0 — 2026-09-06
 - `aix code style [TARGET...]`: readability per function (lines, cognitive complexity per SonarSource, cyclomatic, nesting, parameters, naming, docstring, magic numbers) with limits in `framework.yaml` `style:`; targets are folders, files (extension optional) or one function (`file:func`, `file/func`, `file::Class.method`) which gets a card with line-numbered findings and advice; `--gate` on limits only; `--selftest`. `docs/meta-docs/conventions/readability.md` with the evidence; linter rule names per stack; wired into AGENTS.md, code-review, implement-feature and the definition of done.
 

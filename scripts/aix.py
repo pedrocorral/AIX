@@ -38,7 +38,9 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
                                       readability, per function: lines, cognitive and cyclomatic complexity,
                                       nesting, parameters, names, docstring, magic numbers; limits in
                                       framework.yaml. TARGET = folder | file[.ext] | file:func | file::Class.m;
-                                      a single function gets a card with line-numbered findings and advice
+                                      a single function gets a card with line-numbered findings and advice;
+                                      detects the runtime (pyproject, venv, tsconfig, Cargo, pom) and suggests
+                                      modernisations that version enables (match, X | None, ?., let-else, ...)
 
 The docs                              (aix docs ...)
   aix docs validate                   are the DOCS right? IDs, links, indexes, front-matter, status vs code markers,
@@ -510,6 +512,14 @@ line 12 (loop, nesting +2) ...", "nesting 5 at lines 44-52: invert the condition
 
 Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust and Java are measured from
 tokens and braces: close for lines, parameters and nesting, approximate for complexity.
+
+Modernise (advice tier, never gated): the report detects the runtime the project targets (pyproject
+requires-python, .python-version, the venv, tsconfig target, engines.node, Cargo.toml, pom/Gradle; the header
+names the source) and suggests only what that version enables: if/elif ladder -> match (3.10+), Optional[X] ->
+X | None (3.10+), typing.List -> list (3.9+), assign-only __init__ -> @dataclass (3.7+), os.path -> pathlib,
+toml -> tomllib (3.11+), a && a.b -> a?.b and x !== undefined ? x : d -> x ?? d (ES2020+), var -> const/let,
+unwrap-only match -> let-else (Rust 1.65+), switch with breaks -> switch expression (Java 14+).
+"Python on PATH (assumed)" means nothing in the project declares a version: declare it in pyproject.
   --gate      exit 1 if any function is over a limit or any file too long (advice never fails the gate)
   --all       full table instead of the top 30
   --report    also write docs/tests/code-style.md

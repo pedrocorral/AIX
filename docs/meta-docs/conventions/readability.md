@@ -33,6 +33,16 @@ The rules below have measurements behind them; the limits are in `framework.yaml
 - Magic numbers become named constants; the name is the comment.
 - A public function carries a one-line docstring or doc comment: what it does and when to call it.
 
+## Modernise for the runtime you actually target
+`aix code style` detects the runtime (pyproject `requires-python`, `.python-version`, the venv, `tsconfig` target,
+`engines.node`, `Cargo.toml` rust-version/edition, `pom.xml`/Gradle) and adds advice that only that version enables:
+an if/elif ladder on one value → `match` (Python 3.10+); `Optional[X]` → `X | None` (3.10+); `typing.List` → `list`
+(3.9+); an `__init__` that only assigns → `@dataclass` (3.7+); `os.path` → `pathlib`; `toml` → `tomllib` (3.11+);
+`a && a.b` → `a?.b` and `x !== undefined ? x : d` → `x ?? d` (ES2020+); `var` → `const`/`let` (ES2015+); a match
+that only unwraps → `let … else` (Rust 1.65+); a switch with `break`s → a switch expression (Java 14+).
+Same idea as pyupgrade / ruff `UP`, ESLint `ecmaVersion`, Clippy MSRV lints, OpenRewrite. Advice, never gated;
+when nothing declares a version the report says so and the tier is skipped.
+
 ## Tooling
 `aix code style [TARGET...]` — ranked table for a folder or file, a full card for one function
 (`file:func`, `file/func`, `file::Class.method`; extension optional), `--gate` for CI (fails on limits only; names,

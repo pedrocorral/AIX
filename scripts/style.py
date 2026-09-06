@@ -172,7 +172,7 @@ def analyse_py(file: Path, cls, fn, lang="python"):
     return dict(name=f"{cls + '.' if cls else ''}{fn.name}", file=rel(file), line=fn.lineno, lang=lang,
                 lines=(fn.end_lineno or fn.lineno) - fn.lineno + 1, params=len(params), cyclomatic=cyclomatic_py(fn),
                 cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc,
-                public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name)
+                public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name, node=fn, cls=cls)
 
 
 # ---- other languages: tokens and braces --------------------------------------------------------------------------
@@ -213,7 +213,7 @@ def analyse_tokens(file: Path, name: str, header_end: int, text: str, lang: str)
     short = sorted({(start_line + cleaned.count("\n", 0, m.start()), m.group(1)) for m in re.finditer(r"\b(?:let|const|var|mut)\s+([a-zA-Z])\b", cleaned) if m.group(1) not in LOOP_VARS})
     return dict(name=name, file=rel(file), line=start_line, lang=lang, lines=lines, params=len(params), cyclomatic=cyc,
                 cognitive=cog, cognitive_items=cog_items, nesting=max(depth - 1, 0), deepest=(deepest_line, deepest_line),
-                docstring=doc, public=not name.startswith("_"), short_names=short, magic=magic, fname=name)
+                docstring=doc, public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body)
 
 
 # ---- targets ----------------------------------------------------------------------------------------------------
@@ -273,6 +273,97 @@ def file_lines(file: Path) -> int:
     return file.read_text(encoding="utf-8", errors="replace").count("\n") + 1
 
 
+# ---- modernisation: only what the detected runtime allows ---------------------------------------------------------
+
+def _py_at_least(rt, major, minor):
+    v = rt.get("python", (None,))[0]
+    return v is not None and v >= (major, minor)
+
+
+def _typing_names(node):
+    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)} | {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+
+
+def modern_py(fx, rt):
+    fn, out = fx["node"], []
+    if _py_at_least(rt, 3, 10):
+        for node in ast.walk(fn):
+            if isinstance(node, ast.If) and _elif_ladder_on_one_name(node) >= 3:
+                out.append((node.lineno, "if/elif ladder comparing one value", "a `match` statement (Python 3.10+) reads as a table and cuts nesting"))
+                break
+        ann = [a for a in fn.args.args + fn.args.kwonlyargs if a.annotation] + ([fn] if fn.returns else [])
+        names = set()
+        for a in ann:
+            names |= _typing_names(a.annotation if a is not fn else fn.returns)
+        if "Optional" in names or "Union" in names:
+            out.append((fn.lineno, "`Optional[...]` / `Union[...]` in the signature", "write `X | None` and `A | B` (Python 3.10+)"))
+        if names & {"List", "Dict", "Set", "Tuple", "FrozenSet", "Type"}:
+            out.append((fn.lineno, "`typing.List/Dict/Set/Tuple` in the signature", "use the builtins `list[...]`, `dict[...]` (Python 3.9+)"))
+    if _py_at_least(rt, 3, 7) and fx["fname"] == "__init__" and fx["cls"] and fn.body and all(
+            isinstance(s, ast.Assign) and len(s.targets) == 1 and isinstance(s.targets[0], ast.Attribute)
+            and isinstance(s.value, ast.Name) for s in fn.body):
+        out.append((fn.lineno, "`__init__` that only assigns its parameters", f"`@dataclass` on `{fx['cls']}` removes it (Python 3.7+)"))
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Attribute) and isinstance(node.value.value, ast.Name) \
+                and node.value.value.id == "os" and node.value.attr == "path":
+            out.append((node.lineno, f"`os.path.{node.attr}`", "`pathlib.Path` reads as objects, not string plumbing"))
+            break
+    if _py_at_least(rt, 3, 11):
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Import) and any(a.name in ("toml", "tomli") for a in node.names):
+                out.append((node.lineno, "`import toml/tomli`", "`tomllib` is in the standard library (Python 3.11+)"))
+    return out
+
+
+def _elif_ladder_on_one_name(node) -> int:
+    """Length of an if/elif chain whose every test is `NAME == constant` on the same NAME (else 0)."""
+    name, count = None, 0
+    while isinstance(node, ast.If):
+        t = node.test
+        if not (isinstance(t, ast.Compare) and len(t.ops) == 1 and isinstance(t.ops[0], ast.Eq)
+                and isinstance(t.left, ast.Name) and isinstance(t.comparators[0], ast.Constant)):
+            return 0
+        if name is None:
+            name = t.left.id
+        elif t.left.id != name:
+            return 0
+        count += 1
+        node = node.orelse[0] if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If) else None
+    return count
+
+
+def modern_tokens(fx, rt):
+    src, lang, out = fx.get("src", ""), fx["lang"], []
+    base = fx["line"]
+    line_of = lambda m: base + src.count("\n", 0, m.start())
+    if lang == "js":
+        es = rt.get("js", (None,))[0]
+        if es and es[0] >= 2020:
+            m = re.search(r"\b([A-Za-z_$][\w$.]*)\s*&&\s*\1\.", src)
+            if m:
+                out.append((line_of(m), f"`{m.group(1)} && {m.group(1)}.…`", "optional chaining `?.` (ES2020)"))
+            m = re.search(r"\b([A-Za-z_$][\w$.]*)\s*!==?\s*(?:undefined|null)\s*\?\s*\1\s*:", src)
+            if m:
+                out.append((line_of(m), f"`{m.group(1)} !== undefined ? {m.group(1)} : …`", "nullish coalescing `??` (ES2020)"))
+        if es and es[0] >= 2015 and re.search(r"\bvar\s+\w", src):
+            out.append((line_of(re.search(r"\bvar\s+\w", src)), "`var`", "`const`/`let` have block scope (ES2015)"))
+    elif lang == "rust":
+        v = rt.get("rust", (None,))[0]
+        if v and v >= (1, 65):
+            m = re.search(r"match\s+[^{]+\{\s*(?:Some|Ok)\((\w+)\)\s*=>\s*\1\s*,\s*(?:None|Err\([^)]*\))\s*=>\s*(?:return|continue|break)", src)
+            if m:
+                out.append((line_of(m), "match that only unwraps or returns", "`let … else` (Rust 1.65+)"))
+    elif lang == "java":
+        v = rt.get("java", (None,))[0]
+        if v and v[0] >= 14 and re.search(r"\bswitch\s*\(", src) and "->" not in src and re.search(r"\bbreak\s*;", src):
+            out.append((line_of(re.search(r"\bswitch\s*\(", src)), "switch with `break`s", "switch expression with `->` (Java 14+)"))
+    return out
+
+
+def modernisations(fx, rt):
+    return modern_py(fx, rt) if fx["lang"] == "python" else modern_tokens(fx, rt)
+
+
 # ---- findings ---------------------------------------------------------------------------------------------------
 
 def findings(fx, th):
@@ -318,7 +409,7 @@ def score(fx, th):
 
 # ---- rendering --------------------------------------------------------------------------------------------------
 
-def card(fx, th):
+def card(fx, th, rt=None):
     lines = [f"{fx['file']}:{fx['name']}  (line {fx['line']}, {fx['lang']})", ""]
     for k, label in (("lines", "lines"), ("cognitive", "cognitive complexity"), ("cyclomatic", "cyclomatic complexity"), ("nesting", "nesting depth"), ("params", "parameters")):
         v, lim = fx[k], th["max_" + k]
@@ -330,10 +421,16 @@ def card(fx, th):
         lines.append("  no findings")
     for sev, line, msg, advice in fs:
         lines.append(f"  line {line:<5} {msg}\n             -> {advice}")
+    for line, what, advice in (modernisations(fx, rt) if rt else []):
+        lines.append(f"  line {line:<5} modernise: {what}\n             -> {advice}")
     return "\n".join(lines)
 
 
-def table(fxs, th, files, limit=30):
+def runtime_header(rt, langs):
+    return "  runtime: " + "; ".join(f"{rt[l][1]} ({rt[l][2]})" for l in ("python", "js", "rust", "java") if l in langs and l in rt)
+
+
+def table(fxs, th, files, limit=30, rt=None):
     over = [fx for fx in fxs if score(fx, th) > 0 or findings(fx, th)]
     over.sort(key=lambda fx: (-score(fx, th), -len(findings(fx, th))))
     counts = {k: sum(1 for fx in fxs if fx[k] > th["max_" + k]) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params")}
@@ -353,6 +450,13 @@ def table(fxs, th, files, limit=30):
         lines.append(f"  ... {len(over) - limit} more; narrow the target or use --all")
     for f, n in long_files[:10]:
         lines.append(f"  FILE  {f}: {n} lines (limit {th['max_file_lines']})  -> split by responsibility")
+    mods = [(fx, m) for fx in fxs for m in (modernisations(fx, rt) if rt else [])]
+    if mods:
+        lines.append(f"  modernise ({len(mods)}, advice for the detected runtime):")
+        for fx, (line, what, advice) in mods[:15]:
+            lines.append(f"    {fx['file']}:{fx['name']} line {line}: {what} -> {advice}")
+        if len(mods) > 15:
+            lines.append(f"    ... {len(mods) - 15} more")
     lines.append("  * = over its limit (gated). Names, docstrings and magic numbers are advice.  Details: aix code style FILE:FUNCTION")
     return "\n".join(lines), n_over + len(long_files)
 
@@ -374,6 +478,14 @@ def sonar_example(x):
         pass
     return x and x > 1       # +1 boolean sequence
 
+def ladder(cmd):
+    if cmd == "start":
+        return 1
+    elif cmd == "stop":
+        return 2
+    elif cmd == "status":
+        return 3
+
 def deep(a):
     if a:
         if a:
@@ -390,7 +502,9 @@ def selftest():
     checks = [("simple cognitive", fxs["simple"]["cognitive"], 0), ("simple cyclomatic", fxs["simple"]["cyclomatic"], 1),
               ("sonar example cognitive", fxs["sonar_example"]["cognitive"], 9), ("sonar example cyclomatic", fxs["sonar_example"]["cyclomatic"], 6),
               ("deep nesting", fxs["deep"]["nesting"], 5), ("deep magic number", len(fxs["deep"]["magic"]), 1),
-              ("simple params", fxs["simple"]["params"], 2)]
+              ("simple params", fxs["simple"]["params"], 2),
+              ("ladder -> match under 3.10", len(modern_py(fxs["ladder"], {"python": ((3, 10), "", "")})), 1),
+              ("ladder silent under 3.8", len(modern_py(fxs["ladder"], {"python": ((3, 8), "", "")})), 0)]
     failed = 0
     for name, got, want in checks:
         ok = got == want; failed += not ok
@@ -410,6 +524,8 @@ def main(args):
     gate, report, show_all = "--gate" in args, "--report" in args, "--all" in args
     specs = [a for a in args if not a.startswith("--")] or CODE_ROOTS
     th = thresholds()
+    import runtime
+    rt = runtime.detect(ROOT)
     fxs, files, cards = [], [], []
     for spec in specs:
         t = parse_target(spec)
@@ -427,11 +543,14 @@ def main(args):
             if not hits:
                 sys.exit(f"aix code style: no function '{t[2]}' in {rel(t[1])}")
             cards += hits
+    langs = {fx["lang"] for fx in fxs + cards}
     if cards and not fxs:
-        print("\n\n".join(card(fx, th) for fx in cards))
+        print("\n\n".join(card(fx, th, rt) for fx in cards))
+        print("\n" + runtime_header(rt, langs))
         n = sum(1 for fx in cards if score(fx, th) > 0)
     else:
-        text, n = table(fxs + cards, th, files, limit=10**6 if show_all else 30)
+        text, n = table(fxs + cards, th, files, limit=10**6 if show_all else 30, rt=rt)
+        text = runtime_header(rt, langs) + "\n" + text
         print(f"Code style — {', '.join(specs)}\n\n" + text)
         if report:
             out = ROOT / "docs" / "tests" / "code-style.md"

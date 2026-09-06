@@ -7,7 +7,7 @@ agent_runtime: claude-code
 
 ## Where we are (3 lines max)
 - Kit work: TASK-0002 (Antigravity + Gemini CLI support via `GEMINI.md` pointer) completed 2026-09-05; changes uncommitted in the working tree.
-- Kit 1.7.0 (2026-09-06): `aix code style` + readability.md. 1.6.0: command groups `aix code ...` / `aix docs ...`, old names aliased. 1.5.4: `aix code clones`. 1.5.3: `aix code dead`. 1.5.2: README modularity section, graph options in help. 1.5.1: `aix code graph` measurement fixed (stability, contracted cycles, upward deps, NCCD, Q, selftest). 1.5.0 on 2026-09-06: `aix code graph`/`complexity` (modularity metric), per-command help, kit scripts made acyclic. 1.4.0 earlier the same day: CLI, upgrade, security gate, modularity, Gemini/Antigravity.
+- Kit 1.7.1 (2026-09-06): runtime detection + modernise tier in `aix code style`. 1.7.0: `aix code style` + readability.md. 1.6.0: command groups `aix code ...` / `aix docs ...`, old names aliased. 1.5.4: `aix code clones`. 1.5.3: `aix code dead`. 1.5.2: README modularity section, graph options in help. 1.5.1: `aix code graph` measurement fixed (stability, contracted cycles, upward deps, NCCD, Q, selftest). 1.5.0 on 2026-09-06: `aix code graph`/`complexity` (modularity metric), per-command help, kit scripts made acyclic. 1.4.0 earlier the same day: CLI, upgrade, security gate, modularity, Gemini/Antigravity.
 ## Files to load for the active task (nothing else)
 -
 ## Last verified facts (tests green? migrations applied? env?)

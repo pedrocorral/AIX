@@ -582,7 +582,8 @@ public private protected static final abstract interface package void int long d
 """.split())
 TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_]\w*|[^\sA-Za-z_0-9]')
 FUNC_HEAD = {
-    "js": re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>\s*\{|(?:public|private|protected|static|async|\s)*(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\{)", re.M),
+    # function f( | const f[: Type] = [async] (params[: Ret]) => { | method(params)[: Ret] {   (params may nest one level of parens)
+    "js": re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*(?::\s*[^=]+?)?=\s*(?:async\s*)?(?:\((?:[^()]|\([^()]*\))*\)|\w+)\s*(?::\s*[^=]+?)?=>\s*\{|(?:public|private|protected|static|async|\s)*(\w+)\s*\((?:[^()]|\([^()]*\))*\)\s*(?::\s*[^{]+)?\{)", re.M | re.S),
     "rust": re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+(\w+)", re.M),
     "java": re.compile(r"^\s*(?:public|private|protected|static|final|abstract|synchronized|\s)*[\w<>\[\], ]+\s+(\w+)\s*\([^)]*\)\s*(?:throws[^{]+)?\{", re.M),
 }
