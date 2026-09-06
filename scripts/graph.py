@@ -54,6 +54,8 @@ def import_roots(f: Path):
     directory holding a Python project marker, and their `src/`. Deliberately NOT "nearest non-package ancestor":
     namespace packages (no __init__.py) would turn `.../adapters/git/` into a top-level `git` and shadow GitPython."""
     roots = {ROOT} | {ROOT / r for r in CODE_ROOTS if (ROOT / r).is_dir()}
+    if not (f.resolve().parent / "__init__.py").exists():
+        roots.add(f.resolve().parent)  # a script directory: Python puts it on sys.path, siblings import by bare name
     for d in [f.resolve().parent, *f.resolve().parents]:
         if any((d / m).exists() for m in PY_PROJECT_MARKERS):
             roots.add(d)
