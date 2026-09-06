@@ -189,7 +189,9 @@ def main(args):
     if dry:
         print("  then: relink skills in the project (aix install) and suggest aix doctor + aix validate")
         return
-    if not yes and not confirm("  Proceed? Kit-owned files are overwritten; your git history is the backup. [y/N] "):
+    print("\n  WARNING: `aix upgrade` is an experimental feature. Kit-owned files listed above are overwritten;\n"
+          "  your git history is the backup. Review the plan before answering.")
+    if not yes and not confirm("  Are you sure you want to use this? [y/N] "):
         sys.exit("aborted")
     apply(project, rows)
     print(f"  applied {len(rows)} changes; relinking skills in the project")
