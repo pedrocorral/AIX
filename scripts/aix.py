@@ -567,7 +567,7 @@ def topic_help(name: str):
 
 
 def usage(code=0):
-    print(f"aix {version()}\n")
+    print(f"AIX {version()}\n")
     print(__doc__.replace("{n}", str(skill_count())))
     sys.exit(code)
 
@@ -697,7 +697,7 @@ def main(argv):
         import skills
         skills.main(args)
     elif cmd in ("version", "-V", "--version"):
-        print(f"aix {version()}")
+        print(f"AIX {version()}")
     else:
         print(f"aix: unknown command '{cmd}'\n")
         usage(1)
