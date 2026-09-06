@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""aix graph — measure the codebase dependency graph: complexity vs ideal complexity.
+"""aix code graph|dead|clones — measure the codebase dependency graph: complexity vs ideal complexity.
 
 Nodes are modules (files) for Python, JavaScript/TypeScript, Rust and Java, or functions/methods for Python
 (`--functions`). Edges are imports / calls between project files (external packages ignored).
@@ -784,7 +784,7 @@ def selftest():
     sys.exit(1 if failed else 0)
 
 
-USAGE = "usage: aix graph [PATH...] [--functions] [--dead] [--clones [--similarity PCT]] [--gate] [--max-reducible PCT] [--report] [--selftest]"
+USAGE = "usage: aix code graph|dead|clones [PATH...] [--functions] [--similarity PCT] [--gate] [--max-reducible PCT] [--report] [--selftest]"
 
 
 def main(args):

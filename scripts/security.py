@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""aix security — where does the vulnerability register stand?
+"""aix docs security — where does the vulnerability register stand?
 
 Reads docs/security/vulnerability-register.md and docs/security/audits/. Reports which VUL rows are validated
 (closed with evidence or an owned decision) and which are not, plus rows whose status has no audit evidence.
@@ -103,7 +103,7 @@ def main(args):
     args = [a for a in args if a != "--gate"]
     which = args[0] if args else None
     if which not in (None, "open", "validated"):
-        sys.exit("usage: aix security [open|validated] [--gate]")
+        sys.exit("usage: aix docs security [open|validated] [--gate]")
     cmd_report(which, gate)
 
 

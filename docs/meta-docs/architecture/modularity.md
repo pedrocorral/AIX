@@ -50,14 +50,14 @@ configuration, I/O or a domain. Every change to a hub propagates to all its depe
 - **Fan-in only on leaves**: list the top-N most-imported modules; each must have no upward dependency.
 - **Propagation**: for a change in node X, the set of nodes that can be affected is X's dependents. Keep that set
   a sub-tree, not the whole graph.
-`aix graph` (alias `aix complexity`) measures all of this deterministically. It collapses re-export facades,
+`aix code graph` (alias `aix code complexity`) measures all of this deterministically. It collapses re-export facades,
 treats edges into **stable** nodes (Martin's instability ≤ 0.25) as free reuse, and compares the real graph's
 **complexity** with its **ideal complexity**: the transitive reduction with cycles contracted (Aho, Garey & Ullman
 1972), the lowest complexity that delivers the same dependencies. The ideal is a baseline, achievable or not; the
 distance from it, **reducible %**, is the number, and every counted edge is listed with its bypass. Separately it
 reports cycles, upward dependencies (into a composition root or against the layer order), hubs, propagation cost,
 Lakos' NCCD and Newman's modularity Q of the folder partition. Run it before reasoning about the code;
-`review-code-review` runs it on every diff and `aix graph --gate` fails CI on any cycle or upward dependency.
+`review-code-review` runs it on every diff and `aix code graph --gate` fails CI on any cycle or upward dependency.
 
 ## Evidence (this is established engineering, not taste)
 - Parnas, *On the Criteria To Be Used in Decomposing Systems into Modules*, 1972 — one design decision per module.

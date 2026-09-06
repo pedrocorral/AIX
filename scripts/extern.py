@@ -56,7 +56,7 @@ def extract_subdir(tar, top: str, sub: str, dest: Path):
 
 
 def fix_name(skill_md: Path, name: str):
-    """Runtimes and `aix validate` require front-matter name == folder name."""
+    """Runtimes and `aix docs validate` require front-matter name == folder name."""
     t = skill_md.read_text(encoding="utf-8")
     t2 = re.sub(r"^name:.*$", f"name: {name}", t, count=1, flags=re.M)
     if t2 != t:

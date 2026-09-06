@@ -12,7 +12,7 @@ Inputs: user intent; `docs/requirements/product/glossary.md` (domain codes); `do
 3. Draft from `templates/requirement.md`: one SHALL statement, ACs in Given/When/Then, constraints, out-of-scope; `status: draft`.
 4. Field names: every field in an `API-*`/`DM-*` must exist in `docs/requirements/data-model/field-dictionary.md`; add rows first, never invent synonyms.
 5. If the requirement implies a boundary or data: draft `API-*` (`templates/api-contract.md`) and/or `DM-*` (`templates/data-model.md`) stubs and link them in `related:`.
-6. Add rows to the folder INDEX files. Run `aix validate`.
+6. Add rows to the folder INDEX files. Run `aix docs validate`.
 7. Show the user the statement + ACs only (not the whole file) and ask for approval → set `status: approved`.
 
 ## Vibe mode

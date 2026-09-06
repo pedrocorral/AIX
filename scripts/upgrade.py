@@ -187,7 +187,7 @@ def main(args):
                 print("  " + describe(project, d, action, rel))
     print("  untouched: docs/requirements tests security conflicts operations road-map, skills/extern, runtime folders, your code")
     if dry:
-        print("  then: relink skills in the project (aix install) and suggest aix doctor + aix validate")
+        print("  then: relink skills in the project (aix install) and suggest aix doctor + aix docs validate")
         return
     print("\n  WARNING: `aix upgrade` is an experimental feature. Kit-owned files listed above are overwritten;\n"
           "  your git history is the backup. Review the plan before answering.")
@@ -196,7 +196,7 @@ def main(args):
     apply(project, rows)
     print(f"  applied {len(rows)} changes; relinking skills in the project")
     subprocess.call([sys.executable, str(project / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
-    print("  done. Run `aix doctor` and `aix validate` in the project.")
+    print("  done. Run `aix doctor` and `aix docs validate` in the project.")
 
 
 if __name__ == "__main__":

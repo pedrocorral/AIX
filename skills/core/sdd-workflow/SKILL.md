@@ -23,7 +23,7 @@ Pure questions with no code/doc change (answer directly, citing docs).
 8. **Tests** — run the `testing-write-*` skills for each TS; mark `status: automated`; run the suite.
 9. **Audit** — run `security-audit` for the categories touched in step 5.
 10. **Review** — run `review-code-review` and `review-doc-drift-check` on the diff.
-11. **Close** — `aix validate`, `aix coverage`, DoD checklist (`docs/meta-docs/workflow/definition-of-done.md`), `core-roadmap-task` done, `core-session-handoff`.
+11. **Close** — `aix docs validate`, `aix docs coverage`, DoD checklist (`docs/meta-docs/workflow/definition-of-done.md`), `core-roadmap-task` done, `core-session-handoff`.
 
 ## Outputs
 Updated requirements (if any, via ADR), TS files, task file, code with markers, tests, audit report, STATE.md.

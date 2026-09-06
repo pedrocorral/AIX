@@ -27,7 +27,7 @@ and code is its optimised implementation.
 ```bash
 git clone <this-repo> my-app && cd my-app
 ./aix install        # links skills into .opencode/ .github/ .claude/ .agents/ .cursor/ ; writes pointer files (Copilot, Cursor, Gemini) + road-map state
-aix validate         # sanity-check IDs, links, indexes
+aix docs validate         # sanity-check IDs, links, indexes
 ```
 
 `aix` acts on the nearest project at or above your current folder (the one holding `framework.yaml`), running that project's own copy of the CLI. Outside any project only `help`, `about`, `version`, `install --into` and `skills registry` work. `aix` is the only tool you need. Linux/macOS run the `aix` bash launcher, Windows runs `aix.cmd`; both call
@@ -37,11 +37,11 @@ aix validate         # sanity-check IDs, links, indexes
 |---|---|
 | `aix install [--into DIR] [--copy]` | Install skills into every agent runtime; `--into` first copies the kit into an existing project, asking per existing item: replace (old kept as `.bak`), skip, merge (add missing files only), all-variants, abort. `--replace-all` / `--skip-all` / `--merge-all` answer for you |
 | `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run: overwrites kit-owned paths (scripts, templates, meta-docs, built-in skills, launchers), merges AGENTS.md and framework.yaml, never touches your docs, code or extern skills |
-| `aix validate` | Check IDs, links, indexes, front-matter (exit 1 on errors) |
+| `aix docs validate` | Check IDs, links, indexes, front-matter (exit 1 on errors) |
 | `aix doctor` | Installation health (links, pointer files, always-on wiring, STATE.md, Python, PATH) with a fix per problem. `validate` = the docs; `doctor` = the tooling |
-| `aix security [open\|validated] [--gate]` | Vulnerability register: validated vs not-validated rows, audit skills still to run, statuses without evidence; `--gate` is the release check |
-| `aix graph` / `aix complexity` `[PATH...] [--functions] [--dead] [--clones] [--gate] [--max-reducible PCT] [--report] [--selftest]` | The modularity metric: real dependency graph vs its ideal (transitive reduction) = reducible %, each edge listed with its bypass; cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q; `--dead` lists dead modules and (Python) never-referenced functions; `--clones` lists duplicated functions (exact groups and near-clones); `--gate` for CI |
-| `aix coverage` | Regenerate `docs/tests/coverage-matrix.md` |
+| `aix docs security [open\|validated] [--gate]` | Vulnerability register: validated vs not-validated rows, audit skills still to run, statuses without evidence; `--gate` is the release check |
+| `aix code graph` / `aix code complexity` `[PATH...] [--functions] [--dead] [--clones] [--gate] [--max-reducible PCT] [--report] [--selftest]` | The modularity metric: real dependency graph vs its ideal (transitive reduction) = reducible %, each edge listed with its bypass; cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q; `--dead` lists dead modules and (Python) never-referenced functions; `--clones` lists duplicated functions (exact groups and near-clones); `--gate` for CI |
+| `aix docs coverage` | Regenerate `docs/tests/coverage-matrix.md` |
 | `aix task new\|start\|block\|done\|list` | Road-map helper, keeps `STATE.md` in sync |
 | `aix skills [general\|specific] [category]` | Catalogue: group (general = behaviour for every session, specific = one job), level (always / orchestrator / on-demand), state, runtimes. `*` marks always-on; a general skill not always-on shows as inactive. `show`, `enable`, `disable`, `always`, `on-demand NAME` manage them |
 | `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor/Gemini pointers) unless `--on-demand` |
@@ -85,7 +85,7 @@ Evidence that this predicts real cost: propagation cost (MacCormack, Rusnak & Ba
 study of a cyclic core (several times the defect density, lower productivity), Cai & Kazman's design-rule-space
 work, and the fact that Cargo and Go refuse to compile dependency cycles.
 
-**`aix graph` (alias `aix complexity`) measures it** instead of trusting anyone's opinion:
+**`aix code graph` (alias `aix code complexity`) measures it** instead of trusting anyone's opinion:
 
 | Step | What |
 |---|---|
@@ -97,9 +97,9 @@ work, and the fact that Cargo and Go refuse to compile dependency cycles.
 | shape | propagation cost, Lakos' NCCD (1.0 = balanced binary tree), Newman modularity Q of the folder tree |
 
 ```bash
-aix graph --selftest          # known-answer cases: chain, diamond, shortcut, cycle, reuse, layer skip, upward
-aix graph                     # the report
-aix graph --gate              # CI: fails on any cycle or upward dependency (add --max-reducible PCT for a ceiling)
+aix code graph --selftest          # known-answer cases: chain, diamond, shortcut, cycle, reuse, layer skip, upward
+aix code graph                     # the report
+aix code graph --gate              # CI: fails on any cycle or upward dependency (add --max-reducible PCT for a ceiling)
 ```
 
 Read it in this order: cycles and upward dependencies are facts, fix them first; each SHORTCUT line is one edge

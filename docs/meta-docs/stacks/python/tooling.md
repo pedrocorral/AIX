@@ -8,5 +8,5 @@ title: Python tooling
 - Tests: `pytest` + `pytest-asyncio` + `hypothesis` for value objects; `testcontainers` for integration; `pytest-cov` with thresholds per layer.
 - Security: `pip-audit`, `bandit`, `detect-secrets` in pre-commit and CI.
 - Migrations: Alembic (SQLAlchemy) or Django migrations.
-- Pre-commit: ruff, mypy (changed files), detect-secrets, `aix validate`.
+- Pre-commit: ruff, mypy (changed files), detect-secrets, `aix docs validate`.
 - Run everything through `Makefile` targets or `uv run` so agents don't guess commands; document them in `infra/README.md`.

@@ -21,7 +21,7 @@ hand-off note; the active `TASK-*.md` is the detailed log.
 1. Append to the task's progress log: what was done, what is half-done (file:function), what failed.
 2. Rewrite `STATE.md` fully (it is a snapshot, not a log): where we are, files to load, verified facts,
    immediate next action, blockers.
-3. Ensure every changed doc is listed in its INDEX and `aix validate` passes.
+3. Ensure every changed doc is listed in its INDEX and `aix docs validate` passes.
 4. Commit with IDs in the message.
 
 ## Multi-agent / parallel work

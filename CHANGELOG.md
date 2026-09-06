@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.0 — 2026-09-06
+- Commands grouped by what they act on: `aix code graph|complexity|dead|clones`, `aix docs validate|coverage|security`, plus the kit commands (`install`, `upgrade`, `doctor`, `about`, `version`, `help`), `aix task`, `aix skills`. `aix help code`, `aix help docs` and `aix help code dead` etc. Old forms (`aix graph`, `aix complexity`, `aix validate`, `aix coverage`, `aix security`) remain as aliases for the 1.x line.
+
 ## 1.5.4 — 2026-09-06
 - `aix graph --clones [--similarity PCT]`: duplicated functions. Exact groups by normalised structure hash (clone types 1-2; Python via the parser, JS/TS/Rust/Java via normalised tokens), near-clones by winnowed fingerprints (type 3, MOSS algorithm), sorted by size × similarity; `--clones --gate` fails on exact groups. Verified on the kit (0) and the monolith (1 exact pair, 8 near-clones, hand-checked).
 

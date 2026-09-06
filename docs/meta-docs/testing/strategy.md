@@ -21,7 +21,7 @@ and reference (not repeat) the lower TS in "Not covered here". `testing-plan-tes
 ## Mapping
 - `docs/tests/<level>/<domain>/TS-<DOMAIN>-NNN-*.md` ⇄ `backend/tests/<level>/<domain>/test_*.py` with `@tests TS-…`.
 - One TS may map to one test function or a parametrised set; never one test for many TS.
-- `aix coverage` reports gaps: `no test spec`, `spec not automated`, `no code`.
+- `aix docs coverage` reports gaps: `no test spec`, `spec not automated`, `no code`.
 
 ## CI gates (define in `infra/ci/`)
 1. lint + type check + import-layer check; 2. unit; 3. integration (containers); 4. functional; 5. security scans

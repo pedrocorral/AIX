@@ -7,52 +7,55 @@ frontend/backend split, persistence abstraction, ORM, testing, security); docume
 the road-map that lets work resume across sessions. `aix` then keeps the documentation consistent
 and moves tasks between states. Run `aix about` for the full story.
 
-Usage: aix <command> [args]   (no command = this help)
+Usage: aix <group> <command> [args]   (no command = this help; aix help <command> for details)
 aix acts on the nearest project at or above the current folder (the one holding framework.yaml).
 
-  aix about                           what AIX is, how it works, and what every command does
+The kit
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
-  aix upgrade [PROJECT] [--dry-run] [--yes]
-                                      bring a project's kit files up to this checkout: overwrites kit-owned paths
-                                      (scripts, templates, docs/meta-docs, built-in skills, launchers), merges
-                                      AGENTS.md and framework.yaml, never touches your docs, code or extern skills
       --into asks per existing item: [r]eplace [s]kip [m]erge [R/S/M] all [a]bort  (replace keeps <item>.bak)
       --replace-all | --skip-all | --merge-all   answer for every collision without asking (CI, no terminal)
-  aix validate                        are the DOCS right? IDs, links, indexes, front-matter. CI gate, exit 1 on errors
+  aix upgrade [PROJECT] [--dry-run] [--yes]
+                                      bring a project's kit files up to this checkout: overwrites kit-owned paths,
+                                      merges AGENTS.md and framework.yaml, never touches your docs, code or extern skills
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
-  aix coverage                        regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
-  aix graph [PATH...]                 the modularity metric (alias: aix complexity): real dependency graph vs its
-                                      ideal (transitive reduction) = reducible %, each edge listed with its bypass;
-                                      cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.
-                                      Python, JS/TS, Rust, Java modules; PATH... limits the folders measured
+  aix about | version | help [CMD]    the full story | kit version | detailed help (e.g. aix help code dead)
+
+The code                              (aix code ...; all four: Python, JS/TS, Rust, Java; --report writes docs/tests/)
+  aix code graph [PATH...]            the modularity metric (alias: aix code complexity): real dependency graph
+                                      vs its ideal (transitive reduction) = reducible %, each edge listed with its
+                                      bypass; cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q
       --functions                     Python call graph (functions and methods) instead of modules
-      --gate                          CI: exit 1 on any cycle, any upward dependency, or reducible above the limit
-      --max-reducible PCT             the limit for --gate (default: none, cycles and upward only)
-      --dead                          dead code instead: modules no entry point reaches; with --functions, Python
+      --gate [--max-reducible PCT]    CI: exit 1 on any cycle, any upward dependency, or reducible above the limit
+      --selftest                      run the built-in known-answer cases; proves the arithmetic
+  aix code dead [PATH...] [--functions] [--gate]
+                                      dead code: modules no entry point reaches; with --functions, Python
                                       functions/methods never referenced (name-based, conservative)
-      --clones [--similarity PCT]     duplicated functions instead: exact groups (same structure, other names/
-                                      literals) and near-clones above the threshold (default 70 %)
-      --report                        also write docs/tests/dependency-graph.md
-      --selftest                      run the built-in known-answer cases (chain, diamond, shortcut, cycle, reuse,
-                                      layer skip, upward); proves the arithmetic before you trust a report
-                                      full explanation: aix help graph
-  aix security [open|validated]       vulnerability register: which VUL rows are validated (evidence) and which
-                                      are not, which audit skills still to run; --gate exits 1 if any row is open
-  aix task new "Title" [--bucket next|backlog|ideas]
-  aix task start|block|done TASK-0007 ["reason"]
-  aix task list
+  aix code clones [PATH...] [--similarity PCT] [--gate]
+                                      duplicated functions: exact groups (same structure, other names/literals)
+                                      and near-clones above the threshold (default 70 %)
+
+The docs                              (aix docs ...)
+  aix docs validate                   are the DOCS right? IDs, links, indexes, front-matter, status vs code markers,
+                                      VUL evidence. CI gate, exit 1 on errors
+  aix docs coverage                   regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
+  aix docs security [open|validated] [--gate]
+                                      vulnerability register: validated rows (evidence) vs not, audit skills
+                                      still to run; --gate exits 1 if any row is open
+
+The road-map                          (aix task ...)
+  aix task new "Title" [--bucket next|backlog|ideas] | start|block|done TASK-0007 ["reason"] | list
+
+The skills                            (aix skills ...)
   aix skills [general|specific] [cat] catalogue: name, state (always / on-demand / disabled), description
-  aix skills info NAME                details: group, level, runtimes it is installed in, source
-  aix skills show NAME                print a skill's SKILL.md
+  aix skills info NAME | show NAME    details (group, level, runtimes, source) | the SKILL.md
   aix skills enable|disable NAME...   link/unlink a skill everywhere; remembered in framework.yaml
   aix skills registry                 known third-party skills (caveman, ponytail, ...) with evidence
   aix skills add NAME [--on-demand]   download a registry skill into skills/extern/, link it everywhere;
-                                      general skills become always-on (AGENTS.md + Copilot/Cursor pointers)
-                                      unless --on-demand; specific ones stay on-demand unless --always
+                                      general skills become always-on unless --on-demand
   aix skills remove|update NAME       drop it / re-download it;  aix skills always|on-demand NAME
-  aix version
-  aix help [COMMAND]                  detailed help for one command (e.g. aix help graph), or aix COMMAND --help
+
+Old forms still work: aix graph|complexity|validate|coverage|security = aix code graph | aix docs ...
 
 Launchers: `aix` (bash, Linux/macOS) and `aix.cmd` (Windows) simply call this file with python3."""
 import os, subprocess, sys
@@ -121,7 +124,7 @@ A session looks like this:
                7. write tests per TS, mark them automated, run the suite
                8. security audit for the categories touched
                9. code review and doc-drift check on the diff
-              10. close: aix validate, aix coverage, definition-of-done, task done, session handoff
+              10. close: aix docs validate, aix docs coverage, definition-of-done, task done, session handoff
   end     -> skill core-session-handoff (also at ~60 % context): update STATE.md, task progress, INDEXes.
 
 4. THE DOCUMENT HIERARCHY  (docs/)
@@ -154,9 +157,9 @@ YAML front-matter with their ID, status and relations.
   DM-nnn           data model entity            CONFLICT-nnnn    spec-vs-code conflict
   ADR-nnnn         decision
 
-Code carries markers in comments: @implements FR-..., @tests TS-..., @mitigates VUL-.... `aix coverage` scans them
+Code carries markers in comments: @implements FR-..., @tests TS-..., @mitigates VUL-.... `aix docs coverage` scans them
 (no LLM involved) and produces the matrix requirement -> test spec -> code -> gaps ("no test spec", "spec not
-automated", "no code"). `aix validate` checks that every referenced ID exists, links resolve, each folder has an
+automated", "no code"). `aix docs validate` checks that every referenced ID exists, links resolve, each folder has an
 INDEX that lists its files, front-matter is present, skill names match their paths, register statuses are valid and
 API/DM field names appear in the field dictionary.
 
@@ -187,102 +190,66 @@ having the model read code) and references/.
 7. THE CLI
 ----------
 `aix` is a bash launcher (Linux, macOS) and `aix.cmd` a batch launcher (Windows). Both run scripts/aix.py with
-Python 3.9+ and no third-party dependencies.
+Python 3.9+ and no third-party dependencies. It acts on the nearest project at or above the current folder (the
+one holding framework.yaml). Commands are grouped by what they act on; `aix help <command>` explains each.
 
+  The kit
   aix                       version and command list (same as `aix help`)
-  aix about                 this text
-  aix version               kit version from framework.yaml
-
-  aix install               link all skills into the five runtime folders of the current kit checkout; write
-                            pointer files for Copilot, Cursor and Gemini CLI if missing; create road-map STATE.md if missing;
-                            on Linux/macOS symlink `aix` into ~/.local/bin when that folder exists. Idempotent.
-      --copy                copy skills instead of symlinking (filesystems without symlinks, some Windows setups)
-      --into DIR            first copy the kit payload (AGENTS.md, CLAUDE.md, GEMINI.md, framework.yaml, docs/, skills/,
-                            templates/, scripts/, aix, aix.cmd) into an existing project, then install there.
-                            For every item that already exists it asks:
-                              [r]eplace   move yours to <item>.bak, copy the kit's version
-                              [s]kip      leave yours untouched
-                              [m]erge     folders only: add the kit's missing files, never overwrite
-                              [R] [S] [M] the same answer for every remaining collision
-                              [a]bort     stop; items already added stay
-      --replace-all | --skip-all | --merge-all
-                            answer every collision without asking (CI, no terminal). Without a terminal and
-                            without one of these flags the installer refuses to guess and exits.
-
+  aix about | version       this text | kit version from framework.yaml
+  aix install               link all skills into the five runtime folders; write pointer files for Copilot, Cursor
+                            and Gemini CLI if missing; create road-map STATE.md if missing; on Linux/macOS symlink
+                            `aix` into ~/.local/bin when that folder exists. Idempotent.
+      --copy                copy skills instead of symlinking
+      --into DIR            first copy the kit payload into an existing project, asking per existing item
+                            ([r]eplace keeps <item>.bak, [s]kip, [m]erge adds missing files only, R/S/M for all,
+                            [a]bort); --replace-all | --skip-all | --merge-all answer without a terminal
   aix upgrade [PROJECT] [--dry-run] [--yes]
-                            update a project created with `--into` to the kit version of the checkout whose
-                            `aix` you run (so run the kit's aix, from PATH, inside the project). Kit-owned paths
-                            are overwritten and files gone from the kit removed: scripts/, aix, aix.cmd,
-                            templates/, docs/meta-docs/, skills/<built-in categories>/, CLAUDE.md.
-                            AGENTS.md and GEMINI.md are replaced by the kit's text with the project's "## Always-on skills" and
-                            "## Project notes" sections kept; framework.yaml keeps disabled_skills. Never touched:
-                            docs/requirements, tests, security, conflicts, operations, road-map, skills/extern,
-                            code. Shows the plan and asks; git is the backup.
-
-  aix validate              documentation integrity check described in section 5; exit 1 on errors
+                            update a project created with `--into` to the kit version of the checkout whose `aix`
+                            you run. Kit-owned paths overwritten, AGENTS.md / GEMINI.md / framework.yaml merged
+                            (always-on skills, project notes, disabled skills kept), project docs and code never
+                            touched. Shows the full plan, warns (experimental), asks; git is the backup.
   aix doctor                installation health: every skill linked in every runtime, no dangling links, pointer
-                            files present, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini,
-                            extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
-                            validate = is what we wrote right; doctor = is the tooling around it right.
-  aix coverage              regenerate docs/tests/coverage-matrix.md
-  aix graph [PATH...] [--functions] [--dead] [--clones] [--gate] [--max-reducible PCT] [--report] [--selftest]
-                            the modularity metric (alias: aix complexity). --dead lists dead code instead:
-                            modules no entry point reaches, and (Python, --functions) never-referenced functions.
-                            --clones lists duplicated functions: exact groups (same structure) and near-clones. Distance between the real dependency
-                            graph and its ideal, the lowest complexity that delivers the same dependencies (the
-                            transitive reduction with cycles contracted; Aho, Garey & Ullman 1972). Facades are
-                            collapsed, edges into stable nodes (Martin instability <= 0.25) are free reuse, wiring
-                            from composition roots and tests is exempt. reducible % = shortcuts + cycle edges,
-                            each listed with its bypass. Separately: cycles, upward dependencies (into a
-                            composition root or against the layer order), hubs, propagation cost, Lakos NCCD,
-                            folder modularity Q. --gate for CI; --selftest runs known-answer cases.
-  aix validate              documentation integrity check described in section 5; exit 1 on errors
-  aix doctor                installation health: every skill linked in every runtime, no dangling links, pointer
-                            files present, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini,
-                            extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
-                            validate = is what we wrote right; doctor = is the tooling around it right.
-  aix coverage              regenerate docs/tests/coverage-matrix.md
-  aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report]
-                            the modularity metric (alias: aix complexity). Builds the dependency graph (modules:
-                            Python, JS/TS, Rust, Java via imports; --functions: Python call graph), collapses
-                            re-export facades, sets leaves aside (reusing a leaf is free), then compares the
-                            inner graph's complexity (its edges) with its ideal complexity: the transitive
-                            reduction (Aho, Garey & Ullman 1972), the smallest graph with the same reachability.
-                            reducible % = what could be removed today without losing a dependency: shortcuts
-                            (layer skips) and cycle edges. 0 % = ideal. Also cycles, hubs, propagation cost and
-                            the diamond shape (circuit rank) for the trend. `aix help graph` explains it fully.
-  aix validate              documentation integrity check described in section 5; exit 1 on errors
-  aix doctor                installation health: every skill linked in every runtime, no dangling links, pointer
-                            files present, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini,
-                            extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
-                            validate = is what we wrote right; doctor = is the tooling around it right.
-  aix coverage              regenerate docs/tests/coverage-matrix.md
-  aix security [open|validated] [--gate]
-                            state of the vulnerability register: rows not validated (expected, unverified,
-                            confirmed, mitigated; worst first) with the audit skill to run, rows validated
-                            (addressed, accepted, not-applicable), and rows whose status has no evidence (an
-                            audit report in docs/security/audits/, plus an ADR for `accepted`). The audits are
-                            done by the security-audit-* skills; this only reports. --gate is the release check.
+                            files present, always-on sections consistent, extern skills updatable, STATE.md
+                            consistent, Python and PATH. Prints a fix per problem.
 
-  aix task new "Title" [--bucket next|backlog|ideas]
-                            create pending/<bucket>/TASK-nnnn-title.md from the template
-  aix task start TASK-nnnn  move to going-on/, set status, point STATE.md at it
-  aix task block TASK-nnnn "reason"
-                            move to blocked/, note the reason, clear the active task
-  aix task done TASK-nnnn   move to completed/YYYY-MM/, stamp the date, clear the active task
-  aix task list             one line per task with status
+  The code (aix code ...)   Python, JS/TS, Rust, Java; PATH... limits the folders; --report writes docs/tests/
+  aix code graph            the modularity metric (alias: aix code complexity). Real dependency graph vs its ideal,
+                            the transitive reduction with cycles contracted (the lowest complexity delivering the
+                            same dependencies; a baseline, achievable or not): reducible %, each edge listed with
+                            its bypass. Also cycles, upward dependencies, hubs, propagation cost, Lakos NCCD,
+                            folder modularity Q. --functions for the Python call graph; --gate for CI (any cycle,
+                            any upward dependency, or reducible above --max-reducible); --selftest proves the
+                            arithmetic on known-answer cases.
+  aix code dead             dead code: modules no entry point reaches; with --functions, Python functions and
+                            methods never referenced by name (decorated, dunder, exported, entry/test code excluded)
+  aix code clones           duplicated functions: exact groups (same structure, other names/literals) and
+                            near-clones above --similarity PCT (default 70). Candidates: merge on shared purpose.
 
-  aix skills [list [category]]
-                            every skill with its activation level, enabled/disabled state and the runtimes it
-                            is installed in. Levels are derived, not configured:
-                              always        named in AGENTS.md, so every session runs or may need them
-                                            (session-resume, sdd-workflow, session-handoff, conflict-resolution)
-                              orchestrator  entry points that chain other skills
-                              on-demand     invoked by an orchestrator, by you, or when the description matches
-  aix skills show NAME      print the skill's SKILL.md
-  aix skills disable NAME   unlink it from every runtime and record it in framework.yaml `disabled_skills`
-                            (aix install keeps it unlinked); warns if AGENTS.md depends on it
-  aix skills enable NAME    the reverse
+  The docs (aix docs ...)
+  aix docs validate         documentation integrity check described in section 5, plus status drift (a doc may
+                            not claim implemented/automated/mitigated without the code marker) and VUL evidence
+                            (a status beyond `expected` needs an audit report). Exit 1 on errors; the CI gate.
+  aix docs coverage         regenerate docs/tests/coverage-matrix.md
+  aix docs security [open|validated] [--gate]
+                            the vulnerability register: rows not validated (worst first) with the audit skill to
+                            run, validated rows, statuses without evidence. --gate is the release check.
+
+  The road-map (aix task ...)
+  aix task new "Title" [--bucket next|backlog|ideas]   create pending/<bucket>/TASK-nnnn-title.md
+  aix task start | block "reason" | done TASK-nnnn     move it and keep STATE.md in sync
+  aix task list                                        one line per task with status
+
+  The skills (aix skills ...)
+  aix skills [general|specific] [category]            catalogue: state (recommended/available/always/on-demand/
+                                                      disabled), * marks always-on; general = behaviour for every
+                                                      session, specific = one job
+  aix skills info | show NAME                         details | the SKILL.md
+  aix skills enable | disable NAME                    link/unlink everywhere; recorded in framework.yaml
+  aix skills registry | add NAME | remove | update    third-party skills with evidence; add downloads (no git),
+                                                      general skills become always-on unless --on-demand
+  aix skills always | on-demand NAME                  the always-on wiring (AGENTS.md, Copilot, Cursor, Gemini)
+
+  Old forms remain as aliases: aix graph | complexity | validate | coverage | security.
 
 8. GETTING STARTED
 ------------------
@@ -357,9 +324,9 @@ from the kit. Ownership decides what happens:
                  your code
 Prints the full plan, one line per file (line deltas, kept sections, removals), then warns and asks.
   --dry-run      plan only, nothing written        --yes   skip the question (scripts)
-Afterwards it relinks skills; run `aix doctor` and `aix validate`. Your git history is the backup.""",
+Afterwards it relinks skills; run `aix doctor` and `aix docs validate`. Your git history is the backup.""",
 
-"validate": """aix validate
+"docs validate": """aix docs validate
 
 Are the DOCS right? Exit 1 on errors. Checks every markdown file under docs/ and skills/:
   - front-matter present; skill `name` equals its folder path
@@ -378,16 +345,16 @@ Is the INSTALL right? Exit 1 if anything is broken; every finding comes with its
 `aix` on PATH, the pointer files (CLAUDE.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc, GEMINI.md)
 reaching AGENTS.md, every enabled skill linked in all runtime folders, dangling links, unknown names in
 disabled_skills, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini, extern skills with
-provenance, and STATE.md naming a task that exists in going-on/. `aix validate` is the counterpart for the docs.""",
+provenance, and STATE.md naming a task that exists in going-on/. `aix docs validate` is the counterpart for the docs.""",
 
-"coverage": """aix coverage
+"docs coverage": """aix docs coverage
 
 Regenerates docs/tests/coverage-matrix.md: one row per requirement with the test specs that cover it (`covers:`
 in TS files), the code that implements it (@implements markers) and the tests that exercise it (@tests markers),
 plus a gap column: `no test spec`, `spec not automated`, `no code`. Pure regex scan, no model. Only as honest as
-the markers: `aix validate` fails a status that claims more than the markers show.""",
+the markers: `aix docs validate` fails a status that claims more than the markers show.""",
 
-"security": """aix security [open|validated] [--gate]
+"docs security": """aix docs security [open|validated] [--gate]
 
 Where does the vulnerability register stand? Reads docs/security/vulnerability-register.md and the audit reports.
   NOT VALIDATED   rows still expected / unverified / confirmed / mitigated, worst first, with the audit skill to run
@@ -396,7 +363,7 @@ Where does the vulnerability register stand? Reads docs/security/vulnerability-r
   --gate          release check: exit 1 if any row is open or lacks evidence
 The audits themselves are done by the security-audit-* skills; this only reports and gates.""",
 
-"graph": """aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]     alias: aix complexity
+"code graph": """aix code graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]     alias: aix code complexity
 
 THE MODULARITY METRIC. Distance between the real dependency graph and its ideal: the lowest complexity that still
 delivers every dependency the code has. The ideal is a baseline, achievable or not; the same baseline for every
@@ -457,7 +424,7 @@ Dead code (--dead)
                       entry/test code are excluded. Name-based like vulture, so a method called through any object
                       of the same name is live: conservative, few false positives, some misses.
   Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting.
-  --dead --gate fails on any candidate.
+  aix code dead --gate fails on any candidate.
 
 Clones (--clones)
   EXACT               groups of functions with the same normalised structure: identifiers -> role, literals ->
@@ -468,11 +435,10 @@ Clones (--clones)
                       function. Functions under 6 lines are ignored. Sorted by size x similarity: biggest wins first.
   Why: clones are the leaf that was never extracted, and clones later changed inconsistently are bugs (Juergens
   et al., ICSE 2009). Every line is a candidate: adapters of one port share a shape legitimately; merge only when
-  they share a purpose. --clones --gate fails on exact groups only.
+  they share a purpose. aix code clones --gate fails on exact groups only.
 
 Options
-  --dead                dead-code report instead of the modularity report (see above)
-  --clones              clone report instead (see above); --similarity PCT sets the near-clone threshold
+  aix code dead         the dead-code report (see above); aix code clones the clone report (--similarity PCT)
   --gate                exit 1 on any cycle, any upward dependency, or reducible > --max-reducible PCT (CI)
   --report              also write docs/tests/dependency-graph.md (generated, git-ignored)
   --selftest            run the built-in cases with known answers (chain, diamond, shortcut, cycle, reuse, layer skip, upward)
@@ -511,15 +477,38 @@ Groups (filters): general = behaviour that applies to every session (style, meth
 
 "about": "aix about      prints the full description of the kit: purpose, workflow, folders, IDs, skills, every command.",
 "version": "aix version    prints the kit version from framework.yaml.",
-"help": "aix help [COMMAND]    this list, or the detailed help for one command (also: aix COMMAND --help).",
+"help": "aix help [COMMAND]    this list, or the detailed help for one command or group (e.g. aix help code dead; also: aix code dead --help).",
 }
-TOPICS["complexity"] = TOPICS["graph"]
+TOPICS["code"] = """aix code graph | complexity | dead | clones   [PATH...] [--gate] [--report]
+
+Three tools on one engine (scripts/graph.py). All read the same dependency graph of the project's source
+(Python, JS/TS, Rust, Java modules; Python functions with --functions); PATH... limits the folders.
+  aix code graph      the modularity metric: real graph vs its ideal (transitive reduction) = reducible %,
+                      cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.  alias: complexity
+  aix code dead       dead code: modules no entry point reaches; with --functions, Python functions never referenced
+  aix code clones     duplicated functions: exact groups (same structure) and near-clones (--similarity PCT)
+--gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones."""
+TOPICS["docs"] = """aix docs validate | coverage | security
+
+  aix docs validate   are the DOCS right? front-matter, INDEXes, IDs, links, TS -> FR, VUL statuses, field
+                      dictionary, status drift (implemented/automated/mitigated without the code marker), VUL
+                      evidence. CI gate, exit 1 on errors.
+  aix docs coverage   regenerate docs/tests/coverage-matrix.md: requirement -> test spec -> code -> gaps.
+  aix docs security   the vulnerability register: validated rows vs not, audit skills still to run, statuses
+                      without evidence; --gate is the release check.
+Details: aix help docs validate | docs coverage | docs security."""
+TOPICS["code complexity"] = TOPICS["code graph"]
+TOPICS["code dead"] = TOPICS["code graph"]
+TOPICS["code clones"] = TOPICS["code graph"]
+for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("validate", "docs validate"), ("coverage", "docs coverage"), ("security", "docs security")):
+    TOPICS[_old] = TOPICS[_new]
 
 
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Commands: " + ", ".join(k for k in TOPICS if k != "complexity"))
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -596,36 +585,56 @@ def cmd_task(args):
         usage(1)
 
 
+ALIASES = {"graph": ["code", "graph"], "complexity": ["code", "graph"], "validate": ["docs", "validate"],
+           "coverage": ["docs", "coverage"], "security": ["docs", "security"]}
+CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--clones"]}
+
+
+def run_code(args):
+    import graph
+    sub = args[0] if args and args[0] in CODE_MODES else "graph"
+    rest = args[1:] if args and args[0] in CODE_MODES else args
+    graph.main(CODE_MODES[sub] + rest)
+
+
+def run_docs(args):
+    sub, rest = (args[0], args[1:]) if args else ("", [])
+    if sub == "validate":
+        sys.exit(run_script("validate.py"))
+    if sub == "coverage":
+        sys.exit(run_script("coverage_matrix.py"))
+    if sub == "security":
+        import security
+        return security.main(rest)
+    print("aix docs: validate | coverage | security [open|validated] [--gate]")
+    sys.exit(1)
+
+
 def main(argv):
+    argv = list(argv)
+    if argv and argv[0] in ALIASES:
+        argv = ALIASES[argv[0]] + argv[1:]
     if len(argv) >= 2 and argv[0] == "help":
-        return topic_help(argv[1])
-    if len(argv) >= 2 and argv[1] in ("--help", "-h"):
-        return topic_help(argv[0])
+        return topic_help(" ".join(argv[1:]))
+    if len(argv) >= 2 and argv[-1] in ("--help", "-h"):
+        return topic_help(" ".join(argv[:-1]))
     reexec_in_project(argv)
     if not argv or argv[0] in ("help", "-h", "--help"):
         usage(0)
     cmd, args = argv[0], argv[1:]
-    if cmd == "complexity":
-        cmd = "graph"
     if cmd == "about":
         print(ABOUT)
     elif cmd == "install":
         cmd_install(args)
-    elif cmd == "validate":
-        sys.exit(run_script("validate.py"))
     elif cmd == "upgrade":
         import upgrade
         upgrade.main(args)
     elif cmd == "doctor":
         sys.exit(run_script("doctor.py"))
-    elif cmd == "security":
-        import security
-        security.main(args)
-    elif cmd == "graph":
-        import graph
-        graph.main(args)
-    elif cmd == "coverage":
-        sys.exit(run_script("coverage_matrix.py"))
+    elif cmd == "code":
+        run_code(args)
+    elif cmd == "docs":
+        run_docs(args)
     elif cmd == "task":
         cmd_task(args)
     elif cmd == "skills":

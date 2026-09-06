@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""aix doctor — installation health (not document content; that is `aix validate`).
+"""aix doctor — installation health (not document content; that is `aix docs validate`).
 Each finding comes with the fix. Exit 1 if anything is broken."""
 import json, os, re, shutil, sys
 from pathlib import Path

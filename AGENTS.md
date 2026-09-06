@@ -10,7 +10,7 @@ Project built on **AIX**. Keep this file in context; load everything else on dem
 1. **Requirements are ground truth.** Code ≠ requirement → STOP, record `docs/conflicts/open/CONFLICT-*`, run `core-conflict-resolution`, ask the user. Never silently reconcile either side.
 2. **Navigate, never scan.** No `ls -R` / `find .` / "read all". Path: `docs/INDEX.md` → folder `INDEX.md` → file; or `grep -rln "<ID>"`. See `docs/meta-docs/conventions/token-economy.md`.
 3. **All work is a road-map task** in `docs/road-map/going-on/` with `context_files`; `STATE.md` kept current.
-4. **Trace everything.** IDs `FR/NFR/API/DM/ADR/TS/VUL/TASK/CONFLICT`; code markers `@implements`, `@tests`, `@mitigates`. No marker → the doc may not say `implemented`/`automated`/`mitigated` (`aix validate` fails).
+4. **Trace everything.** IDs `FR/NFR/API/DM/ADR/TS/VUL/TASK/CONFLICT`; code markers `@implements`, `@tests`, `@mitigates`. No marker → the doc may not say `implemented`/`automated`/`mitigated` (`aix docs validate` fails).
 5. **No test without a `TS-*`, no `TS-*` without a requirement.** New attack surface → `VUL-*` rows as `expected`; status changes need an audit report.
 6. **Ask before destructive/irreversible actions.**
 7. Prefer one precise file over three broad ones, but never skip a file an INDEX marks as required.
@@ -28,7 +28,7 @@ Project built on **AIX**. Keep this file in context; load everything else on dem
 | Runbooks, deploy, recovery | `docs/operations/INDEX.md` |
 | Where code goes | `docs/meta-docs/architecture/project-layout.md` |
 | Skills | `skills/INDEX.md` |
-| Kit commands (`aix validate/coverage/task/skills`) | `docs/meta-docs/conventions/cli.md` |
+| Kit commands (`aix docs validate/coverage/task/skills`) | `docs/meta-docs/conventions/cli.md` |
 
 ## Session
 Start: `core-session-resume`. Work: `core-sdd-workflow`. `core-session-handoff` after every completed task or workflow step, on stop/save, or at ~60 % context used, whichever first.

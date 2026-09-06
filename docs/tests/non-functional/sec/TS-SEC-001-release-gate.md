@@ -7,4 +7,4 @@ status: planned
 automated_in: []
 ---
 # TS-SEC-001
-Run `aix validate` and a check that no `VUL-*` row with component tagged `internet-facing` is `expected`/`unverified`/`confirmed`/`mitigated`. Fails the release pipeline otherwise.
+Run `aix docs validate` and a check that no `VUL-*` row with component tagged `internet-facing` is `expected`/`unverified`/`confirmed`/`mitigated`. Fails the release pipeline otherwise.
