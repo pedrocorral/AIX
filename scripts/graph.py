@@ -46,15 +46,21 @@ def rel(p: Path) -> str:
 
 # ---- module-level edges per language ----------------------------------------------------------------------
 
+PY_PROJECT_MARKERS = ("pyproject.toml", "setup.py", "setup.cfg", "requirements.txt")
+
+
 def import_roots(f: Path):
-    """Directories absolute imports resolve against, like sys.path: the project root, each code root, and the
-    nearest ancestor of `f` that is not a package (no __init__.py). Never arbitrary suffixes: `import git` must
-    not match a local `.../adapters/git/` package."""
+    """Directories absolute imports resolve against, like sys.path: the project root, each code root, every
+    directory holding a Python project marker, and their `src/`. Deliberately NOT "nearest non-package ancestor":
+    namespace packages (no __init__.py) would turn `.../adapters/git/` into a top-level `git` and shadow GitPython."""
     roots = {ROOT} | {ROOT / r for r in CODE_ROOTS if (ROOT / r).is_dir()}
-    d = f.resolve().parent
-    while d != ROOT and (d / "__init__.py").exists():
-        d = d.parent
-    roots.add(d)
+    for d in [f.resolve().parent, *f.resolve().parents]:
+        if any((d / m).exists() for m in PY_PROJECT_MARKERS):
+            roots.add(d)
+            if (d / "src").is_dir():
+                roots.add(d / "src")
+        if d == ROOT:
+            break
     return roots
 
 
