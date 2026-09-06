@@ -197,8 +197,8 @@ Python 3.9+ and no third-party dependencies.
                             update a project created with `--into` to the kit version of the checkout whose
                             `aix` you run (so run the kit's aix, from PATH, inside the project). Kit-owned paths
                             are overwritten and files gone from the kit removed: scripts/, aix, aix.cmd,
-                            templates/, docs/meta-docs/, skills/<built-in categories>/, CLAUDE.md, GEMINI.md.
-                            AGENTS.md is replaced by the kit's text with the project's "## Always-on skills" and
+                            templates/, docs/meta-docs/, skills/<built-in categories>/, CLAUDE.md.
+                            AGENTS.md and GEMINI.md are replaced by the kit's text with the project's "## Always-on skills" and
                             "## Project notes" sections kept; framework.yaml keeps disabled_skills. Never touched:
                             docs/requirements, tests, security, conflicts, operations, road-map, skills/extern,
                             code. Shows the plan and asks; git is the backup.

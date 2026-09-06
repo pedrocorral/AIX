@@ -3,10 +3,10 @@
 
 Ownership decides what happens to each path:
   kit-owned   (overwritten, removed if gone from the kit): scripts/, aix, aix.cmd, templates/, docs/meta-docs/,
-              skills/<every category except extern>/, CLAUDE.md, GEMINI.md
+              skills/<every category except extern>/, CLAUDE.md
   project-own (never touched): docs/requirements, tests, security, conflicts, operations, road-map, skills/extern,
               runtime folders, code
-  merged:     AGENTS.md  (kit text + project's "## Always-on skills" and "## Project notes" sections)
+  merged:     AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
               framework.yaml (kit text + project's disabled_skills line)
 Runs from the KIT's scripts (not the project's), so it always carries the newest logic."""
 import filecmp, re, shutil, subprocess, sys
@@ -14,7 +14,8 @@ from pathlib import Path
 
 KIT = Path(__file__).resolve().parent.parent
 KIT_OWNED_DIRS = ["scripts", "templates", "docs/meta-docs"]
-KIT_OWNED_FILES = ["aix", "aix.cmd", "CLAUDE.md", "GEMINI.md"]
+KIT_OWNED_FILES = ["aix", "aix.cmd", "CLAUDE.md"]
+MERGED_FILES = ["AGENTS.md", "GEMINI.md", "framework.yaml"]  # GEMINI.md carries the always-on section like AGENTS.md
 KEEP_SECTIONS = ("## Always-on skills", "## Project notes")
 
 
@@ -58,9 +59,10 @@ def plan(project: Path):
         src, dst = KIT / f, project / f
         if src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
             rows.append((".", "update" if dst.exists() else "add", Path(f)))
-    for f in ("AGENTS.md", "framework.yaml"):
-        if merged_text(project, f) != (project / f).read_text(encoding="utf-8"):
-            rows.append((".", "merge", Path(f)))
+    for f in MERGED_FILES:
+        current = (project / f).read_text(encoding="utf-8") if (project / f).exists() else None
+        if merged_text(project, f) != current:
+            rows.append((".", "merge" if current is not None else "add", Path(f)))
     return rows
 
 
@@ -76,7 +78,7 @@ def section(text: str, header: str) -> str:
 def merged_text(project: Path, name: str) -> str:
     kit_text = (KIT / name).read_text(encoding="utf-8")
     proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
-    if name == "AGENTS.md":
+    if name in ("AGENTS.md", "GEMINI.md"):
         out = kit_text
         for h in KEEP_SECTIONS:
             keep = section(proj_text, h)
@@ -99,11 +101,23 @@ def apply(project: Path, rows):
             parent = dst.parent
             while parent != project and not any(parent.iterdir()):
                 parent.rmdir(); parent = parent.parent
-        elif action == "merge":
+        elif action == "merge" or (d == "." and rel.name in MERGED_FILES):
             dst.write_text(merged_text(project, rel.name), encoding="utf-8")
         else:
             dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
+            copy_content(src, dst)
+
+
+def copy_content(src: Path, dst: Path):
+    """Copy bytes and the executable bit only. Never copy ownership or timestamps: the project's files may belong
+    to another user (shared checkout, /tmp copy) and utime/chown would fail there."""
+    import os, stat
+    shutil.copyfile(src, dst)
+    if os.access(src, os.X_OK):
+        try:
+            os.chmod(dst, os.stat(dst).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        except OSError:
+            pass
 
 
 def confirm(question: str) -> bool:
