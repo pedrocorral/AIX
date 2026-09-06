@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.2 — 2026-09-06
+- `aix code style` respects context (after review feedback on a real project): tests get twice the line limit, `assert` no longer counts as a branch, no magic-number/docstring advice in tests; decorated functions (routes, commands, fixtures) have no parameter limit; React components may be PascalCase; HTTP status codes are not magic numbers.
+
 ## 1.7.1 — 2026-09-06
 - `aix code style` detects the target runtime (`scripts/runtime.py`: pyproject requires-python, .python-version, venv, tsconfig target, engines.node, Cargo.toml, pom/Gradle; source shown in the header) and adds a modernise tier with only what that version enables (match, `X | None`, builtin generics, `@dataclass`, pathlib, tomllib, `?.`, `??`, const/let, let-else, switch expressions). Advice, never gated. JS/TS function detection now handles typed arrow functions and destructured parameters.
 

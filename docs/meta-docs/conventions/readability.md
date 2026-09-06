@@ -19,6 +19,15 @@ The rules below have measurements behind them; the limits are in `framework.yaml
 | Lines | 60 | NASA/JPL *Power of 10*: one printed page. McConnell's survey: defects rise in very long routines; below ~50 lines shorter is not automatically better, so this is a ceiling, not a target. |
 | File lines | 400 | one responsibility per file; longer files are usually two modules. |
 
+## Context the limits respect
+- **Tests** are sequential stories: twice the line limit; `assert` does not count as a branch; no magic-number or
+  docstring advice (`assert status == 200` needs no constant).
+- **Framework-mapped parameters**: a decorated function (FastAPI route, Click command, pytest fixture) has its
+  parameters dictated by the framework; the parameter limit does not apply.
+- **React components** must be PascalCase (`<NoteCard />`; camelCase would compile to an HTML tag): in `.jsx`/`.tsx`
+  or any function returning JSX, PascalCase is correct.
+- **HTTP status codes** are not magic numbers.
+
 ## Names (evidence: Lawrie et al. 2006; Butler et al. 2010; Hofmeister et al. 2017)
 - Full words, not abbreviations: `customer_count`, not `cust_cnt`. Descriptive names speed defect finding by ~19 %.
 - Functions are verbs (`load_orders`, `is_valid`); values are nouns; booleans read as questions (`is_`, `has_`, `can_`).

@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from graph import ROOT, CODE_ROOTS, EXT, FUNC_HEAD, KEYWORDS, TOKEN, brace_block, iter_functions, rel, source_files
 
 DEFAULTS = dict(max_lines=60, max_cognitive=15, max_cyclomatic=10, max_nesting=4, max_params=5, max_file_lines=400)
-PLAIN_NUMBERS = {0, 1, 2, -1, 10, 100, 1000, 0.5, 1.0, 0.0, 2.0}
+PLAIN_NUMBERS = {0, 1, 2, -1, 10, 100, 1000, 0.5, 1.0, 0.0, 2.0} | {200, 201, 202, 204, 301, 302, 304, 400, 401, 403, 404, 405, 409, 410, 422, 429, 500, 502, 503, 504}
+TEST_LINES_FACTOR = 2      # a test is a sequential story: twice the line limit, no magic-number or docstring advice
+JSX = re.compile(r"</|/>")
 LOOP_VARS = {"i", "j", "k", "n", "x", "y", "z", "_", "e", "f", "p", "m", "t"}
 CASE = {"python": ("snake", re.compile(r"^_{0,2}[a-z][a-z0-9_]*$")), "rust": ("snake", re.compile(r"^[a-z][a-z0-9_]*$")),
         "js": ("camel", re.compile(r"^[a-z$_][A-Za-z0-9$_]*$")), "java": ("camel", re.compile(r"^[a-z][A-Za-z0-9]*$"))}
@@ -42,7 +44,7 @@ NESTING = (ast.If, ast.For, ast.While, ast.AsyncFor, ast.ExceptHandler, ast.With
 def cyclomatic_py(fn) -> int:
     n = 1
     for node in ast.walk(fn):
-        if isinstance(node, (ast.If, ast.For, ast.While, ast.AsyncFor, ast.ExceptHandler, ast.IfExp, ast.Assert)):
+        if isinstance(node, (ast.If, ast.For, ast.While, ast.AsyncFor, ast.ExceptHandler, ast.IfExp)):
             n += 1
         elif isinstance(node, ast.BoolOp):
             n += len(node.values) - 1
@@ -164,6 +166,12 @@ def magic_py(fn):
     return sorted(set(out))
 
 
+def is_test(file: Path, name: str) -> bool:
+    p = file.resolve()
+    return "tests" in p.parts or "test" in p.parts or "__tests__" in p.parts or p.name.startswith("test_") \
+        or p.name.endswith(("_test.py", ".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.js")) or name.startswith("test")
+
+
 def analyse_py(file: Path, cls, fn, lang="python"):
     params = [a.arg for a in fn.args.args + fn.args.kwonlyargs if a.arg not in ("self", "cls")]
     cog, cog_items = cognitive_py(fn)
@@ -172,7 +180,8 @@ def analyse_py(file: Path, cls, fn, lang="python"):
     return dict(name=f"{cls + '.' if cls else ''}{fn.name}", file=rel(file), line=fn.lineno, lang=lang,
                 lines=(fn.end_lineno or fn.lineno) - fn.lineno + 1, params=len(params), cyclomatic=cyclomatic_py(fn),
                 cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc,
-                public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name, node=fn, cls=cls)
+                public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name, node=fn, cls=cls,
+                test=is_test(file, fn.name), decorated=bool(fn.decorator_list), jsx=False)
 
 
 # ---- other languages: tokens and braces --------------------------------------------------------------------------
@@ -213,7 +222,8 @@ def analyse_tokens(file: Path, name: str, header_end: int, text: str, lang: str)
     short = sorted({(start_line + cleaned.count("\n", 0, m.start()), m.group(1)) for m in re.finditer(r"\b(?:let|const|var|mut)\s+([a-zA-Z])\b", cleaned) if m.group(1) not in LOOP_VARS})
     return dict(name=name, file=rel(file), line=start_line, lang=lang, lines=lines, params=len(params), cyclomatic=cyc,
                 cognitive=cog, cognitive_items=cog_items, nesting=max(depth - 1, 0), deepest=(deepest_line, deepest_line),
-                docstring=doc, public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body)
+                docstring=doc, public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body,
+                test=is_test(file, name), decorated=bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*$", before)), jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))
 
 
 # ---- targets ----------------------------------------------------------------------------------------------------
@@ -366,12 +376,22 @@ def modernisations(fx, rt):
 
 # ---- findings ---------------------------------------------------------------------------------------------------
 
+def limit(fx, th, key):
+    """The limit that applies to THIS function: tests get twice the lines; decorated functions (routes, commands,
+    fixtures: the framework maps their parameters) have no parameter limit."""
+    if key == "lines" and fx["test"]:
+        return th["max_lines"] * TEST_LINES_FACTOR
+    if key == "params" and fx["decorated"]:
+        return 10 ** 6
+    return th["max_" + key]
+
+
 def findings(fx, th):
     """(severity, line, message, advice) — every one specific to this function."""
     out = []
-    if fx["lines"] > th["max_lines"]:
+    if fx["lines"] > limit(fx, th, "lines"):
         a, b = fx["deepest"]
-        out.append(("over", fx["line"], f"{fx['lines']} lines (limit {th['max_lines']})",
+        out.append(("over", fx["line"], f"{fx['lines']} lines (limit {limit(fx, th, 'lines')})",
                     f"split: one job per function; the deepest block is lines {a}-{b}, extract it into a named function"))
     if fx["cognitive"] > th["max_cognitive"]:
         worst = sorted(fx["cognitive_items"], key=lambda x: -x[1])[:3]
@@ -385,18 +405,19 @@ def findings(fx, th):
         a, b = fx["deepest"]
         out.append(("over", a, f"nesting depth {fx['nesting']} (limit {th['max_nesting']}) at lines {a}-{b}",
                     "invert the condition and return early, or extract the inner block into a function"))
-    if fx["params"] > th["max_params"]:
+    if fx["params"] > limit(fx, th, "params"):
         out.append(("over", fx["line"], f"{fx['params']} parameters (limit {th['max_params']})",
                     "group related parameters into one object (dataclass/struct/options), or split the function"))
     case, rx = CASE[fx["lang"]]
-    if not rx.match(fx["fname"]) and not (fx["fname"].startswith("__") and fx["fname"].endswith("__")):
+    component = fx["lang"] == "js" and fx["jsx"] and re.match(r"^[A-Z][A-Za-z0-9]*$", fx["fname"])  # React: PascalCase is required
+    if not rx.match(fx["fname"]) and not component and not (fx["fname"].startswith("__") and fx["fname"].endswith("__")):
         out.append(("name", fx["line"], f"name `{fx['fname']}` is not {case}_case" if case == "snake" else f"name `{fx['fname']}` is not camelCase",
                     "follow the language convention; a name that looks wrong slows every reader"))
     for line, name in fx["short_names"]:
         out.append(("name", line, f"single-letter name `{name}`", "say what it holds: `count`, `path`, `user`; one-letter names are for loop counters and maths"))
-    if fx["public"] and not fx["docstring"] and fx["lines"] >= 6:
+    if fx["public"] and not fx["docstring"] and fx["lines"] >= 6 and not fx["test"]:
         out.append(("doc", fx["line"], "public function without a docstring / doc comment", "one line: what it does and when to call it"))
-    for line, value in fx["magic"][:5]:
+    for line, value in ([] if fx["test"] else fx["magic"][:5]):
         v = int(value) if float(value).is_integer() else value
         out.append(("magic", line, f"magic number {v}", "name it: a constant tells the reader what the value means"))
     return out
@@ -404,7 +425,7 @@ def findings(fx, th):
 
 def score(fx, th):
     """How far over the limits, summed; 0 = all metrics inside."""
-    return sum(max(0.0, fx[k] / th["max_" + k] - 1) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params"))
+    return sum(max(0.0, fx[k] / limit(fx, th, k) - 1) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params"))
 
 
 # ---- rendering --------------------------------------------------------------------------------------------------
@@ -412,8 +433,9 @@ def score(fx, th):
 def card(fx, th, rt=None):
     lines = [f"{fx['file']}:{fx['name']}  (line {fx['line']}, {fx['lang']})", ""]
     for k, label in (("lines", "lines"), ("cognitive", "cognitive complexity"), ("cyclomatic", "cyclomatic complexity"), ("nesting", "nesting depth"), ("params", "parameters")):
-        v, lim = fx[k], th["max_" + k]
-        lines.append(f"  {label:22s} {v:>4}   limit {lim:<4}  {'OVER' if v > lim else 'ok'}")
+        v, lim = fx[k], limit(fx, th, k)
+        note = "  (test: doubled)" if k == "lines" and fx["test"] else "  (decorated: framework-mapped, no limit)" if k == "params" and fx["decorated"] else ""
+        lines.append(f"  {label:22s} {v:>4}   limit {str(lim) if lim < 10 ** 6 else '-':<4}  {'OVER' if v > lim else 'ok'}{note}")
     lines.append(f"  {'docstring':22s} {'yes' if fx['docstring'] else 'no':>4}")
     fs = findings(fx, th)
     lines.append("")
@@ -430,24 +452,24 @@ def runtime_header(rt, langs):
     return "  runtime: " + "; ".join(f"{rt[l][1]} ({rt[l][2]})" for l in ("python", "js", "rust", "java") if l in langs and l in rt)
 
 
-def table(fxs, th, files, limit=30, rt=None):
+def table(fxs, th, files, max_rows=30, rt=None):
     over = [fx for fx in fxs if score(fx, th) > 0 or findings(fx, th)]
     over.sort(key=lambda fx: (-score(fx, th), -len(findings(fx, th))))
-    counts = {k: sum(1 for fx in fxs if fx[k] > th["max_" + k]) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params")}
+    counts = {k: sum(1 for fx in fxs if fx[k] > limit(fx, th, k)) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params")}
     long_files = [(rel(f), n) for f, n in files if n > th["max_file_lines"]]
     n_over = sum(1 for fx in fxs if score(fx, th) > 0)
     lines = [f"  functions analysed {len(fxs)}; over a limit {n_over} (" + ", ".join(f"{k} {v}" for k, v in counts.items())
              + f"); with any finding {len(over)}; files over {th['max_file_lines']} lines: {len(long_files)}", ""]
     if over:
         lines.append(f"  {'FUNCTION':60s} {'lines':>5} {'cogn':>5} {'cycl':>5} {'nest':>5} {'prm':>4}  findings")
-    for fx in over[:limit]:
+    for fx in over[:max_rows]:
         fs = findings(fx, th)
-        tag = lambda k: (str(fx[k]) + ("*" if fx[k] > th["max_" + k] else " "))
+        tag = lambda k: (str(fx[k]) + ("*" if fx[k] > limit(fx, th, k) else " "))
         label = fx['file'] + ':' + fx['name']
         label = label if len(label) <= 60 else "…" + label[-59:]  # keep the function name, cut the path
         lines.append(f"  {label:60s} {tag('lines'):>6}{tag('cognitive'):>6}{tag('cyclomatic'):>6}{tag('nesting'):>6}{tag('params'):>5}  " + "; ".join(m for _, _, m, _ in fs[:2]))
-    if len(over) > limit:
-        lines.append(f"  ... {len(over) - limit} more; narrow the target or use --all")
+    if len(over) > max_rows:
+        lines.append(f"  ... {len(over) - max_rows} more; narrow the target or use --all")
     for f, n in long_files[:10]:
         lines.append(f"  FILE  {f}: {n} lines (limit {th['max_file_lines']})  -> split by responsibility")
     mods = [(fx, m) for fx in fxs for m in (modernisations(fx, rt) if rt else [])]
@@ -486,6 +508,13 @@ def ladder(cmd):
     elif cmd == "status":
         return 3
 
+def test_many_asserts(client):
+    r = client.get("/x")
+    assert r.status_code == 200
+    assert r.json()["a"] == 1
+    assert r.json()["b"] == 2
+    assert r.json()["c"] == 3
+
 def deep(a):
     if a:
         if a:
@@ -503,6 +532,8 @@ def selftest():
               ("sonar example cognitive", fxs["sonar_example"]["cognitive"], 9), ("sonar example cyclomatic", fxs["sonar_example"]["cyclomatic"], 6),
               ("deep nesting", fxs["deep"]["nesting"], 5), ("deep magic number", len(fxs["deep"]["magic"]), 1),
               ("simple params", fxs["simple"]["params"], 2),
+              ("asserts do not add cyclomatic", fxs["test_many_asserts"]["cyclomatic"], 1),
+              ("test: 200 is not magic, no magic advice", len([f for f in findings(fxs["test_many_asserts"], DEFAULTS) if f[0] == "magic"]), 0),
               ("ladder -> match under 3.10", len(modern_py(fxs["ladder"], {"python": ((3, 10), "", "")})), 1),
               ("ladder silent under 3.8", len(modern_py(fxs["ladder"], {"python": ((3, 8), "", "")})), 0)]
     failed = 0
@@ -549,7 +580,7 @@ def main(args):
         print("\n" + runtime_header(rt, langs))
         n = sum(1 for fx in cards if score(fx, th) > 0)
     else:
-        text, n = table(fxs + cards, th, files, limit=10**6 if show_all else 30, rt=rt)
+        text, n = table(fxs + cards, th, files, max_rows=10**6 if show_all else 30, rt=rt)
         text = runtime_header(rt, langs) + "\n" + text
         print(f"Code style — {', '.join(specs)}\n\n" + text)
         if report:
