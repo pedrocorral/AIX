@@ -65,5 +65,45 @@ For an **existing project** (any language): `aix install --into /path/to/project
 3. **Everything has an ID and a trail.** `FR-…` → `TS-…` → code markers (`@implements`, `@tests`) → `VUL-…`.
 4. **Skills are small and specific.** Each does one job; the orchestrator skills chain them.
 5. **State survives sessions.** `docs/road-map/going-on/STATE.md` lets any agent resume.
+6. **Modularity.** One job per node; the dependency graph is sparse, acyclic and one-directional; reuse stable
+   leaves, never hubs. Measured, not assumed: see below.
+
+## Modularity: the principle and the measurement
+
+Picture the code as a graph. Nodes are modules (or functions), edges are dependencies (imports, calls).
+The principle, known in the literature as **modularity** (Parnas 1972, Constantine 1974, Martin's acyclic and
+stable dependencies, Baldwin & Clark 2000), says:
+
+- **One job per node.** If describing a module needs "and", split it.
+- **Few edges, one direction, no cycles.** Edges point from the specific toward the stable: controllers → services
+  → ports → models. Never sideways into a sibling domain, never upward into whoever calls you.
+- **Reuse leaves, never hubs.** Depending on a stable node (a value type, a pure function, a port) is free reuse and
+  makes the graph bigger without tangling it. A hub, widely depended on *and* reaching into state, I/O or a domain,
+  spreads every change to all its dependants.
+
+Evidence that this predicts real cost: propagation cost (MacCormack, Rusnak & Baldwin 2006), Sturtevant's MIT
+study of a cyclic core (several times the defect density, lower productivity), Cai & Kazman's design-rule-space
+work, and the fact that Cargo and Go refuse to compile dependency cycles.
+
+**`aix graph` (alias `aix complexity`) measures it** instead of trusting anyone's opinion:
+
+| Step | What |
+|---|---|
+| real graph | files and their imports (Python, JS/TS, Rust, Java) or Python functions and calls; re-export facades collapsed; unresolved imports ignored, never guessed |
+| stable nodes | Martin's instability `out / (in + out)` ≤ 0.25; edges into them are free reuse and not counted |
+| **ideal complexity** | the transitive reduction of the graph with cycles contracted (Aho, Garey & Ullman 1972): the smallest graph that delivers exactly the same dependencies. A baseline, achievable or not, identical for every project |
+| **reducible %** | `(complexity − ideal) / ideal`. Every counted edge is listed with its bypass (`A -> C also reached via B`) so a human or an agent can confirm it. 0 % = at the baseline |
+| exact findings | cycles; upward dependencies (into a composition root, or against the layer order); hubs |
+| shape | propagation cost, Lakos' NCCD (1.0 = balanced binary tree), Newman modularity Q of the folder tree |
+
+```bash
+aix graph --selftest          # known-answer cases: chain, diamond, shortcut, cycle, reuse, layer skip, upward
+aix graph                     # the report
+aix graph --gate              # CI: fails on any cycle or upward dependency (add --max-reducible PCT for a ceiling)
+```
+
+Read it in this order: cycles and upward dependencies are facts, fix them first; each SHORTCUT line is one edge
+to drop or route through its bypass; reducible % and the shape numbers are for comparing over time and across
+projects. Full method: `aix help graph` and `docs/meta-docs/architecture/modularity.md`.
 
 See `docs/INDEX.md` and `skills/INDEX.md` to explore. Developing AIX itself (not an app)? Read `AIX-DEVELOPMENT.md` — it is never loaded by app agents. Framework version: see `framework.yaml`.
