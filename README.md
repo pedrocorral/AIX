@@ -1,7 +1,7 @@
 # AIX — Spec-Driven Development Kit for Agentic AI
 
 A language-agnostic, clone-and-go framework for building applications with AI coding agents
-(opencode, VS Code / Copilot, Claude Code, Cursor, …) where **documentation is the ground truth**
+(opencode, VS Code / Copilot, Claude Code, Cursor, Antigravity, Gemini CLI, …) where **documentation is the ground truth**
 and code is its optimised implementation.
 
 ## What you get
@@ -26,7 +26,7 @@ and code is its optimised implementation.
 
 ```bash
 git clone <this-repo> my-app && cd my-app
-./aix install        # links skills into .opencode/ .github/ .claude/ .agents/ .cursor/ ; writes pointer files + road-map state
+./aix install        # links skills into .opencode/ .github/ .claude/ .agents/ .cursor/ ; writes pointer files (Copilot, Cursor, Gemini) + road-map state
 aix validate         # sanity-check IDs, links, indexes
 ```
 
@@ -42,7 +42,7 @@ aix validate         # sanity-check IDs, links, indexes
 | `aix coverage` | Regenerate `docs/tests/coverage-matrix.md` |
 | `aix task new\|start\|block\|done\|list` | Road-map helper, keeps `STATE.md` in sync |
 | `aix skills [general\|specific] [category]` | Catalogue: group (general = behaviour for every session, specific = one job), level (always / orchestrator / on-demand), state, runtimes. `*` marks always-on; a general skill not always-on shows as inactive. `show`, `enable`, `disable`, `always`, `on-demand NAME` manage them |
-| `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor pointers) unless `--on-demand` |
+| `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor/Gemini pointers) unless `--on-demand` |
 | `aix about` | Full explanation of the kit: purpose, workflow, folders, IDs, skills, every command |
 | `aix version` | Kit version from `framework.yaml` |
 

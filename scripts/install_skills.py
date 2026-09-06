@@ -12,7 +12,7 @@ from pathlib import Path
 KIT_ROOT = Path(__file__).resolve().parent.parent
 TARGETS = [".opencode/skills", ".claude/skills", ".github/skills", ".agents/skills", ".cursor/skills"]
 KIT_PAYLOAD = [  # AIX-DEVELOPMENT.md is intentionally NOT here (kit-development only)
-    "AGENTS.md", "CLAUDE.md", "framework.yaml", "docs", "skills", "templates", "scripts", "aix", "aix.cmd"]
+    "AGENTS.md", "CLAUDE.md", "GEMINI.md", "framework.yaml", "docs", "skills", "templates", "scripts", "aix", "aix.cmd"]
 
 
 def flat_name(rel_parts):
@@ -89,6 +89,10 @@ def install_into(project: Path, copy: bool):
     if not cur.exists():
         cur.parent.mkdir(parents=True, exist_ok=True)
         cur.write_text("---\ndescription: AIX agent contract\nalwaysApply: true\n---\nRead and follow `AGENTS.md` at the repository root before doing anything. Skills are in `.cursor/skills/`.\n")
+    # Gemini CLI reads GEMINI.md (not AGENTS.md) and skills from .agents/skills; Antigravity reads AGENTS.md and .agents/skills natively
+    gem = project / "GEMINI.md"
+    if not gem.exists():
+        gem.write_text("Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.agents/skills/` (installed from `skills/` by `aix install`).\n")
     state = project / "docs" / "road-map" / "going-on" / "STATE.md"
     if not state.exists():
         shutil.copy(project / "templates" / "session-state.md", state)

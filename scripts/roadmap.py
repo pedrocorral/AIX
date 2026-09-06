@@ -69,6 +69,9 @@ def cmd_block(tid, reason=""):
 def cmd_done(tid):
     p = find(tid); month = datetime.date.today().strftime("%Y-%m")
     dst = RM / "completed" / month / p.name; dst.parent.mkdir(parents=True, exist_ok=True)
+    idx = dst.parent / "INDEX.md"   # validate.py requires an INDEX.md in every docs folder
+    if not idx.exists():
+        idx.write_text(f"# road-map/completed/{month}/\nTasks completed this month, newest last.\n\n| Task | Title | Requirements |\n|---|---|---|\n", encoding="utf-8")
     t = set_field(p.read_text(encoding="utf-8"), "status", "completed")
     t = set_field(t, "completed", datetime.date.today().isoformat())
     dst.write_text(t, encoding="utf-8"); p.unlink()

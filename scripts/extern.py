@@ -3,8 +3,8 @@
 
 Known skills live in skills/extern/registry.json (name -> GitHub repo + sub-path + evidence). `add` downloads the
 repo tarball over HTTPS (no git needed), copies the skill folder to skills/extern/<name>/, records provenance in
-.aix-source and links it into every runtime. `--always` also names it in AGENTS.md, .github/copilot-instructions.md
-and .cursor/rules/aix.mdc so every session applies it. Extern skills keep their bare name (no category prefix)."""
+.aix-source and links it into every runtime. `--always` also names it in AGENTS.md, .github/copilot-instructions.md,
+.cursor/rules/aix.mdc and GEMINI.md so every session applies it. Extern skills keep their bare name (no category prefix)."""
 import io, json, re, shutil, sys, tarfile, urllib.request
 from datetime import date
 from pathlib import Path
@@ -14,11 +14,13 @@ EXTERN = ROOT / "skills" / "extern"
 REGISTRY = EXTERN / "registry.json"
 AGENTS = ROOT / "AGENTS.md"
 ALWAYS_HEADER = "## Always-on skills"
-# file -> where that runtime finds the skill folder (Copilot reads .github/skills, Cursor .cursor/skills)
+# file -> where that runtime finds the skill folder (Copilot reads .github/skills, Cursor .cursor/skills,
+# Gemini CLI .agents/skills; Antigravity reads AGENTS.md itself)
 ALWAYS_FILES = {
     ROOT / "AGENTS.md": "Apply these in every session, before anything else. Read `<your runtime's skills dir>/<name>/SKILL.md` (e.g. `.claude/skills/`, `.opencode/skills/`, `.agents/skills/`):",
     ROOT / ".github" / "copilot-instructions.md": "Apply these in every session, before anything else. Read `.github/skills/<name>/SKILL.md` first:",
     ROOT / ".cursor" / "rules" / "aix.mdc": "Apply these in every session, before anything else. Read `.cursor/skills/<name>/SKILL.md` first:",
+    ROOT / "GEMINI.md": "Apply these in every session, before anything else. Read `.agents/skills/<name>/SKILL.md` first:",
 }
 
 
@@ -146,7 +148,7 @@ def cmd_add(names, always: bool, on_demand: bool, extra):
             if entry["kind"] == "style" and any(s != name for s in styles_on):
                 print(f"  warning: another style skill is already always-on ({', '.join(styles_on)}); two output styles conflict")
             mark_always(name, True)
-            print(f"  {name}: always-on (AGENTS.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc)")
+            print(f"  {name}: always-on (AGENTS.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc, GEMINI.md)")
 
 
 def cmd_remove(names):

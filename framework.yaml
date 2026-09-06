@@ -19,7 +19,7 @@ skill_targets:            # where `aix install` links every leaf skill (name = f
   - .opencode/skills      # opencode (native)
   - .claude/skills        # Claude Code, also read by opencode and VS Code
   - .github/skills        # VS Code / GitHub Copilot
-  - .agents/skills        # agentskills.io generic location (VS Code, others)
+  - .agents/skills        # agentskills.io generic location (VS Code, Antigravity, Gemini CLI; installer also writes GEMINI.md pointer)
   - .cursor/skills        # Cursor (installer also writes .cursor/rules/aix.mdc pointer)
 id_prefixes:
   requirement_functional: FR

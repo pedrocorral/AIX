@@ -29,7 +29,7 @@ def check_path():
 
 def check_pointers():
     wanted = {ROOT / "CLAUDE.md": "AGENTS.md", ROOT / ".github" / "copilot-instructions.md": "AGENTS.md",
-              ROOT / ".cursor" / "rules" / "aix.mdc": "AGENTS.md"}
+              ROOT / ".cursor" / "rules" / "aix.mdc": "AGENTS.md", ROOT / "GEMINI.md": "AGENTS.md"}
     for f, needle in wanted.items():
         if not f.exists() or needle not in f.read_text(encoding="utf-8"):
             problem(f"{f.relative_to(ROOT)} missing or not pointing at AGENTS.md", "run `aix install`")

@@ -15,7 +15,7 @@ MANIFEST = ROOT / "framework.yaml"
 AGENTS = ROOT / "AGENTS.md"
 TARGETS = [".opencode/skills", ".claude/skills", ".github/skills", ".agents/skills", ".cursor/skills"]
 RUNTIME = {".opencode/skills": "opencode", ".claude/skills": "claude", ".github/skills": "copilot",
-           ".agents/skills": "agents", ".cursor/skills": "cursor"}
+           ".agents/skills": "agents", ".cursor/skills": "cursor"}   # agents = agentskills.io dir: Antigravity, Gemini CLI, VS Code
 
 
 def front_matter(text: str, key: str) -> str:

@@ -110,7 +110,7 @@ Example content that ships with the kit and should be deleted by the first real 
 
 ## 4. Key mechanisms (how they actually work)
 
-- **Skill install**: leaf dir `skills/a/b/` → name `a-b` (validator enforces `name:` == path). Symlinks by default, `--copy` on Windows/CI. Targets: `.opencode/skills`, `.claude/skills`, `.github/skills`, `.agents/skills`, `.cursor/skills`. Pointer files: `CLAUDE.md`, `.github/copilot-instructions.md`, `.cursor/rules/aix.mdc`. Runtime facts verified 2026-09-04: opencode reads `.opencode/skills` and `.claude/skills`; VS Code reads `.github/skills`, `.claude/skills`, `.agents/skills` (setting `chat.useAgentSkills`).
+- **Skill install**: leaf dir `skills/a/b/` → name `a-b` (validator enforces `name:` == path). Symlinks by default, `--copy` on Windows/CI. Targets: `.opencode/skills`, `.claude/skills`, `.github/skills`, `.agents/skills`, `.cursor/skills`. Pointer files: `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursor/rules/aix.mdc`. Runtime facts verified 2026-09-04: opencode reads `.opencode/skills` and `.claude/skills`; VS Code reads `.github/skills`, `.claude/skills`, `.agents/skills` (setting `chat.useAgentSkills`). Verified 2026-09-05: Antigravity reads `.agents/skills` (default; `.agent/skills` legacy) and `AGENTS.md` directly (since 1.20.5); Gemini CLI reads `.gemini/skills` or the `.agents/skills` alias (alias wins on name clash) and `GEMINI.md` as context file (`context.fileName` in `.gemini/settings.json` could point it at AGENTS.md, but a pointer file needs no per-user setting).
 - **Register statuses**: `expected → unverified | confirmed → mitigated → addressed`, plus `accepted` (ADR with owner + review condition) and `not-applicable` (justified). Release gate: no internet-facing row left before `addressed/accepted/not-applicable`.
 - **Requirement lifecycle**: `draft → approved → implemented → verified → superseded`. Only the user approves.
 - **Road-map**: `pending/{ideas,backlog,next} → going-on ⇄ blocked → completed/YYYY-MM`; `roadmap.py` moves files and rewrites `STATE.md` fields. Task template carries `context_files`, files changed, verification performed, exact next actions.
@@ -166,6 +166,7 @@ Built 2026-09-04/05 in a chat session, then compared against two alternative des
 | K8 | Skill names carry category prefix | Trigger clarity and namespace hygiene across four install targets |
 | K9 | Keep "sdd" in `core-sdd-workflow` after renaming kit to AIX | "sdd" = spec-driven development, still accurate |
 | K10 | This file excluded from `--into` payload and from all INDEXes | Zero interference with app projects |
+| K11 | Antigravity and Gemini CLI via the existing `.agents/skills` target plus a `GEMINI.md` pointer; no `.gemini/skills` target | Both runtimes already read `.agents/skills`; a second copy would be redundant and lose on Gemini's alias precedence anyway. Pointer file beats asking every user to edit `.gemini/settings.json` |
 
 ## 9. Working on the kit (rules for the developing agent)
 

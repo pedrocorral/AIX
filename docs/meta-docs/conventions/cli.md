@@ -51,9 +51,10 @@ mechanism every runtime honours is its instructions file, so `aix skills always 
 
 | File | Read by |
 |---|---|
-| `AGENTS.md` | Claude Code (via `CLAUDE.md`), opencode, generic agents |
+| `AGENTS.md` | Claude Code (via `CLAUDE.md`), opencode, Antigravity, generic agents |
 | `.github/copilot-instructions.md` | VS Code / GitHub Copilot — points at `.github/skills/NAME/SKILL.md` |
 | `.cursor/rules/aix.mdc` | Cursor (`alwaysApply: true`) — points at `.cursor/skills/NAME/SKILL.md` |
+| `GEMINI.md` | Gemini CLI (its context file) — points at `.agents/skills/NAME/SKILL.md` |
 
 `aix skills on-demand NAME`, `remove NAME` and disabling all delete the entry. Two always-on *style* skills
 conflict; the CLI warns. Skills named in `AGENTS.md` by the session protocol (`core-session-resume`,

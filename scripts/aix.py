@@ -80,8 +80,8 @@ the user, and the decision is written down as an ADR (Architecture Decision Reco
 
 3. HOW AN AGENT USES IT
 -----------------------
-AGENTS.md at the repository root is the contract every agent reads first (CLAUDE.md, .github/copilot-instructions.md
-and .cursor/rules/aix.mdc just point to it). It fits in about 3k tokens and stays in context permanently. Everything
+AGENTS.md at the repository root is the contract every agent reads first (CLAUDE.md, GEMINI.md,
+.github/copilot-instructions.md and .cursor/rules/aix.mdc just point to it; Antigravity reads it directly). It fits in about 3k tokens and stays in context permanently. Everything
 else is loaded on demand by navigation, never by scanning: docs/INDEX.md -> folder INDEX.md -> file, or
 `grep -rln "<ID>"`. The design constraint behind every file is minimal resident context per turn.
 
@@ -159,8 +159,9 @@ organised in seven categories:
 
 The nested folder is the single source of truth. `aix install` links every leaf skill, under its flat name
 (security/audit-injection -> security-audit-injection), into the folders each runtime reads:
-.opencode/skills, .claude/skills, .github/skills, .agents/skills and .cursor/skills. Never edit the installed
-copies; they are ignored by git. Some skills bundle deterministic scripts/ (regex scans that are cheaper than
+.opencode/skills, .claude/skills, .github/skills, .agents/skills and .cursor/skills (.agents/skills is the
+agentskills.io location read by Antigravity, Gemini CLI and VS Code). Never edit the installed copies; they are
+ignored by git. Some skills bundle deterministic scripts/ (regex scans that are cheaper than
 having the model read code) and references/.
 
 7. THE CLI
@@ -173,10 +174,10 @@ Python 3.9+ and no third-party dependencies.
   aix version               kit version from framework.yaml
 
   aix install               link all skills into the five runtime folders of the current kit checkout; write
-                            pointer files for Copilot and Cursor if missing; create road-map STATE.md if missing;
+                            pointer files for Copilot, Cursor and Gemini CLI if missing; create road-map STATE.md if missing;
                             on Linux/macOS symlink `aix` into ~/.local/bin when that folder exists. Idempotent.
       --copy                copy skills instead of symlinking (filesystems without symlinks, some Windows setups)
-      --into DIR            first copy the kit payload (AGENTS.md, CLAUDE.md, framework.yaml, docs/, skills/,
+      --into DIR            first copy the kit payload (AGENTS.md, CLAUDE.md, GEMINI.md, framework.yaml, docs/, skills/,
                             templates/, scripts/, aix, aix.cmd) into an existing project, then install there.
                             For every item that already exists it asks:
                               [r]eplace   move yours to <item>.bak, copy the kit's version
@@ -190,7 +191,7 @@ Python 3.9+ and no third-party dependencies.
 
   aix validate              documentation integrity check described in section 5; exit 1 on errors
   aix doctor                installation health: every skill linked in every runtime, no dangling links, pointer
-                            files present, always-on sections consistent across AGENTS.md / Copilot / Cursor,
+                            files present, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini,
                             extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
                             validate = is what we wrote right; doctor = is the tooling around it right.
   aix coverage              regenerate docs/tests/coverage-matrix.md
