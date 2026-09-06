@@ -12,6 +12,10 @@ aix acts on the nearest project at or above the current folder (the one holding 
 
   aix about                           what AIX is, how it works, and what every command does
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
+  aix upgrade [PROJECT] [--dry-run] [--yes]
+                                      bring a project's kit files up to this checkout: overwrites kit-owned paths
+                                      (scripts, templates, docs/meta-docs, built-in skills, launchers), merges
+                                      AGENTS.md and framework.yaml, never touches your docs, code or extern skills
       --into asks per existing item: [r]eplace [s]kip [m]erge [R/S/M] all [a]bort  (replace keeps <item>.bak)
       --replace-all | --skip-all | --merge-all   answer for every collision without asking (CI, no terminal)
   aix validate                        are the DOCS right? IDs, links, indexes, front-matter. CI gate, exit 1 on errors
@@ -189,6 +193,16 @@ Python 3.9+ and no third-party dependencies.
                             answer every collision without asking (CI, no terminal). Without a terminal and
                             without one of these flags the installer refuses to guess and exits.
 
+  aix upgrade [PROJECT] [--dry-run] [--yes]
+                            update a project created with `--into` to the kit version of the checkout whose
+                            `aix` you run (so run the kit's aix, from PATH, inside the project). Kit-owned paths
+                            are overwritten and files gone from the kit removed: scripts/, aix, aix.cmd,
+                            templates/, docs/meta-docs/, skills/<built-in categories>/, CLAUDE.md, GEMINI.md.
+                            AGENTS.md is replaced by the kit's text with the project's "## Always-on skills" and
+                            "## Project notes" sections kept; framework.yaml keeps disabled_skills. Never touched:
+                            docs/requirements, tests, security, conflicts, operations, road-map, skills/extern,
+                            code. Shows the plan and asks; git is the backup.
+
   aix validate              documentation integrity check described in section 5; exit 1 on errors
   aix doctor                installation health: every skill linked in every runtime, no dangling links, pointer
                             files present, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini,
@@ -259,6 +273,8 @@ def find_project(start: Path):
 
 def reexec_in_project(argv):
     """Run the project's own copy of the CLI so every module resolves ROOT to the project, not to this checkout."""
+    if argv[:1] == ["upgrade"]:
+        return  # upgrade must run from THIS checkout's scripts, not the project's older copy
     project = find_project(Path.cwd())
     if project is None:
         if argv and argv[0] in ANYWHERE or (argv[:1] == ["install"] and "--into" in argv) or argv[:2] == ["skills", "registry"]:
@@ -355,6 +371,9 @@ def main(argv):
         cmd_install(args)
     elif cmd == "validate":
         sys.exit(run_script("validate.py"))
+    elif cmd == "upgrade":
+        import upgrade
+        upgrade.main(args)
     elif cmd == "doctor":
         sys.exit(run_script("doctor.py"))
     elif cmd == "security":

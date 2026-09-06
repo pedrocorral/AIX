@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""aix upgrade — bring a project's copy of the kit up to this kit checkout, without touching the project's own work.
+
+Ownership decides what happens to each path:
+  kit-owned   (overwritten, removed if gone from the kit): scripts/, aix, aix.cmd, templates/, docs/meta-docs/,
+              skills/<every category except extern>/, CLAUDE.md, GEMINI.md
+  project-own (never touched): docs/requirements, tests, security, conflicts, operations, road-map, skills/extern,
+              runtime folders, code
+  merged:     AGENTS.md  (kit text + project's "## Always-on skills" and "## Project notes" sections)
+              framework.yaml (kit text + project's disabled_skills line)
+Runs from the KIT's scripts (not the project's), so it always carries the newest logic."""
+import filecmp, re, shutil, subprocess, sys
+from pathlib import Path
+
+KIT = Path(__file__).resolve().parent.parent
+KIT_OWNED_DIRS = ["scripts", "templates", "docs/meta-docs"]
+KIT_OWNED_FILES = ["aix", "aix.cmd", "CLAUDE.md", "GEMINI.md"]
+KEEP_SECTIONS = ("## Always-on skills", "## Project notes")
+
+
+def version_of(root: Path) -> str:
+    m = re.search(r"^version:\s*([^\s#]+)", (root / "framework.yaml").read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else "?"
+
+
+def skill_categories(root: Path):
+    d = root / "skills"
+    return [p.name for p in d.iterdir() if p.is_dir() and p.name != "extern"] if d.is_dir() else []
+
+
+def kit_owned_paths():
+    """Directories (kit-relative) that the kit owns outright inside a project."""
+    return KIT_OWNED_DIRS + [f"skills/{c}" for c in skill_categories(KIT)]
+
+
+def diff_dir(src: Path, dst: Path):
+    """Return (added, updated, removed) file lists comparing kit dir `src` with project dir `dst`."""
+    added, updated, removed = [], [], []
+    src_files = {p.relative_to(src) for p in src.rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+    dst_files = {p.relative_to(dst) for p in dst.rglob("*") if p.is_file() and "__pycache__" not in p.parts} if dst.exists() else set()
+    for rel in sorted(src_files - dst_files):
+        added.append(rel)
+    for rel in sorted(src_files & dst_files):
+        if not filecmp.cmp(src / rel, dst / rel, shallow=False):
+            updated.append(rel)
+    for rel in sorted(dst_files - src_files):
+        removed.append(rel)
+    return added, updated, removed
+
+
+def plan(project: Path):
+    """Everything the upgrade would do, as (label, action, path) rows."""
+    rows = []
+    for d in kit_owned_paths():
+        a, u, r = diff_dir(KIT / d, project / d)
+        rows += [(d, "add", x) for x in a] + [(d, "update", x) for x in u] + [(d, "remove", x) for x in r]
+    for f in KIT_OWNED_FILES:
+        src, dst = KIT / f, project / f
+        if src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
+            rows.append((".", "update" if dst.exists() else "add", Path(f)))
+    for f in ("AGENTS.md", "framework.yaml"):
+        if merged_text(project, f) != (project / f).read_text(encoding="utf-8"):
+            rows.append((".", "merge", Path(f)))
+    return rows
+
+
+def section(text: str, header: str) -> str:
+    """The section starting at `header` up to the next H2 (or end), or ''."""
+    if header not in text:
+        return ""
+    rest = text.split(header, 1)[1]
+    body = rest.split("\n## ", 1)[0]
+    return header + body.rstrip("\n") + "\n\n"
+
+
+def merged_text(project: Path, name: str) -> str:
+    kit_text = (KIT / name).read_text(encoding="utf-8")
+    proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
+    if name == "AGENTS.md":
+        out = kit_text
+        for h in KEEP_SECTIONS:
+            keep = section(proj_text, h)
+            if keep and h not in out:
+                out = out.rstrip("\n") + "\n\n" + keep
+        return out
+    m = re.search(r"^disabled_skills:.*$", proj_text, re.M)
+    if m and not re.search(r"^disabled_skills:", kit_text, re.M):
+        return kit_text.rstrip("\n") + "\n" + m.group(0) + "\n"
+    if m:
+        return re.sub(r"^disabled_skills:.*$", m.group(0), kit_text, count=1, flags=re.M)
+    return kit_text
+
+
+def apply(project: Path, rows):
+    for d, action, rel in rows:
+        src, dst = KIT / d / rel, project / d / rel
+        if action == "remove":
+            dst.unlink()
+            parent = dst.parent
+            while parent != project and not any(parent.iterdir()):
+                parent.rmdir(); parent = parent.parent
+        elif action == "merge":
+            dst.write_text(merged_text(project, rel.name), encoding="utf-8")
+        else:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+
+
+def confirm(question: str) -> bool:
+    if not sys.stdin.isatty():
+        sys.exit("no terminal to confirm; rerun with --yes")
+    return input(question).strip().lower() in ("y", "yes")
+
+
+def main(args):
+    yes, dry = "--yes" in args, "--dry-run" in args
+    args = [a for a in args if a not in ("--yes", "--dry-run")]
+    from aix import find_project
+    project = Path(args[0]).resolve() if args else find_project(Path.cwd())
+    if project is None or not (project / "framework.yaml").exists():
+        sys.exit("aix upgrade: no project found (nearest framework.yaml); pass the project path")
+    if project == KIT:
+        sys.exit("aix upgrade: you are running this project's own copy of aix, which cannot upgrade itself. "
+                 "Run the kit checkout's aix (the one on PATH, or /path/to/kit/aix upgrade) from inside the project.")
+    rows = plan(project)
+    print(f"upgrade {project}\n  kit {version_of(KIT)} (this checkout: {KIT})  ->  project {version_of(project)}")
+    if not rows:
+        print("  already up to date"); return
+    for action in ("add", "update", "remove", "merge"):
+        items = [f"{d}/{rel}" if d != "." else str(rel) for d, a, rel in rows if a == action]
+        if items:
+            print(f"  {action} ({len(items)}):")
+            for i in items[:40]:
+                print(f"    {i}")
+            if len(items) > 40:
+                print(f"    ... {len(items) - 40} more")
+    print("  untouched: docs/requirements tests security conflicts operations road-map, skills/extern, your code")
+    if dry:
+        return
+    if not yes and not confirm("  Proceed? Kit-owned files are overwritten; your git history is the backup. [y/N] "):
+        sys.exit("aborted")
+    apply(project, rows)
+    print(f"  applied {len(rows)} changes; relinking skills in the project")
+    subprocess.call([sys.executable, str(project / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
+    print("  done. Run `aix doctor` and `aix validate` in the project.")
+
+
+if __name__ == "__main__":
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    main(sys.argv[1:])

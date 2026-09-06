@@ -115,7 +115,8 @@ def mark_always(name: str, on: bool):
 
 
 def known_skill(name: str) -> bool:
-    return (EXTERN / name).exists() or any((ROOT / "skills").rglob(f"{name}/SKILL.md"))
+    _, sk = runtime_tools()
+    return name in sk.catalogue()
 
 
 # ---- commands ---------------------------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- `aix upgrade [PROJECT] [--dry-run] [--yes]`: update a project's kit files from the kit checkout by ownership (kit-owned overwritten/removed, project-owned untouched, AGENTS.md and framework.yaml merged). Fix: `aix skills always|on-demand` now accepts built-in skills.
 - Design principle *modularity* (`docs/meta-docs/architecture/modularity.md`, AGENTS.md rule 8): acyclic, one-directional, sparse dependency graph; reuse leaves, never hubs; evidence cited. Wired into design-app, code-review and the definition of done.
 - `aix task done` creates `completed/YYYY-MM/INDEX.md` when the month folder is new (`aix validate` used to fail on the first completed task). [TASK-0002]
 - Antigravity and Gemini CLI support: both read skills from the existing `.agents/skills` target; `GEMINI.md` pointer (committed, in the `--into` payload, created by `aix install` if missing) carries the always-on section for Gemini CLI; `aix doctor` checks it. Antigravity reads `AGENTS.md` directly. [TASK-0002]

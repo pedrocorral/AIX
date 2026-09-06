@@ -53,6 +53,7 @@ AIX/
 │   ├── doctor.py            # `aix doctor`: installation health checks with fixes
 │   ├── extern.py            # third-party skills: registry.json, tarball fetch into skills/extern/<name>, always-on sections in AGENTS.md + pointers
 │   ├── security.py          # `aix security`: register state, evidence check, release gate
+│   ├── upgrade.py           # `aix upgrade`: ownership-based update of a project's kit files (runs from the kit, not the project)
 │   ├── skills.py            # `aix skills`: catalogue, levels (always = named in AGENTS.md), enable/disable via framework.yaml
 │   ├── install_skills.py    # links/copies skills/<cat>/<name> → <target>/<cat>-<name>; --into copies kit payload; writes pointer files
 │   ├── validate.py          # front-matter, skill name==path, INDEX completeness, links, TS covers, VUL statuses, field dictionary

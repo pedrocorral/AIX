@@ -68,6 +68,12 @@ there. `aix skills add NAME` downloads the repo tarball over HTTPS (no git), cop
 into every runtime. Extern skills keep their bare name (`caveman`, not `extern-caveman`) so slash commands match
 upstream docs. `skills/extern/` is committed with the project; `aix skills update` re-downloads.
 
+## Ownership (what `aix upgrade` may overwrite)
+| Kit-owned (overwritten on upgrade) | Project-owned (never touched) | Merged |
+|---|---|---|
+| `scripts/`, `aix`, `aix.cmd`, `templates/`, `docs/meta-docs/`, `skills/<built-in categories>/`, `CLAUDE.md`, `GEMINI.md` | `docs/requirements tests security conflicts operations road-map`, `skills/extern/`, runtime folders, your code | `AGENTS.md` (project keeps `## Always-on skills`, `## Project notes`), `framework.yaml` (`disabled_skills`) |
+Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.
+
 ## Rules for agents
 - Never edit files under `.opencode/ .claude/ .github/skills .agents/ .cursor/skills`: they are generated links.
 - Never move `TASK-*` files by hand; use `aix task`.

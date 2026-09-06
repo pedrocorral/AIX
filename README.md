@@ -36,6 +36,7 @@ aix validate         # sanity-check IDs, links, indexes
 | Command | Does |
 |---|---|
 | `aix install [--into DIR] [--copy]` | Install skills into every agent runtime; `--into` first copies the kit into an existing project, asking per existing item: replace (old kept as `.bak`), skip, merge (add missing files only), all-variants, abort. `--replace-all` / `--skip-all` / `--merge-all` answer for you |
+| `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run: overwrites kit-owned paths (scripts, templates, meta-docs, built-in skills, launchers), merges AGENTS.md and framework.yaml, never touches your docs, code or extern skills |
 | `aix validate` | Check IDs, links, indexes, front-matter (exit 1 on errors) |
 | `aix doctor` | Installation health (links, pointer files, always-on wiring, STATE.md, Python, PATH) with a fix per problem. `validate` = the docs; `doctor` = the tooling |
 | `aix security [open\|validated] [--gate]` | Vulnerability register: validated vs not-validated rows, audit skills still to run, statuses without evidence; `--gate` is the release check |
