@@ -491,6 +491,87 @@ def measure(nodes, edges):
     )
 
 
+# ---- dead code --------------------------------------------------------------------------------------------------
+
+ENTRY_STEMS = ROOT_STEMS | {"manage", "wsgi", "asgi", "cli", "conftest", "setup", "settings", "config"}
+ENTRY_SUFFIX = (".config.ts", ".config.js", ".config.mjs", ".d.ts")
+
+
+def has_main_guard(node: str) -> bool:
+    """A Python file run as a script (`if __name__ == "__main__":`) is an entry point in its own right."""
+    f = ROOT / node
+    return f.suffix == ".py" and f.is_file() and '__name__ == "__main__"' in f.read_text(encoding="utf-8", errors="replace")
+
+
+def is_entry_module(node: str) -> bool:
+    """Modules nothing needs to import for them to be alive: entry points, tests, framework/tool config, scripts."""
+    p = Path(node)
+    return is_root_or_test(node) or p.stem in ENTRY_STEMS or p.name.endswith(ENTRY_SUFFIX) or p.name in FACADE_NAMES \
+        or has_main_guard(node)
+
+
+def dead_modules(nodes, edges):
+    """Files no entry module reaches through imports. Reachability, not fan-in: an orphan cluster that imports
+    each other is dead as a whole."""
+    roots = {n for n in nodes if is_entry_module(n)}
+    _, reach = reach_sets(nodes, edges)
+    live = set(roots) | {x for r in roots for x in reach[r]}
+    return roots, sorted(n for n in nodes if n not in live)
+
+
+IMPLICIT_NAMES = {"main", "setup", "teardown", "setUp", "tearDown"}
+
+
+def dead_functions(roots):
+    """Python functions/methods whose simple name is never referenced anywhere (as a bare name or an attribute)
+    outside their own definition, are not decorated (routes, fixtures, commands are called by the framework),
+    are not dunder/implicit, not in __all__, and not in an entry/test file. Same rule as vulture: name-based,
+    so a method called through any object of the same name counts as live. Conservative by design."""
+    files = [f for f in source_files(roots) if f.suffix == ".py"]
+    trees = {}
+    for f in files:
+        try:
+            trees[f] = ast.parse(f.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:
+            continue
+    used, exported, defs = defaultdict(int), set(), []
+    for f, tree in trees.items():
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name):
+                used[node.id] += 1
+            elif isinstance(node, ast.Attribute):
+                used[node.attr] += 1
+            elif isinstance(node, ast.Assign) and any(isinstance(x, ast.Name) and x.id == "__all__" for x in node.targets):
+                exported |= {c.value for c in ast.walk(node.value) if isinstance(c, ast.Constant) and isinstance(c.value, str)}
+        for cls, fn in iter_functions(tree):
+            defs.append((rel(f), cls, fn))
+    dead = []
+    for file, cls, fn in defs:
+        name = fn.name
+        if is_entry_module(file) or fn.decorator_list or name in exported or name in IMPLICIT_NAMES \
+                or (name.startswith("__") and name.endswith("__")) or name.startswith("test"):
+            continue
+        if used[name] == 0:  # a def is not an ast.Name, so any count is a real reference
+            dead.append((f"{file}:{cls + '.' if cls else ''}{name}", fn.lineno))
+    return sorted(dead)
+
+
+def render_dead(nodes, edges, paths, functions):
+    roots, dead = dead_modules(nodes, edges)
+    lines = ["", f"Dead code — {', '.join(paths)}", "",
+             f"  entry modules (live by definition): {len(roots)}  e.g. " + ", ".join(sorted(roots)[:6]),
+             f"  DEAD MODULES {len(dead)}  (no entry module reaches them through imports)"]
+    lines += [f"    {n}" for n in dead[:40]]
+    if functions:
+        df = dead_functions(paths)
+        lines += [f"  DEAD FUNCTIONS {len(df)}  (Python: name never referenced outside its definition; decorated, dunder, exported and entry/test code excluded)"]
+        lines += [f"    {q}  (line {ln})" for q, ln in df[:60]]
+    else:
+        lines.append("  (add --functions for Python dead functions and methods)")
+    lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting.")
+    return "\n".join(lines), len(dead) + (len(df) if functions else 0)
+
+
 # ---- report -----------------------------------------------------------------------------------------------
 
 def render(m, level, scope):
@@ -548,13 +629,13 @@ def selftest():
     sys.exit(1 if failed else 0)
 
 
-USAGE = "usage: aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]"
+USAGE = "usage: aix graph [PATH...] [--functions] [--dead] [--gate] [--max-reducible PCT] [--report] [--selftest]"
 
 
 def main(args):
     if "--selftest" in args:
         return selftest()
-    functions, gate, report = "--functions" in args, "--gate" in args, "--report" in args
+    functions, gate, report, dead = "--functions" in args, "--gate" in args, "--report" in args, "--dead" in args
     max_reducible = None
     for flag in ("--max-reducible", "--max-excess"):  # --max-excess kept as an alias
         if flag in args:
@@ -563,6 +644,18 @@ def main(args):
     nodes, edges = function_graph(paths) if functions else module_graph(paths)
     if not nodes:
         sys.exit(f"no source files under {', '.join(paths)} (looked for {', '.join(EXT)})")
+    if dead:
+        mnodes, medges = module_graph(paths)
+        mn, me, _ = collapse_facades(set(mnodes), set(medges))
+        text, n_dead = render_dead(mn, me, paths, functions)
+        print(text.lstrip("\n"))
+        if report:
+            print(f"\n  wrote {write_report(text).relative_to(ROOT)}")
+        if gate and n_dead:
+            sys.exit(f"GATE FAILED: {n_dead} dead-code candidate(s)")
+        if gate:
+            print("GATE PASSED")
+        return
     m = measure(nodes, edges)
     text = render(m, "functions" if functions else "modules", ", ".join(paths))
     print(text)

@@ -29,6 +29,8 @@ aix acts on the nearest project at or above the current folder (the one holding 
       --functions                     Python call graph (functions and methods) instead of modules
       --gate                          CI: exit 1 on any cycle, any upward dependency, or reducible above the limit
       --max-reducible PCT             the limit for --gate (default: none, cycles and upward only)
+      --dead                          dead code instead: modules no entry point reaches; with --functions, Python
+                                      functions/methods never referenced (name-based, conservative)
       --report                        also write docs/tests/dependency-graph.md
       --selftest                      run the built-in known-answer cases (chain, diamond, shortcut, cycle, reuse,
                                       layer skip, upward); proves the arithmetic before you trust a report
@@ -221,8 +223,9 @@ Python 3.9+ and no third-party dependencies.
                             extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
                             validate = is what we wrote right; doctor = is the tooling around it right.
   aix coverage              regenerate docs/tests/coverage-matrix.md
-  aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]
-                            the modularity metric (alias: aix complexity). Distance between the real dependency
+  aix graph [PATH...] [--functions] [--dead] [--gate] [--max-reducible PCT] [--report] [--selftest]
+                            the modularity metric (alias: aix complexity). --dead lists dead code instead:
+                            modules no entry point reaches, and (Python, --functions) never-referenced functions. Distance between the real dependency
                             graph and its ideal, the lowest complexity that delivers the same dependencies (the
                             transitive reduction with cycles contracted; Aho, Garey & Ullman 1972). Facades are
                             collapsed, edges into stable nodes (Martin instability <= 0.25) are free reuse, wiring
@@ -440,7 +443,21 @@ How to read the result
   NCCD, Q                    shape: tree-likeness and folder cohesion; trend indicators
   a hub that is not a root   split it: keep the stable part, move the rest up to its callers
 
+Dead code (--dead)
+  DEAD MODULES        files no entry module reaches through imports. Entry modules are live by definition:
+                      composition roots and entry points (main, app, index, server, manage, wsgi, cli, ...),
+                      tests, tool/framework config, facades, and any Python file with an `if __name__ ==
+                      "__main__"` guard. Reachability, not fan-in: an orphan cluster importing itself is dead.
+  DEAD FUNCTIONS      with --functions, Python only: a function or method whose simple name is never referenced
+                      anywhere else, as a bare name or an attribute. Decorated functions (routes, fixtures,
+                      commands are called by the framework), dunder and implicit names, `__all__` exports and
+                      entry/test code are excluded. Name-based like vulture, so a method called through any object
+                      of the same name is live: conservative, few false positives, some misses.
+  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting.
+  --dead --gate fails on any candidate.
+
 Options
+  --dead                dead-code report instead of the modularity report (see above)
   --gate                exit 1 on any cycle, any upward dependency, or reducible > --max-reducible PCT (CI)
   --report              also write docs/tests/dependency-graph.md (generated, git-ignored)
   --selftest            run the built-in cases with known answers (chain, diamond, shortcut, cycle, reuse, layer skip, upward)

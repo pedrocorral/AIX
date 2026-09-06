@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.3 — 2026-09-06
+- `aix graph --dead`: dead modules (no entry module reaches them: entry points, tests, config, facades, `__main__` scripts) and, with `--functions`, Python functions/methods never referenced by name (decorated, dunder, exported, entry/test code excluded). Candidates listed with the rule that judged them; `--dead --gate` fails on any.
+
 ## 1.5.2 — 2026-09-06
 - README explains the modularity principle and how `aix graph` measures it; `aix help` lists every graph option.
 
