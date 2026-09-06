@@ -4,6 +4,8 @@ title: Layering and the dependency rule
 ---
 # Layering
 
+Special case of `modularity.md`: the layers are the levels of an acyclic graph whose edges point inward.
+
 ```
  controllers  ──►  services  ──►  domain models
       │               │                ▲

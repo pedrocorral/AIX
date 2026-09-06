@@ -3,6 +3,7 @@ Read this when: designing a new app/feature or deciding where code belongs. Skip
 
 | Path | What | Read when |
 |---|---|---|
+| `modularity.md` | **The governing principle**: dependency graph acyclic, one-directional, sparse; one job per node; reuse leaves, never hubs; evidence | First, before any other file here; adding any import between modules |
 | `mvc.md` | MVC as used here: what Model/View/Controller mean for APIs, SPAs, server-rendered and data/AI apps | Any design; onboarding |
 | `frontend-backend-separation.md` | The contract boundary, what never crosses it, who owns validation/state/auth | Designing UI ↔ API; any "should this go in the frontend?" |
 | `layering.md` | Controller → Service → Repository → Model; DTOs; dependency rule | Placing any new class/function |

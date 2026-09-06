@@ -6,6 +6,7 @@ title: Definition of done
 
 ## Task
 - All `requirements:` in the task are `status: implemented`; code has `@implements` markers.
+- No dependency cycle introduced and no sibling-domain import; shared code added only as leaves (`architecture/modularity.md`).
 - All `tests:` in the task are `status: automated`, green in CI, with `@tests` markers.
 - `security:` entries either `addressed` (audit report exists) or explicitly `accepted` by the user (ADR).
 - Every new/changed doc is in its folder INDEX; `aix validate` passes; `aix coverage` regenerated.

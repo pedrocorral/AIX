@@ -9,7 +9,7 @@ Reading order (required, ≈ 900 lines total): `docs/meta-docs/architecture/INDE
 ## Procedure
 1. **Domains**: derive bounded contexts from requirements/personas; propose `<DOMAIN>` codes → glossary. One folder each in `functional/`, `api/`, `backend/app/`.
 2. **Shape**: API+SPA / server-rendered / data-science / AI-supported (or mix) → ADR with rationale (`spec-write-adr`).
-3. **Layering per domain**: list aggregates (DM-*), services (use cases from FRs), controllers (API-*), adapters needed. Produce `docs/requirements/decisions/ADR-000N-architecture-overview.md` containing a table domain → aggregates → use cases → endpoints.
+3. **Layering per domain**: list aggregates (DM-*), services (use cases from FRs), controllers (API-*), adapters needed. Draw the domain dependency graph: acyclic, no sibling domain → domain edges, shared code only as leaves (`architecture/modularity.md`). Produce `docs/requirements/decisions/ADR-000N-architecture-overview.md` containing a table domain → aggregates → use cases → endpoints.
 4. **Persistence plan**: run `architecture-design-persistence`.
 5. **Cross-cutting**: auth model, config, errors/observability, jobs/events — one ADR each only when deviating from meta-doc defaults.
 6. **Test & security plan**: for each domain, TS families and VUL rows expected (`security-threat-model`).
