@@ -65,8 +65,8 @@ def fix_name(skill_md: Path, name: str):
 
 def runtime_tools():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import install_skills, skills
-    return install_skills, skills
+    import install_skills, catalog
+    return install_skills, catalog
 
 
 def install_one(name: str, entry: dict):

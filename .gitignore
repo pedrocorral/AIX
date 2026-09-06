@@ -6,6 +6,7 @@
 .cursor/skills/
 # generated reports
 docs/tests/coverage-matrix.md
+docs/tests/dependency-graph.md
 # usual suspects
 __pycache__/
 *.pyc

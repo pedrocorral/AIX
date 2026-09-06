@@ -167,7 +167,7 @@ def confirm(question: str) -> bool:
 def main(args):
     yes, dry = "--yes" in args, "--dry-run" in args
     args = [a for a in args if a not in ("--yes", "--dry-run")]
-    from aix import find_project
+    from project import find_project
     project = Path(args[0]).resolve() if args else find_project(Path.cwd())
     if project is None or not (project / "framework.yaml").exists():
         sys.exit("aix upgrade: no project found (nearest framework.yaml); pass the project path")

@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import install_skills as inst
-import skills as sk
+import catalog as sk
 from extern import ALWAYS_FILES, always_on_names
 
 problems = []

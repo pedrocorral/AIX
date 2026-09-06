@@ -22,6 +22,10 @@ aix acts on the nearest project at or above the current folder (the one holding 
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
   aix coverage                        regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
+  aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]
+                                      measure the dependency graph against its ground state (a forest): excess %,
+                                      leaf-adjusted excess, cycles, hubs, propagation cost. Modules for Python,
+                                      JS/TS, Rust, Java; --functions for Python call graphs. --gate fails on cycles
   aix security [open|validated]       vulnerability register: which VUL rows are validated (evidence) and which
                                       are not, which audit skills still to run; --gate exits 1 if any row is open
   aix task new "Title" [--bucket next|backlog|ideas]
@@ -46,6 +50,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
+from project import find_project
 
 
 ABOUT = """\
@@ -209,6 +214,16 @@ Python 3.9+ and no third-party dependencies.
                             extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
                             validate = is what we wrote right; doctor = is the tooling around it right.
   aix coverage              regenerate docs/tests/coverage-matrix.md
+  aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]
+                            the modularity metric. Builds the dependency graph (modules: Python, JS/TS, Rust,
+                            Java via imports; --functions: Python call graph via the stdlib parser) and measures
+                            it against its ground state, a forest with N-P edges (0 % excess). Reports the circuit
+                            rank (E-N+P, Berge; McCabe's number applied across functions), excess %, the
+                            leaf-adjusted excess (edges into pure leaves are free reuse, per modularity.md),
+                            cycles (the defects), hubs (high fan-in AND fan-out), propagation cost (MacCormack
+                            2006). --gate exits 1 on any cycle or when leaf-adjusted excess exceeds --max-excess.
+                            --report writes docs/tests/dependency-graph.md. Static analysis: unresolved imports
+                            and calls are ignored, never guessed.
   aix security [open|validated] [--gate]
                             state of the vulnerability register: rows not validated (expected, unverified,
                             confirmed, mitigated; worst first) with the audit skill to run, rows validated
@@ -261,14 +276,6 @@ def skill_count():
 
 
 ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version"}
-
-
-def find_project(start: Path):
-    """Nearest folder at or above `start` holding framework.yaml: that is the project aix operates on."""
-    for d in [start, *start.parents]:
-        if (d / "framework.yaml").exists():
-            return d
-    return None
 
 
 def reexec_in_project(argv):
@@ -379,6 +386,9 @@ def main(argv):
     elif cmd == "security":
         import security
         security.main(args)
+    elif cmd == "graph":
+        import graph
+        graph.main(args)
     elif cmd == "coverage":
         sys.exit(run_script("coverage_matrix.py"))
     elif cmd == "task":
