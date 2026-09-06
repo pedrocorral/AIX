@@ -52,6 +52,9 @@ that only unwraps → `let … else` (Rust 1.65+); a switch with `break`s → a 
 Same idea as pyupgrade / ruff `UP`, ESLint `ecmaVersion`, Clippy MSRV lints, OpenRewrite. Advice, never gated;
 when nothing declares a version the report says so and the tier is skipped.
 
+## Fixing a finding
+An OVER metric → skill `refactor-readability` (one metric per change, the card names the block and the costs); a modernise line → `refactor-modernise` (one construct per change).
+
 ## Tooling
 `aix code style [TARGET...]` — ranked table for a folder or file, a full card for one function
 (`file:func`, `file/func`, `file::Class.method`; extension optional), `--gate` for CI (fails on limits only; names,

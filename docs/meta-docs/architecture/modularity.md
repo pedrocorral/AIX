@@ -77,6 +77,9 @@ Lakos' NCCD and Newman's modularity Q of the folder partition. Run it before rea
   *Software Reflexion Models*, 1995 — checking code against an intended structure (the upward-dependency check).
 - Cargo (Rust) and Go refuse to compile dependency cycles between crates/packages.
 
+## Fixing a finding
+Each `aix code graph` line has a skill: CYCLE/UPWARD → `refactor-cycle`, SHORTCUT → `refactor-shortcut`, HUB → `refactor-hub`; `aix code dead` → `refactor-dead`; `aix code clones` → `refactor-clone`. One finding per change, verified by re-running the tool and the tests.
+
 ## Anti-patterns to name in reviews
 `utils`/`common`/`helpers` modules that import project state · "god" services · sibling domains importing each
 other · a model importing its repository · circular type imports patched with lazy imports · a shared base class

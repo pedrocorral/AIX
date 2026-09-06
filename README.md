@@ -16,7 +16,7 @@ and code is its optimised implementation.
 | `docs/conflicts/` | Open/resolved spec-vs-code conflicts awaiting or holding human decisions. |
 | `docs/operations/` | Deployment, recovery, runbooks. |
 | `docs/road-map/` | `pending/` → `going-on/` → `completed/` tasks; session state for resuming work. |
-| `skills/` | Hierarchical agent skills (one source of truth) installed into every agent runtime. |
+| `skills/` | Hierarchical agent skills (one source of truth) installed into every agent runtime. `refactor/` holds one skill per `aix code` finding: how to fix it, verify, hand off. |
 | `templates/` | Canonical templates for every document type. |
 | `aix` / `aix.cmd` | The CLI (Linux/macOS bash launcher, Windows batch launcher) → `scripts/aix.py`. |
 | `scripts/` | CLI implementation: installer, validator, coverage matrix, road-map helper (Python 3.9+, no deps). |

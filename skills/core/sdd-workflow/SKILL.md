@@ -22,7 +22,7 @@ Pure questions with no code/doc change (answer directly, citing docs).
 7. **Implement** — run `implement-feature` (it picks layer skills). Add `@implements` markers.
 8. **Tests** — run the `testing-write-*` skills for each TS; mark `status: automated`; run the suite.
 9. **Audit** — run `security-audit` for the categories touched in step 5.
-10. **Review** — run `review-code-review` and `review-doc-drift-check` on the diff.
+10. **Review** — run `review-code-review` and `review-doc-drift-check` on the diff; for each `aix code` finding run the `refactor-*` skill it names (one finding per change), then review again.
 11. **Close** — `aix docs validate`, `aix docs coverage`, DoD checklist (`docs/meta-docs/workflow/definition-of-done.md`), `core-roadmap-task` done, `core-session-handoff`.
 
 ## Outputs

@@ -568,7 +568,7 @@ def render_dead(nodes, edges, paths, functions):
         lines += [f"    {q}  (line {ln})" for q, ln in df[:60]]
     else:
         lines.append("  (add --functions for Python dead functions and methods)")
-    lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting.")
+    lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting. Fix with: skill refactor-dead")
     return "\n".join(lines), len(dead) + (len(df) if functions else 0)
 
 
@@ -724,7 +724,7 @@ def render_clones(roots, similarity):
         lines.append(f"  EXACT  {len(g)} × ~{g[0][3]} lines: " + ", ".join(f"{fx[0]} (l.{fx[2]})" for fx in g) + "   -> keep one, make it a leaf")
     for dice, a, b in near[:30]:
         lines.append(f"  NEAR   {dice:3.0f} %  {a[0]} (l.{a[2]}, {a[3]} lines)  ~  {b[0]} (l.{b[2]}, {b[3]} lines)   -> extract the shared part into a leaf")
-    lines.append("  Every line is a candidate: two functions may legitimately share a shape (adapters of one port); merge only when they share a purpose.")
+    lines.append("  Every line is a candidate: two functions may legitimately share a shape (adapters of one port); merge only when they share a purpose. Fix with: skill refactor-clone")
     return "\n".join(lines), len(exact)
 
 
@@ -749,6 +749,8 @@ def render(m, level, scope):
     for h in m["hubs"][:10]:
         note = "composition root: a hub by design" if is_composition_root(h) else "split it: keep the stable part, move the rest up"
         lines.append(f"  HUB       {h}  (in {m['fi'][h]}, out {m['fo'][h]})  {note}")
+    if m["cycles"] or m["upward"] or m["shortcuts"] or m["hubs"]:
+        lines.append("  fix with: CYCLE/UPWARD -> skill refactor-cycle; SHORTCUT -> refactor-shortcut; HUB -> refactor-hub (aix skills show NAME)")
     return "\n".join(lines)
 
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.8.0 — 2026-09-06
+- `skills/refactor/`: seven skills, one per `aix code` finding type (cycle, shortcut, hub, dead, clone, readability, modernise), each with procedure, verification and hand-off. Reports name the skill on their last line; `review-code-review` proposes it; `core-sdd-workflow` runs it after review; modularity.md and readability.md point to them. `aix help refactor`.
+
 ## 1.7.3 — 2026-09-06
 - `aix help` and `aix version` print the kit name in capitals: AIX 1.7.3.
 

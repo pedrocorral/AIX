@@ -480,6 +480,7 @@ def table(fxs, th, files, max_rows=30, rt=None):
         if len(mods) > 15:
             lines.append(f"    ... {len(mods) - 15} more")
     lines.append("  * = over its limit (gated). Names, docstrings and magic numbers are advice.  Details: aix code style FILE:FUNCTION")
+    lines.append("  fix with: OVER -> skill refactor-readability (one metric per change); modernise -> refactor-modernise")
     return "\n".join(lines), n_over + len(long_files)
 
 

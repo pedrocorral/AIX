@@ -61,6 +61,7 @@ The skills                            (aix skills ...)
   aix skills add NAME [--on-demand]   download a registry skill into skills/extern/, link it everywhere;
                                       general skills become always-on unless --on-demand
   aix skills remove|update NAME       drop it / re-download it;  aix skills always|on-demand NAME
+  aix skills refactor                 the seven fix skills, one per aix code finding (aix help refactor)
 
 Old forms still work: aix graph|complexity|validate|coverage|security = aix code graph | aix docs ...
 
@@ -172,7 +173,7 @@ API/DM field names appear in the field dictionary.
 
 6. SKILLS  (skills/)
 --------------------
-Thirty-six small skills in the Agent Skills open format (SKILL.md with YAML front-matter), each doing one job,
+Small skills in the Agent Skills open format (SKILL.md with YAML front-matter), each doing one job,
 organised in seven categories:
 
   core/          sdd-workflow (orchestrator), session-resume, session-handoff, conflict-resolution, roadmap-task,
@@ -186,6 +187,7 @@ organised in seven categories:
                  audit-secrets-config, audit-dependencies, audit-web-xss-csrf, audit-data-privacy,
                  audit-logging-monitoring, audit-ai-llm, audit-infra
   review/        code-review, doc-drift-check
+  refactor/      cycle, shortcut, hub, dead, clone, readability, modernise (one per `aix code` finding type)
 
 The nested folder is the single source of truth. `aix install` links every leaf skill, under its flat name
 (security/audit-injection -> security-audit-injection), into the folders each runtime reads:
@@ -468,6 +470,19 @@ Moves TASK-* files through the road-map and keeps docs/road-map/going-on/STATE.m
   list    one line per task with status
 Never move task files by hand; agents use this through the core-roadmap-task skill.""",
 
+"refactor": """The refactor skills (aix skills refactor)
+
+One skill per `aix code` finding type; each says how to fix it safely, how to verify (re-run the tool, run the
+tests) and what to write in the hand-off. One finding per change.
+  refactor-cycle        CYCLE / UPWARD: extract the shared part into a leaf, or invert through a port
+  refactor-shortcut     SHORTCUT: use the intermediate's result, move the type to a stable module, or split
+  refactor-hub          HUB (not a root): split by stability, the stable part becomes a leaf
+  refactor-dead         DEAD MODULE / FUNCTION: prove unreachable (grep strings, frameworks), delete, test
+  refactor-clone        EXACT / NEAR: extract the identical part as a leaf, parametrise the difference
+  refactor-readability  OVER metric: nesting, cognitive, cyclomatic, lines, parameters, one metric per change
+  refactor-modernise    modernise line: one construct per change, no behaviour change
+Every report names the skill on its last line; review-code-review proposes it; core-sdd-workflow runs it.""",
+
 "skills": """aix skills [list|general|specific [category]] | info NAME | show NAME | enable|disable NAME...
            | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] | remove NAME... | update [NAME...]
            | always NAME | on-demand NAME
@@ -561,7 +576,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
