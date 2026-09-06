@@ -50,12 +50,13 @@ configuration, I/O or a domain. Every change to a hub propagates to all its depe
 - **Fan-in only on leaves**: list the top-N most-imported modules; each must have no upward dependency.
 - **Propagation**: for a change in node X, the set of nodes that can be affected is X's dependents. Keep that set
   a sub-tree, not the whole graph.
-`aix graph` measures all of this deterministically: it builds the module graph (Python, JS/TS, Rust, Java) or the
-Python call graph (`--functions`) and reports the **ground state** (a forest: N − P edges, 0 % excess), the
-**circuit rank** E − N + P (Berge's cyclomatic number; McCabe's metric is the same formula inside one function),
-the **excess** above ground state, the **leaf-adjusted excess** (edges into leaves excluded, since that reuse is
-free), **cycles**, **hubs** and **propagation cost**. Run it before reasoning about the code; `review-code-review`
-runs it on every diff and `aix graph --gate` fails CI on any cycle.
+`aix graph` (alias `aix complexity`) measures all of this deterministically. It collapses re-export facades, sets
+leaves aside (reusing a leaf is free), and compares the inner graph's **complexity** (its edges) with its **ideal
+complexity**: the transitive reduction (Aho, Garey & Ullman 1972), the smallest graph with exactly the same
+dependencies. The difference is the **reducible** complexity, in %: shortcuts (A → C while A → B → C: layer skips)
+and cycle edges. 0 % means nothing can be removed without losing a dependency. It also reports cycles, hubs,
+propagation cost and the diamond shape (circuit rank) for the trend. Run it before reasoning about the code;
+`review-code-review` runs it on every diff and `aix graph --gate` fails CI on any cycle or on reducible above a limit.
 
 ## Evidence (this is established engineering, not taste)
 - Parnas, *On the Criteria To Be Used in Decomposing Systems into Modules*, 1972 — one design decision per module.

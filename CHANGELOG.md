@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- `aix graph`: the headline is now **reducible complexity** = (complexity − ideal complexity) / ideal, where ideal complexity is the transitive reduction of the inner graph (facades collapsed, leaves excluded; composition roots and tests exempt from shortcut counting). 0 % = nothing removable without losing a dependency. `--max-reducible` (alias `--max-excess`). "Ground state" wording replaced.
+
 ## 1.5.0 — 2026-09-06
 - `aix help COMMAND` / `aix COMMAND --help`: detailed per-command help written for agents; `aix complexity` alias of `aix graph`.
 - `aix graph`: the modularity metric. Module graph (Python, JS/TS, Rust, Java) or Python call graph measured against its ground state (forest): circuit rank, excess %, leaf-adjusted excess, cycles, hubs, propagation cost; `--gate`, `--report`. Wired into modularity.md and code-review. Applied to the kit itself: two import cycles in scripts/ removed by extracting the leaves catalog.py and project.py (leaf-adjusted excess 0 %, propagation cost halved).

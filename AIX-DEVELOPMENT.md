@@ -56,7 +56,7 @@ AIX/
 │   ├── upgrade.py           # `aix upgrade`: ownership-based update of a project's kit files (runs from the kit, not the project)
 │   ├── catalog.py           # leaf: skill catalogue data (used by skills.py, extern.py, doctor.py)
 │   ├── project.py           # leaf: find_project (used by aix.py, upgrade.py)
-│   ├── graph.py             # `aix graph`: dependency graph metrics (ground state, excess, cycles, hubs, propagation cost)
+│   ├── graph.py             # `aix graph`: dependency graph metrics (complexity vs ideal complexity = reducible %, cycles, shortcuts, hubs, propagation cost)
 │   ├── skills.py            # `aix skills`: catalogue, levels (always = named in AGENTS.md), enable/disable via framework.yaml
 │   ├── install_skills.py    # links/copies skills/<cat>/<name> → <target>/<cat>-<name>; --into copies kit payload; writes pointer files
 │   ├── validate.py          # front-matter, skill name==path, INDEX completeness, links, TS covers, VUL statuses, field dictionary

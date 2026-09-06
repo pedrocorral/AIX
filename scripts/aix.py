@@ -22,10 +22,10 @@ aix acts on the nearest project at or above the current folder (the one holding 
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
   aix coverage                        regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
-  aix graph | complexity [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]
-                                      measure the dependency graph against its ground state (a forest): excess %,
-                                      leaf-adjusted excess, cycles, hubs, propagation cost. Modules for Python,
-                                      JS/TS, Rust, Java; --functions for Python call graphs. --gate fails on cycles
+  aix graph | complexity [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report]
+                                      the modularity metric: complexity vs ideal complexity (transitive reduction)
+                                      = reducible %, plus cycles, shortcuts, hubs, propagation cost. Modules for
+                                      Python, JS/TS, Rust, Java; --functions for Python call graphs. --gate: CI
   aix security [open|validated]       vulnerability register: which VUL rows are validated (evidence) and which
                                       are not, which audit skills still to run; --gate exits 1 if any row is open
   aix task new "Title" [--bucket next|backlog|ideas]
@@ -214,16 +214,21 @@ Python 3.9+ and no third-party dependencies.
                             extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
                             validate = is what we wrote right; doctor = is the tooling around it right.
   aix coverage              regenerate docs/tests/coverage-matrix.md
-  aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]
-                            the modularity metric. Builds the dependency graph (modules: Python, JS/TS, Rust,
-                            Java via imports; --functions: Python call graph via the stdlib parser) and measures
-                            it against its ground state, a forest with N-P edges (0 % excess). Reports the circuit
-                            rank (E-N+P, Berge; McCabe's number applied across functions), excess %, the
-                            leaf-adjusted excess (edges into pure leaves are free reuse, per modularity.md),
-                            cycles (the defects), hubs (high fan-in AND fan-out), propagation cost (MacCormack
-                            2006). --gate exits 1 on any cycle or when leaf-adjusted excess exceeds --max-excess.
-                            --report writes docs/tests/dependency-graph.md. Static analysis: unresolved imports
-                            and calls are ignored, never guessed.
+  aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report]
+                            the modularity metric (alias: aix complexity). Builds the dependency graph (modules:
+                            Python, JS/TS, Rust, Java via imports; --functions: Python call graph), collapses
+                            re-export facades, sets leaves aside (reusing a leaf is free), then compares the
+                            inner graph's complexity (its edges) with its ideal complexity: the transitive
+                            reduction (Aho, Garey & Ullman 1972), the smallest graph with the same reachability.
+                            reducible % = what could be removed today without losing a dependency: shortcuts
+                            (layer skips) and cycle edges. 0 % = ideal. Also cycles, hubs, propagation cost and
+                            the diamond shape (circuit rank) for the trend. `aix help graph` explains it fully.
+  aix validate              documentation integrity check described in section 5; exit 1 on errors
+  aix doctor                installation health: every skill linked in every runtime, no dangling links, pointer
+                            files present, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini,
+                            extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
+                            validate = is what we wrote right; doctor = is the tooling around it right.
+  aix coverage              regenerate docs/tests/coverage-matrix.md
   aix security [open|validated] [--gate]
                             state of the vulnerability register: rows not validated (expected, unverified,
                             confirmed, mitigated; worst first) with the audit skill to run, rows validated
@@ -363,48 +368,59 @@ Where does the vulnerability register stand? Reads docs/security/vulnerability-r
   --gate          release check: exit 1 if any row is open or lacks evidence
 The audits themselves are done by the security-audit-* skills; this only reports and gates.""",
 
-"graph": """aix graph [PATH...] [--functions] [--gate] [--max-excess PCT] [--report]     alias: aix complexity
+"graph": """aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report]     alias: aix complexity
 
-THE MODULARITY METRIC. Measures how far the codebase's dependency graph is from its ideal shape.
+THE MODULARITY METRIC. How much of the codebase's dependency complexity could be removed without losing a single
+dependency: 0 % = you are at the ideal complexity for the dependencies you have.
 
 What it builds
   modules (default)   nodes = source files; edges = imports between project files. Python, JavaScript/TypeScript,
-                      Rust, Java. External packages are ignored; unresolved imports are ignored, never guessed.
+                      Rust, Java. External packages ignored; unresolved imports ignored, never guessed.
   --functions         nodes = functions and methods (Python only, stdlib parser); edges = calls resolved by name
                       in the module, through imported names, and self.method(). Calls through typed objects
-                      (repo.save()) cannot be resolved statically and are absent: the function graph is a lower bound.
+                      (repo.save()) cannot be resolved statically: the function graph is a lower bound.
   PATH...             restrict to these folders (default: backend frontend shared infra src app tests lib)
 
-What it measures (N nodes, E edges, P connected components)
-  ground state        N - P edges. A forest: every node except the roots has exactly one dependant. The theoretical
-                      minimum for a connected codebase; defined as 0 % excess.
-  circuit rank        E - N + P. Edges beyond the ground state. Berge's cyclomatic number of the graph; McCabe's
-                      1976 complexity is the same formula applied inside one function's control flow.
-  excess              circuit rank / ground state, in %. How far above the ideal the whole graph sits.
-  leaf-adjusted       the same on the sub-graph without leaves (nodes with no dependencies). Many callers pointing
-    excess            at a pure leaf is free reuse, not tangling (see docs/meta-docs/architecture/modularity.md),
-                      so edges INTO leaves are not counted. THIS is the number to watch.
-  cycles              strongly connected components with more than one node. Always a defect: two nodes that
-                      depend on each other are one node in disguise. Studies link cycles to bug density.
-  hubs                fan-in >= 3 AND fan-out >= 3: a change there propagates everywhere. Composition roots
-                      (composition.py, main.py, app.py, index.ts ...) are hubs by design and are labelled so.
-  propagation cost    average share of the graph reachable from a node (MacCormack, Rusnak & Baldwin 2006).
-                      Roughly: how much of the system one change can touch. Healthy systems sit low (~5-15 %).
+Two normalisations before measuring
+  facades collapsed   an __init__.py / index.ts / mod.rs that only re-exports its own folder is a name, not a
+                      module; edges into it go to what it re-exports. Importing a package and its submodule is
+                      one dependency, not two.
+  leaves excluded     a leaf (no dependencies: pure functions, value types, parsers) may be reused by anyone for
+                      free (docs/meta-docs/architecture/modularity.md). Edges INTO leaves are not complexity.
+                      What remains is the inner graph.
+
+What it measures (inner graph, E edges)
+  complexity          E, the edges of the inner graph.
+  ideal complexity    the edges of its transitive reduction (Aho, Garey & Ullman 1972): the smallest graph with
+                      exactly the same reachability. Every dependency path is kept; only two things go:
+                        shortcuts   A -> C while A -> B -> C already exists: a layer skip, or a type that should
+                                    arrive through B. Edges out of composition roots and tests are exempt (wiring).
+                        cycles      each strongly connected component of k nodes keeps k-1 edges; the rest are
+                                    defects (two nodes that depend on each other are one node in disguise).
+  reducible           (complexity - ideal) / ideal in %. THE number. 10 % = one tenth of the edges could be
+                      removed today without changing what depends on what. 0 % = nothing to reduce.
+  propagation cost    average share of the graph reachable from a node (MacCormack, Rusnak & Baldwin 2006):
+                      how much of the system one change can touch. Invariant under shortcut removal, which is
+                      why shortcuts are pure cost. Healthy systems sit low (~5-15 %).
+  shape               circuit rank E - N + P (Berge; McCabe's number is the same formula inside one function),
+                      shown as % above a forest. Diamonds, two genuine paths converging on one node, raise it and
+                      are NOT reducible: a layered app is diamond-rich by design. Reported for the trend only.
+  hubs                fan-in >= 3 AND fan-out >= 3; composition roots are labelled as hubs by design.
 
 How to read the result
-  cycles > 0                     fix first; extract the shared part into a leaf, or merge the two nodes
-  leaf-adjusted excess rising    coupling is growing faster than the codebase; look at the top fan-out list
-  a hub that is not a root       split it: keep the pure part as a leaf, move the rest up to its callers
-  a diamond-rich DAG (high excess, no cycles, low propagation) is normal for layered apps; track the trend
+  cycles > 0                 fix first: extract the shared part into a leaf, or merge the two nodes
+  SHORTCUT lines             each is one removable edge; either drop the direct import or make the target a leaf
+  reducible rising           coupling is growing faster than the dependencies justify
+  a hub that is not a root   split it: keep the pure part as a leaf, move the rest up to its callers
 
 Options
-  --gate              exit 1 on any cycle, or when leaf-adjusted excess > --max-excess PCT (CI)
-  --report            also write docs/tests/dependency-graph.md (generated, git-ignored)
+  --gate                exit 1 on any cycle, or when reducible > --max-reducible PCT (CI)
+  --report              also write docs/tests/dependency-graph.md (generated, git-ignored)
 
 Examples
-  aix graph                       whole project, module level
-  aix graph backend --functions   Python call graph of the backend
-  aix graph --gate --max-excess 80
+  aix graph                        whole project, module level
+  aix graph backend --functions    Python call graph of the backend
+  aix graph --gate --max-reducible 20
 Used by: review-code-review on every diff (compare before/after), architecture-design-app, the definition of done.""",
 
 "task": """aix task new "Title" [--bucket next|backlog|ideas] | start ID | block ID "reason" | done ID | list
