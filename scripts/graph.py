@@ -4,14 +4,16 @@
 Nodes are modules (files) for Python, JavaScript/TypeScript, Rust and Java, or functions/methods for Python
 (`--functions`). Edges are imports / calls between project files (external packages ignored).
 
-  complexity        edges of the inner graph (leaves excluded: edges INTO a pure leaf are free reuse)
-  ideal complexity  edges of its transitive reduction (Aho, Garey & Ullman 1972): every dependency path kept,
-                    shortcuts and cycles removed. The lowest complexity with the same dependencies.
-  reducible         (complexity - ideal) / ideal, as %: what could be removed without losing any dependency path.
-                    0 % = nothing to reduce. Shortcuts are layer skips (A->C while A->B->C); cycle edges are defects.
-  shape             circuit rank E - N + P (Berge) and its % above a forest: how diamond-rich the DAG is. Diamonds
-                    are two genuine paths to one node and are NOT reducible; reported for the trend only.
-  cycles            strongly connected components with more than one node: the defects
+  stable nodes      instability I = out/(in+out) <= 0.25 (Martin): depending on them is free reuse, not counted
+  complexity        edges into non-stable nodes
+  ideal complexity  the transitive reduction (Aho, Garey & Ullman 1972) with cycles contracted: every dependency
+                    kept, shortcuts removed, each cycle at its acyclic minimum. The baseline: lowest complexity
+                    that delivers the same dependencies, achievable or not.
+  reducible         (complexity - ideal) / ideal, as %. Each counted edge is listed with its bypass ("also via B").
+  upward            edges into a composition root, or from a lower layer into a higher one: defects regardless
+  cycles            strongly connected components with more than one node: defects
+  NCCD, Q           Lakos' normalised cumulative dependency (1.0 = balanced binary tree); Newman modularity of
+                    the folder partition at depths 1-3
   hubs           nodes with high fan-in AND high fan-out: changes there propagate everywhere
   propagation    average share of the graph reachable from a node (MacCormack, Rusnak & Baldwin 2006)
 
@@ -269,6 +271,55 @@ def resolve_call(func, file, cls, imported, defs):
 
 # ---- metrics ------------------------------------------------------------------------------------------------
 
+STABLE_MAX = 0.25          # Martin's instability I = out / (in + out); at or below this a node is stable
+FACADE_NAMES = {"__init__.py", "index.ts", "index.tsx", "index.js", "mod.rs"}
+ROOT_STEMS = {"composition", "main", "app", "index", "server", "wiring"}
+LAYER = {  # folder name -> level; an edge from a lower level to a higher one is an upward dependency
+    "controllers": 4, "routers": 4, "views": 4, "pages": 4, "api": 4, "features": 4,
+    "services": 3, "use_cases": 3, "usecases": 3, "application": 3,
+    "adapters": 2, "repositories": 2, "ports": 2, "infrastructure": 2,
+    "models": 1, "domain": 1, "schemas": 1, "types": 1, "core": 1, "shared": 1, "errors": 1,
+}
+
+
+def is_root_or_test(node: str) -> bool:
+    """Composition roots and tests wire or exercise many modules directly: their out-edges are wiring, not design."""
+    p = Path(node)
+    return (p.stem in ROOT_STEMS and p.name not in FACADE_NAMES) or "tests" in p.parts or "test" in p.parts \
+        or p.name.startswith("test_") or ".test." in p.name or ".spec." in p.name or p.name.endswith("_test.py")
+
+
+def is_composition_root(node: str) -> bool:
+    p = Path(node)
+    return p.stem in ROOT_STEMS and p.name not in FACADE_NAMES
+
+
+def layer_of(node: str):
+    levels = [LAYER[part] for part in Path(node).parts if part in LAYER]
+    return levels[-1] if levels else None
+
+
+def collapse_facades(nodes, edges):
+    """A facade (__init__.py / index.ts / mod.rs) whose dependencies all lie inside its own folder is a name for
+    its submodules, not a module. Edges into it are redirected to what it re-exports; the facade is dropped."""
+    out = defaultdict(set)
+    for a, b in edges:
+        out[a].add(b)
+    facades = {n for n in nodes if Path(n).name in FACADE_NAMES and out[n]
+               and all(Path(b).parent == Path(n).parent or Path(n).parent in Path(b).parents for b in out[n])}
+    for _ in range(10):  # facades re-exporting facades
+        for f in facades:
+            out[f] = {x for b in out[f] for x in (out[b] if b in facades and b != f else {b})}
+    new_edges = set()
+    for a, b in edges:
+        if a in facades:
+            continue
+        for x in (out[b] if b in facades else {b}):
+            if x != a:
+                new_edges.add((a, x))
+    return nodes - facades, new_edges, len(facades)
+
+
 def components(nodes, edges):
     parent = {n: n for n in nodes}
 
@@ -282,7 +333,7 @@ def components(nodes, edges):
 
 
 def sccs(nodes, edges):
-    """Tarjan; returns cycles (SCCs with >1 node)."""
+    """Tarjan; cycles = strongly connected components with more than one node."""
     adj = defaultdict(list)
     for a, b in edges:
         adj[a].append(b)
@@ -305,42 +356,10 @@ def sccs(nodes, edges):
             if len(comp) > 1:
                 out.append(sorted(comp))
     sys.setrecursionlimit(max(10000, len(nodes) * 2))
-    for v in nodes:
+    for v in sorted(nodes):
         if v not in index:
             strong(v)
     return out
-
-
-def propagation_cost(nodes, edges):
-    adj = defaultdict(set)
-    for a, b in edges:
-        adj[a].add(b)
-    total = 0
-    for n in nodes:
-        seen, todo = set(), [n]
-        while todo:
-            x = todo.pop()
-            for y in adj[x]:
-                if y not in seen:
-                    seen.add(y); todo.append(y)
-        total += len(seen)
-    return total / (len(nodes) ** 2) * 100 if nodes else 0.0
-
-
-def excess(nodes, edges):
-    n, e, p = len(nodes), len(edges), components(nodes, edges)
-    ground = n - p
-    rank = e - ground
-    return ground, rank, (rank / ground * 100 if ground else 0.0)
-
-
-def leaf_adjusted(nodes, edges):
-    fan_out = defaultdict(int)
-    for a, _ in edges:
-        fan_out[a] += 1
-    inner = {n for n in nodes if fan_out[n] > 0}
-    inner_edges = {(a, b) for a, b in edges if b in inner}
-    return inner, inner_edges, excess(inner, inner_edges)
 
 
 def reach_sets(nodes, edges):
@@ -359,64 +378,6 @@ def reach_sets(nodes, edges):
     return adj, reach
 
 
-def ideal_complexity(nodes, edges):
-    """Edges of the transitive reduction (Aho, Garey & Ullman 1972): the smallest graph with the same reachability.
-    Every dependency path is kept; only shortcuts go (A->C when A already reaches C through B). Cycles have no
-    reduction, so each strongly connected component of k nodes is counted at its acyclic minimum, k-1 edges, and
-    the rest of its internal edges are reducible. Edges out of a composition root or a test are wiring, never shortcuts.
-    Returns (ideal_edge_count, shortcut_edges, reducible_cycle_edge_count)."""
-    scc_of = {}
-    for i, comp in enumerate(sccs(nodes, edges)):
-        for n in comp:
-            scc_of[n] = i
-    cycle_edges = {(a, b) for a, b in edges if a in scc_of and scc_of.get(b) == scc_of[a]}
-    dag = edges - cycle_edges
-    adj, reach = reach_sets(nodes, dag)
-    shortcuts = {(a, b) for a, b in dag if not is_composition_root(a) and any(b in reach[w] for w in adj[a] if w != b)}
-    sizes = defaultdict(int)
-    for n in scc_of:
-        sizes[scc_of[n]] += 1
-    cycle_min = sum(k - 1 for k in sizes.values())
-    ideal = len(dag) - len(shortcuts) + cycle_min
-    return ideal, shortcuts, len(cycle_edges) - cycle_min
-
-
-FACADE_NAMES = {"__init__.py", "index.ts", "index.tsx", "index.js", "mod.rs"}
-ROOT_STEMS = {"composition", "main", "app", "index", "server", "wiring"}
-
-
-def is_composition_root(node: str) -> bool:
-    """Composition roots and tests wire or exercise many modules directly: their out-edges are never shortcuts."""
-    p = Path(node)
-    return (p.stem in ROOT_STEMS and p.name not in FACADE_NAMES) or "tests" in p.parts or "test" in p.parts \
-        or p.name.startswith("test_") or ".test." in p.name or ".spec." in p.name or p.name.endswith("_test.py")
-
-
-def collapse_facades(nodes, edges):
-    """A facade is an __init__.py / index.ts / mod.rs whose dependencies all lie inside its own folder: a name for
-    its submodules, not a module. Edges into a facade are redirected to what it re-exports and the facade is
-    dropped, so `router -> models/__init__ -> user` plus `router -> user` is one dependency, not a shortcut."""
-    out = defaultdict(set)
-    for a, b in edges:
-        out[a].add(b)
-    facades = {n for n in nodes if Path(n).name in FACADE_NAMES and out[n]
-               and all(Path(b).parent == Path(n).parent or Path(n).parent in Path(b).parents for b in out[n])}
-    changed = True
-    while changed:  # facades re-exporting facades
-        changed = False
-        for f in list(facades):
-            if any(b in facades for b in out[f]):
-                out[f] = {x for b in out[f] for x in (out[b] if b in facades else {b})}
-                changed = True if any(b in facades for b in out[f]) else changed
-    new_edges = set()
-    for a, b in edges:
-        if a in facades:
-            continue
-        targets = out[b] if b in facades else {b}
-        new_edges |= {(a, x) for x in targets if x != a}
-    return nodes - facades, new_edges, len(facades)
-
-
 def degrees(nodes, edges):
     fi, fo = defaultdict(int), defaultdict(int)
     for a, b in edges:
@@ -424,42 +385,133 @@ def degrees(nodes, edges):
     return fi, fo
 
 
-# ---- report -----------------------------------------------------------------------------------------------
+def stable_nodes(nodes, edges):
+    """Instability I = out / (in + out) (Martin 1994). I <= STABLE_MAX: stable; depending on it is free reuse."""
+    fi, fo = degrees(nodes, edges)
+    return {n for n in nodes if (fi[n] + fo[n]) == 0 or fo[n] / (fi[n] + fo[n]) <= STABLE_MAX}
+
+
+def transitive_reduction(nodes, edges):
+    """On the graph with each cycle contracted to one node: an edge A->C is redundant when C is reachable from A
+    through another successor B (Aho, Garey & Ullman 1972; unique on a DAG). Returns (redundant {A->C: B}, cycle_edges,
+    cycle_minimum) where cycle_minimum = sum(k-1) over cycles, the edges an acyclic version of each cycle needs."""
+    scc_of = {}
+    for i, comp in enumerate(sccs(nodes, edges)):
+        for n in comp:
+            scc_of[n] = i
+    rep = lambda n: f"<cycle {scc_of[n]}>" if n in scc_of else n
+    cycle_edges = {(a, b) for a, b in edges if a in scc_of and scc_of.get(b) == scc_of[a]}
+    cnodes = {rep(n) for n in nodes}
+    cedges = {(rep(a), rep(b)) for a, b in edges - cycle_edges}
+    adj, reach = reach_sets(cnodes, cedges)
+    redundant = {}
+    for a, b in sorted(edges - cycle_edges):
+        ra, rb = rep(a), rep(b)
+        via = next((w for w in sorted(adj[ra]) if w != rb and rb in reach[w]), None)
+        if via is not None:
+            redundant[(a, b)] = via
+    sizes = defaultdict(int)
+    for n in scc_of:
+        sizes[scc_of[n]] += 1
+    return redundant, cycle_edges, sum(k - 1 for k in sizes.values())
+
+
+def upward_edges(nodes, edges):
+    """Dependencies that point the wrong way regardless of reachability: into a composition root, or from a
+    lower layer into a higher one (controllers > services > adapters/ports > models)."""
+    out = []
+    for a, b in sorted(edges):
+        if is_root_or_test(a):
+            continue
+        if is_composition_root(b):
+            out.append((a, b, "into the composition root"))
+            continue
+        la, lb = layer_of(a), layer_of(b)
+        if la is not None and lb is not None and la < lb:
+            out.append((a, b, f"layer {la} -> layer {lb}"))
+    return out
+
+
+def nccd(nodes, edges):
+    """Lakos: CCD = sum over nodes of (1 + transitive dependencies); NCCD = CCD / CCD of a balanced binary tree of
+    the same size, (N+1)·log2(N+1) − N. 1.0 = as coupled as an ideal tree; > 1 more coupled."""
+    import math
+    n = len(nodes)
+    if n < 2:
+        return 0.0
+    _, reach = reach_sets(nodes, edges)
+    ccd = sum(1 + len(reach[x]) for x in nodes)
+    tree = (n + 1) * math.log2(n + 1) - n
+    return ccd / tree
+
+
+def modularity_q(nodes, edges, depth):
+    """Newman–Girvan Q for the partition 'first `depth` path components'; edges taken undirected.
+    Q = 1/2m · Σ (A_ij − k_i k_j / 2m) δ(c_i, c_j). ~0: folders mean nothing; 0.3–0.7: real community structure."""
+    und = {tuple(sorted(e)) for e in edges if e[0] != e[1]}
+    m = len(und)
+    if m == 0:
+        return 0.0, 0
+    cluster = {n: "/".join(Path(n).parts[:depth]) for n in nodes}
+    deg = defaultdict(int)
+    for a, b in und:
+        deg[a] += 1; deg[b] += 1
+    inside = sum(1 for a, b in und if cluster[a] == cluster[b])
+    deg_by_cluster = defaultdict(int)
+    for n in nodes:
+        deg_by_cluster[cluster[n]] += deg[n]
+    expected = sum(d * d for d in deg_by_cluster.values()) / (4 * m * m)
+    return inside / m - expected, len(set(cluster.values()))
+
 
 def measure(nodes, edges):
-    ground, rank, pct = excess(nodes, edges)
-    nodes, edges, facades = collapse_facades(nodes, edges)
-    inner, inner_edges, (g2, r2, pct2) = leaf_adjusted(nodes, edges)
-    ideal, shortcuts, cycle_edges = ideal_complexity(inner, inner_edges)
-    reducible = len(inner_edges) - ideal
+    nodes, edges, facades = collapse_facades(set(nodes), set(edges))
+    stable = stable_nodes(nodes, edges)
+    redundant, cycle_edges, cycle_min = transitive_reduction(nodes, edges)
+    counted = {(a, b) for a, b in edges if b not in stable}                   # complexity: edges into non-stable nodes
+    wiring = {(a, b) for a, b in counted if is_root_or_test(a)}                # roots/tests: wiring, never shortcuts
+    shortcuts = {e: via for e, via in redundant.items() if e in counted and e not in wiring}
+    cyc_counted = {e for e in cycle_edges if e in counted}
+    cyc_reducible = max(0, len(cyc_counted) - cycle_min)
+    complexity = len(counted)
+    ideal = complexity - len(shortcuts) - cyc_reducible
     fi, fo = degrees(nodes, edges)
-    return dict(n=len(nodes), e=len(edges), p=components(nodes, edges), ground=ground, rank=rank, pct=pct,
-                inner=len(inner), inner_edges=len(inner_edges), ground2=g2, rank2=r2, pct2=pct2,
-                ideal=ideal, reducible=reducible, reducible_pct=(reducible / ideal * 100 if ideal else 0.0),
-                shortcuts=sorted(shortcuts), cycle_edges=cycle_edges, facades=facades,
-                cycles=sccs(nodes, edges), hubs=sorted((n for n in nodes if fi[n] >= HUB_FAN and fo[n] >= HUB_FAN), key=lambda n: -(fi[n] + fo[n])),
-                fan_out=sorted(nodes, key=lambda n: -fo[n])[:5], fi=fi, fo=fo, prop=propagation_cost(nodes, edges))
+    _, reach = reach_sets(nodes, edges)
+    return dict(
+        n=len(nodes), e=len(edges), p=components(nodes, edges), facades=facades,
+        stable=len(stable), reuse=len(edges) - complexity, wiring=len(wiring),
+        complexity=complexity, ideal=ideal, shortcuts=shortcuts, cyc_reducible=cyc_reducible,
+        reducible=(complexity - ideal), reducible_pct=((complexity - ideal) / ideal * 100 if ideal else 0.0),
+        cycles=sccs(nodes, edges), upward=upward_edges(nodes, edges),
+        hubs=sorted((x for x in nodes if fi[x] >= HUB_FAN and fo[x] >= HUB_FAN), key=lambda x: -(fi[x] + fo[x])),
+        fi=fi, fo=fo,
+        prop=(sum(len(r) for r in reach.values()) / (len(nodes) ** 2) * 100 if nodes else 0.0),
+        nccd=nccd(nodes, edges),
+        q={d: modularity_q(nodes, edges, d) for d in (1, 2, 3)},
+    )
 
+
+# ---- report -----------------------------------------------------------------------------------------------
 
 def render(m, level, scope):
+    q = "  ".join(f"depth {d}: {v:.2f} ({k} folders)" for d, (v, k) in m["q"].items() if k > 1)
     lines = [f"Dependency graph ({level}) — {scope}", "",
-             f"  nodes {m['n']}, edges {m['e']}, components {m['p']}; {m['facades']} facades (__init__/index re-exports) collapsed;",
-             f"  inner graph (leaves excluded, their reuse is free): {m['inner']} nodes, {m['inner_edges']} edges",
-             f"  complexity        {m['inner_edges']} edges",
-             f"  ideal complexity  {m['ideal']} edges  (transitive reduction: every dependency path kept, shortcuts and cycles removed)",
-             f"  reducible         {m['reducible_pct']:.1f} %  ({m['reducible']} edges add no dependency path: {len(m['shortcuts'])} shortcuts, {m['cycle_edges']} cycle edges)",
-             f"  propagation cost  {m['prop']:.1f} %  (average share of the graph a change can reach)",
-             f"  shape: circuit rank {m['rank']} = {m['pct']:.1f} % above a forest (diamonds; not reducible by itself), leaf-adjusted {m['pct2']:.1f} %",
-             f"  cycles {len(m['cycles'])}, hubs {len(m['hubs'])} (fan-in and fan-out both >= {HUB_FAN})", ""]
+             f"  nodes {m['n']}, edges {m['e']}, components {m['p']}; {m['facades']} re-export facades collapsed",
+             f"  stable nodes (instability <= {STABLE_MAX}) {m['stable']}; edges into them, free reuse, not counted: {m['reuse']}",
+             f"  complexity        {m['complexity']} edges (into non-stable nodes)",
+             f"  ideal complexity  {m['ideal']} edges (transitive reduction: every dependency kept; cycles at their acyclic minimum)",
+             f"  reducible         {m['reducible_pct']:.1f} %  ({m['reducible']} edges: {len(m['shortcuts'])} shortcuts, {m['cyc_reducible']} cycle edges; wiring from roots/tests exempt: {m['wiring']})",
+             f"  cycles {len(m['cycles'])}   upward dependencies {len(m['upward'])}   hubs {len(m['hubs'])} (fan-in and fan-out both >= {HUB_FAN})",
+             f"  propagation cost {m['prop']:.1f} %   NCCD {m['nccd']:.2f} (1.0 = balanced binary tree, Lakos)   modularity Q by folder {q or 'n/a'}", ""]
     for c in m["cycles"][:10]:
         lines.append(f"  CYCLE     {' -> '.join(c)} -> {c[0]}")
-    for a, b in m["shortcuts"][:10]:
-        lines.append(f"  SHORTCUT  {a} -> {b}  (already reached through an intermediate: a layer skip)")
+    for a, b, why in m["upward"][:15]:
+        lines.append(f"  UPWARD    {a} -> {b}  ({why})")
+    for (a, b), via in sorted(m["shortcuts"].items())[:15]:
+        lines.append(f"  SHORTCUT  {a} -> {b}  also reached via {via}")
     for h in m["hubs"][:10]:
-        note = "composition root / entry point: a hub by design" if Path(h).stem in ("composition", "main", "app", "index", "server", "wiring") else "split it: keep the leaf part, move the rest up"
+        note = "composition root: a hub by design" if is_composition_root(h) else "split it: keep the stable part, move the rest up"
         lines.append(f"  HUB       {h}  (in {m['fi'][h]}, out {m['fo'][h]})  {note}")
-    if m["fan_out"] and m["fo"][m["fan_out"][0]] > 0:
-        lines.append("  top fan-out: " + ", ".join(f"{n} ({m['fo'][n]})" for n in m["fan_out"] if m["fo"][n] > 0))
     return "\n".join(lines)
 
 
@@ -469,10 +521,39 @@ def write_report(text: str):
     return out
 
 
-USAGE = "usage: aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report]"
+# ---- self-test: graphs with known answers -----------------------------------------------------------------------
+
+def selftest():
+    cases = [
+        ("chain a->b->c->d", {("a", "b"), ("b", "c"), ("c", "d")}, dict(reducible=0, cycles=0)),
+        ("diamond a->b->d, a->c->d", {("a", "b"), ("a", "c"), ("b", "d"), ("c", "d")}, dict(reducible=0, cycles=0)),
+        ("diamond + shortcut a->d into a stable leaf d: free reuse", {("a", "b"), ("a", "c"), ("b", "d"), ("c", "d"), ("a", "d")}, dict(reducible=0, cycles=0, reuse=3)),
+        ("diamond + shortcut a->d, d unstable (d->e, d->f)", {("a", "b"), ("a", "c"), ("b", "d"), ("c", "d"), ("a", "d"), ("d", "e"), ("d", "f")}, dict(reducible=1, cycles=0, shortcut=("a", "d"))),
+        ("two-node cycle", {("a", "b"), ("b", "a"), ("a", "c")}, dict(reducible=1, cycles=1)),
+        ("stable leaf reused: a->s, b->s, a->b", {("a", "s"), ("b", "s"), ("a", "b")}, dict(reducible=0, cycles=0, reuse=2)),
+        ("layer skip x/controllers/r -> x/services/s -> x/models/m, r->m (m stable)",
+         {("x/controllers/r.py", "x/services/s.py"), ("x/services/s.py", "x/models/m.py"), ("x/controllers/r.py", "x/models/m.py"), ("y/z.py", "x/models/m.py")},
+         dict(reducible=0, cycles=0)),
+        ("upward: x/models/m -> x/services/s", {("x/models/m.py", "x/services/s.py")}, dict(upward=1)),
+    ]
+    failed = 0
+    for name, edges, want in cases:
+        nodes = {n for e in edges for n in e}
+        m = measure(nodes, edges)
+        got = dict(reducible=m["reducible"], cycles=len(m["cycles"]), reuse=m["reuse"], upward=len(m["upward"]))
+        ok = all(got[k] == v for k, v in want.items() if k != "shortcut") and ("shortcut" not in want or want["shortcut"] in m["shortcuts"])
+        failed += not ok
+        print(f"  {'PASS' if ok else 'FAIL'}  {name}: {', '.join(f'{k}={got[k]}' for k in want if k != 'shortcut')}")
+    print("selftest: " + ("all passed" if not failed else f"{failed} FAILED"))
+    sys.exit(1 if failed else 0)
+
+
+USAGE = "usage: aix graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]"
 
 
 def main(args):
+    if "--selftest" in args:
+        return selftest()
     functions, gate, report = "--functions" in args, "--gate" in args, "--report" in args
     max_reducible = None
     for flag in ("--max-reducible", "--max-excess"):  # --max-excess kept as an alias
@@ -491,6 +572,8 @@ def main(args):
         bad = []
         if m["cycles"]:
             bad.append(f"{len(m['cycles'])} cycle(s)")
+        if m["upward"]:
+            bad.append(f"{len(m['upward'])} upward dependency(ies)")
         if max_reducible is not None and m["reducible_pct"] > max_reducible:
             bad.append(f"reducible complexity {m['reducible_pct']:.1f} % > {max_reducible:g} %")
         if bad:

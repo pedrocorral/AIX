@@ -50,13 +50,14 @@ configuration, I/O or a domain. Every change to a hub propagates to all its depe
 - **Fan-in only on leaves**: list the top-N most-imported modules; each must have no upward dependency.
 - **Propagation**: for a change in node X, the set of nodes that can be affected is X's dependents. Keep that set
   a sub-tree, not the whole graph.
-`aix graph` (alias `aix complexity`) measures all of this deterministically. It collapses re-export facades, sets
-leaves aside (reusing a leaf is free), and compares the inner graph's **complexity** (its edges) with its **ideal
-complexity**: the transitive reduction (Aho, Garey & Ullman 1972), the smallest graph with exactly the same
-dependencies. The difference is the **reducible** complexity, in %: shortcuts (A → C while A → B → C: layer skips)
-and cycle edges. 0 % means nothing can be removed without losing a dependency. It also reports cycles, hubs,
-propagation cost and the diamond shape (circuit rank) for the trend. Run it before reasoning about the code;
-`review-code-review` runs it on every diff and `aix graph --gate` fails CI on any cycle or on reducible above a limit.
+`aix graph` (alias `aix complexity`) measures all of this deterministically. It collapses re-export facades,
+treats edges into **stable** nodes (Martin's instability ≤ 0.25) as free reuse, and compares the real graph's
+**complexity** with its **ideal complexity**: the transitive reduction with cycles contracted (Aho, Garey & Ullman
+1972), the lowest complexity that delivers the same dependencies. The ideal is a baseline, achievable or not; the
+distance from it, **reducible %**, is the number, and every counted edge is listed with its bypass. Separately it
+reports cycles, upward dependencies (into a composition root or against the layer order), hubs, propagation cost,
+Lakos' NCCD and Newman's modularity Q of the folder partition. Run it before reasoning about the code;
+`review-code-review` runs it on every diff and `aix graph --gate` fails CI on any cycle or upward dependency.
 
 ## Evidence (this is established engineering, not taste)
 - Parnas, *On the Criteria To Be Used in Decomposing Systems into Modules*, 1972 — one design decision per module.
@@ -67,6 +68,13 @@ propagation cost and the diamond shape (circuit rank) for the trend. Run it befo
 - MacCormack, Rusnak, Baldwin, *Exploring the Structure of Complex Software Designs*, 2006 — propagation cost;
   lower in Linux than in pre-rewrite Mozilla.
 - Cai & Kazman, design-rule-space studies — files in dependency cycles carry a disproportionate share of bugs and churn.
+- Sturtevant, *System Design and the Cost of Architectural Complexity*, MIT 2013 — files in the cyclic core: several
+  times the defect density, lower developer productivity, higher turnover.
+- Mo, Cai, Kazman, Xiao, Feng, *Decoupling Level*, ICSE 2016 — architecture anti-patterns predict maintenance cost.
+- Simon, *The Architecture of Complexity*, 1962 — near-decomposable hierarchies; Newman & Girvan, 2004 — modularity Q.
+- Aho, Garey & Ullman, *The Transitive Reduction of a Directed Graph*, 1972 — the ideal-complexity baseline.
+- Martin, *OO Design Quality Metrics*, 1994 — instability; depend toward stability. Murphy, Notkin & Sullivan,
+  *Software Reflexion Models*, 1995 — checking code against an intended structure (the upward-dependency check).
 - Cargo (Rust) and Go refuse to compile dependency cycles between crates/packages.
 
 ## Anti-patterns to name in reviews

@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+## 1.5.1 — 2026-09-06
+- `aix graph`: measurement fixed and tested. Stable nodes by Martin instability (≤ 0.25) replace the fan-out-zero leaf rule (removed the false positives on models); transitive reduction on the graph with cycles contracted; every shortcut listed with its bypass; upward dependencies (into a composition root, or against the layer order) listed and gated; Lakos NCCD and Newman folder modularity Q; `--selftest` with known-answer cases. Verified on a real project by reading every candidate.
 - `aix graph`: the headline is now **reducible complexity** = (complexity − ideal complexity) / ideal, where ideal complexity is the transitive reduction of the inner graph (facades collapsed, leaves excluded; composition roots and tests exempt from shortcut counting). 0 % = nothing removable without losing a dependency. `--max-reducible` (alias `--max-excess`). "Ground state" wording replaced.
 
 ## 1.5.0 — 2026-09-06
