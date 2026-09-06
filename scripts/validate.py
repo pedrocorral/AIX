@@ -20,7 +20,19 @@ def frontmatter(p: Path):
         return None, t
     end = t.find("\n---", 3)
     fm = t[3:end]
-    return dict(re.findall(r"^([a-zA-Z_]+):\s*(.*)$", fm, re.M)), t
+    out = {}
+    for m in re.finditer(r"^([a-zA-Z_]+):[ \t]*(.*)$", fm, re.M):
+        key, value = m.group(1), m.group(2).strip()
+        if value in (">", "|", ">-", "|-"):  # YAML block scalar: join the indented lines that follow
+            block = []
+            for line in fm[m.end():].splitlines()[1:]:
+                if line.startswith((" ", "\t")):
+                    block.append(line.strip())
+                else:
+                    break
+            value = " ".join(block)
+        out[key] = value
+    return out, t
 
 
 def check_skills():

@@ -19,8 +19,20 @@ RUNTIME = {".opencode/skills": "opencode", ".claude/skills": "claude", ".github/
 
 
 def front_matter(text: str, key: str) -> str:
-    m = re.search(rf"^{key}:\s*(.*)$", text, re.M)
-    return m.group(1).strip() if m else ""
+    """Value of a front-matter key; YAML block scalars (`>` / `|`) are joined from their indented lines."""
+    m = re.search(rf"^{key}:[ \t]*(.*)$", text, re.M)
+    if not m:
+        return ""
+    value = m.group(1).strip()
+    if value not in (">", "|", ">-", "|-"):
+        return value
+    lines = []
+    for line in text[m.end():].splitlines()[1:]:
+        if line.startswith((" ", "\t")):
+            lines.append(line.strip())
+        else:
+            break
+    return " ".join(lines)
 
 
 def registry_groups():
