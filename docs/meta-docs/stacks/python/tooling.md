@@ -10,3 +10,8 @@ title: Python tooling
 - Migrations: Alembic (SQLAlchemy) or Django migrations.
 - Pre-commit: ruff, mypy (changed files), detect-secrets, `aix docs validate`.
 - Run everything through `Makefile` targets or `uv run` so agents don't guess commands; document them in `infra/README.md`.
+
+## Readability limits in the linter (same numbers as `aix code style`, `conventions/readability.md`)
+- ruff: `C901` (mccabe, `max-complexity = 10`), `PLR0913` (too many arguments, `max-args = 5`), `PLR0912`/`PLR0915`
+  (branches/statements), `N8xx` naming, `D1xx` missing docstrings; `flake8-cognitive-complexity` for cognitive ≤ 15.
+- radon `cc` / `mi` for a code-base-wide view; `aix code style` for the ranked, cross-language report.

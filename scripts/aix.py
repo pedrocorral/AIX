@@ -34,6 +34,11 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
   aix code clones [PATH...] [--similarity PCT] [--gate]
                                       duplicated functions: exact groups (same structure, other names/literals)
                                       and near-clones above the threshold (default 70 %)
+  aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
+                                      readability, per function: lines, cognitive and cyclomatic complexity,
+                                      nesting, parameters, names, docstring, magic numbers; limits in
+                                      framework.yaml. TARGET = folder | file[.ext] | file:func | file::Class.m;
+                                      a single function gets a card with line-numbered findings and advice
 
 The docs                              (aix docs ...)
   aix docs validate                   are the DOCS right? IDs, links, indexes, front-matter, status vs code markers,
@@ -224,6 +229,10 @@ one holding framework.yaml). Commands are grouped by what they act on; `aix help
                             methods never referenced by name (decorated, dunder, exported, entry/test code excluded)
   aix code clones           duplicated functions: exact groups (same structure, other names/literals) and
                             near-clones above --similarity PCT (default 70). Candidates: merge on shared purpose.
+  aix code style            readability per function (lines, cognitive and cyclomatic complexity, nesting,
+                            parameters, names, docstring, magic numbers) against the limits in framework.yaml;
+                            a folder or file gives a ranked table, one function (file:func) a card with
+                            line-numbered findings and advice. Limits and evidence: conventions/readability.md.
 
   The docs (aix docs ...)
   aix docs validate         documentation integrity check described in section 5, plus status drift (a doc may
@@ -479,7 +488,39 @@ Groups (filters): general = behaviour that applies to every session (style, meth
 "version": "aix version    prints the kit version from framework.yaml.",
 "help": "aix help [COMMAND]    this list, or the detailed help for one command or group (e.g. aix help code dead; also: aix code dead --help).",
 }
-TOPICS["code"] = """aix code graph | complexity | dead | clones   [PATH...] [--gate] [--report]
+TOPICS["code style"] = """aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
+
+READABILITY, per function, with specific feedback. TARGET is a folder, a file (extension optional), or one
+function: path:func, path/func, path::Class.method. A folder or file gives a table ranked worst first; a single
+function gives a card: each metric against its limit, then every finding with its line and what to do.
+
+Metrics and limits (framework.yaml `style:` block; sources in docs/meta-docs/conventions/readability.md)
+  lines                  60   NASA/JPL one page; McConnell: a ceiling, not a target
+  cognitive complexity   15   Campbell / SonarSource 2017: nesting and breaks in linear flow; built for readability
+  cyclomatic complexity  10   McCabe 1976: independent paths = tests needed
+  nesting depth           4   Kernighan & Plauger, McConnell
+  parameters              5   pylint default; McConnell's hard limit 7
+  file lines            400
+Advice (not gated): naming (language casing, single-letter names outside loops), missing docstring on a public
+function, magic numbers. Evidence for names: Lawrie 2006, Butler 2010, Hofmeister 2017.
+
+Feedback is concrete: "72 lines: the deepest block is lines 40-58, extract it", "cognitive 31: biggest costs at
+line 12 (loop, nesting +2) ...", "nesting 5 at lines 44-52: invert the condition and return early",
+"6 parameters: group them into one object".
+
+Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust and Java are measured from
+tokens and braces: close for lines, parameters and nesting, approximate for complexity.
+  --gate      exit 1 if any function is over a limit or any file too long (advice never fails the gate)
+  --all       full table instead of the top 30
+  --report    also write docs/tests/code-style.md
+  --selftest  known-answer cases (Sonar's example scores 9, a five-deep nest scores 5, ...)
+Examples
+  aix code style backend                       ranked table
+  aix code style backend/app/notes/services/note_service:create   one function, full card
+  aix code style frontend/src/app/App.tsx::handleSaveNote
+The stack linters enforce the same limits in the editor: stacks/<lang>/tooling."""
+
+TOPICS["code"] = """aix code graph | complexity | dead | clones | style   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (scripts/graph.py). All read the same dependency graph of the project's source
 (Python, JS/TS, Rust, Java modules; Python functions with --functions); PATH... limits the folders.
@@ -487,8 +528,10 @@ Three tools on one engine (scripts/graph.py). All read the same dependency graph
                       cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.  alias: complexity
   aix code dead       dead code: modules no entry point reaches; with --functions, Python functions never referenced
   aix code clones     duplicated functions: exact groups (same structure) and near-clones (--similarity PCT)
+  aix code style      readability per function: lines, cognitive/cyclomatic complexity, nesting, parameters,
+                      names, docstring, magic numbers; one function = a card with line-numbered advice
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
-proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones."""
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style."""
 TOPICS["docs"] = """aix docs validate | coverage | security
 
   aix docs validate   are the DOCS right? front-matter, INDEXes, IDs, links, TS -> FR, VUL statuses, field
@@ -508,7 +551,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -591,6 +634,9 @@ CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--c
 
 
 def run_code(args):
+    if args and args[0] == "style":
+        import style
+        return style.main(args[1:])
     import graph
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args

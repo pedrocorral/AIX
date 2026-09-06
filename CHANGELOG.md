@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.0 — 2026-09-06
+- `aix code style [TARGET...]`: readability per function (lines, cognitive complexity per SonarSource, cyclomatic, nesting, parameters, naming, docstring, magic numbers) with limits in `framework.yaml` `style:`; targets are folders, files (extension optional) or one function (`file:func`, `file/func`, `file::Class.method`) which gets a card with line-numbered findings and advice; `--gate` on limits only; `--selftest`. `docs/meta-docs/conventions/readability.md` with the evidence; linter rule names per stack; wired into AGENTS.md, code-review, implement-feature and the definition of done.
+
 ## 1.6.0 — 2026-09-06
 - Commands grouped by what they act on: `aix code graph|complexity|dead|clones`, `aix docs validate|coverage|security`, plus the kit commands (`install`, `upgrade`, `doctor`, `about`, `version`, `help`), `aix task`, `aix skills`. `aix help code`, `aix help docs` and `aix help code dead` etc. Old forms (`aix graph`, `aix complexity`, `aix validate`, `aix coverage`, `aix security`) remain as aliases for the 1.x line.
 

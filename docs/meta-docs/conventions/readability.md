@@ -1,0 +1,40 @@
+---
+id: META-CONV-READABILITY
+title: Readability — function size, complexity, nesting, names
+read_when: Writing or reviewing any function; when `aix code style` reports a finding.
+---
+# Readability
+
+Modularity (`architecture/modularity.md`) shapes the graph between functions; this page shapes the inside of one.
+The rules below have measurements behind them; the limits are in `framework.yaml` (`style:` block) and
+`aix code style` enforces them with line-numbered feedback.
+
+## Limits (per function unless noted)
+| Metric | Limit | Why this number |
+|---|---|---|
+| Cognitive complexity | 15 | Campbell / SonarSource 2017: counts nesting and breaks in linear flow, built to measure understandability. Sonar's default. |
+| Cyclomatic complexity | 10 | McCabe 1976: number of independent paths, hence tests needed. His own recommendation. |
+| Nesting depth | 4 | Kernighan & Plauger; McConnell *Code Complete*: comprehension collapses beyond 3–4 levels. |
+| Parameters | 5 | pylint default; McConnell's hard limit is 7; *Clean Code*: three is already many. |
+| Lines | 60 | NASA/JPL *Power of 10*: one printed page. McConnell's survey: defects rise in very long routines; below ~50 lines shorter is not automatically better, so this is a ceiling, not a target. |
+| File lines | 400 | one responsibility per file; longer files are usually two modules. |
+
+## Names (evidence: Lawrie et al. 2006; Butler et al. 2010; Hofmeister et al. 2017)
+- Full words, not abbreviations: `customer_count`, not `cust_cnt`. Descriptive names speed defect finding by ~19 %.
+- Functions are verbs (`load_orders`, `is_valid`); values are nouns; booleans read as questions (`is_`, `has_`, `can_`).
+- One-letter names only for loop counters and maths.
+- The language's casing: `snake_case` in Python and Rust, `camelCase` in JavaScript/TypeScript and Java, `UPPER_CASE` constants.
+- Naming flaws correlate with defects (Butler): a name that looks wrong is a review finding, not a nit.
+
+## Structure (convention from *Clean Code* and *Code Complete*)
+- One job per function; if the description needs "and", split.
+- One level of abstraction per function: a function either orchestrates calls or does the work, not both.
+- Guard clauses and early returns instead of nested `if`s; extract the deepest block into a named function.
+- Magic numbers become named constants; the name is the comment.
+- A public function carries a one-line docstring or doc comment: what it does and when to call it.
+
+## Tooling
+`aix code style [TARGET...]` — ranked table for a folder or file, a full card for one function
+(`file:func`, `file/func`, `file::Class.method`; extension optional), `--gate` for CI (fails on limits only; names,
+docstrings and magic numbers are advice). Python is measured exactly; JS/TS, Rust, Java approximately.
+The stack linters enforce the same limits in the editor: see `stacks/<lang>/tooling` for the rule names.

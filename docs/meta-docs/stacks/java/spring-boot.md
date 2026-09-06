@@ -11,3 +11,7 @@ title: Spring Boot mapping
 - Composition = Spring configuration classes selecting adapters by `@ConditionalOnProperty("persistence.backend")`.
 - Tests: JUnit 5, AssertJ, Testcontainers, ArchUnit for the dependency rule, Spring Boot slice tests for controllers.
 - Security: Spring Security; method-level authorisation in services (`@PreAuthorize` or explicit policy), OWASP dependency-check.
+
+## Readability limits in the linter (same numbers as `aix code style`, `conventions/readability.md`)
+- Checkstyle: `CyclomaticComplexity max=10`, `NestedIfDepth max=4`, `ParameterNumber max=5`, `MethodLength max=60`,
+  `MethodName`/`LocalVariableName` patterns; SonarQube `java:S3776` cognitive complexity ≤ 15.

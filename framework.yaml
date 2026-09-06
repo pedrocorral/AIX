@@ -1,6 +1,6 @@
 # AIX manifest. Tools and scripts read this; agents rarely need to.
 name: aix
-version: 1.6.0
+version: 1.7.0
 spec: https://agentskills.io   # skills follow the Agent Skills open format (SKILL.md + YAML front-matter)
 entrypoint: AGENTS.md
 paths:
@@ -36,3 +36,10 @@ code_markers:
   tests: "@tests"
   mitigates: "@mitigates"
 disabled_skills: []   # managed by `aix skills enable|disable`
+style:                    # aix code style limits (per function unless noted); sources in docs/meta-docs/conventions/readability.md
+  max_lines: 60           # NASA/JPL "one page"; McConnell: defects rise well above this
+  max_cognitive: 15       # SonarSource default
+  max_cyclomatic: 10      # McCabe's original recommendation
+  max_nesting: 4          # Kernighan & Plauger, McConnell
+  max_params: 5           # pylint default; McConnell's hard limit is 7
+  max_file_lines: 400

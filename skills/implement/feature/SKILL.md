@@ -16,3 +16,5 @@ Inputs: task file (`context_files`), FR/API/DM docs listed there, `docs/meta-doc
 
 ## Rules
 Smallest change that satisfies the ACs; no speculative generality; no new dependency without noting it in the task (and `security-audit-dependencies`); no behaviour beyond the requirement (if needed → `spec-write-requirement` first).
+
+Before hand-off: `aix code style <changed files>` must show no function over a limit (`conventions/readability.md`); `aix code graph --gate` no cycle or upward dependency.

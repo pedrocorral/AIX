@@ -10,3 +10,8 @@ title: Frontend (React / Vue / Svelte)
 - Testing: Vitest/Jest unit, Testing Library component tests with `api/` mocked (msw), Playwright e2e for journeys; `@tests TS-…` in comments.
 - Accessibility: semantic HTML, keyboard paths, axe checks per view (`NFR-A11Y-*`).
 - Tooling: TypeScript strict, ESLint + Prettier, `npm audit` in CI, dependency lockfile.
+
+## Readability limits in the linter (same numbers as `aix code style`, `conventions/readability.md`)
+- ESLint: `complexity: ["error", 10]`, `max-depth: ["error", 4]`, `max-params: ["error", 5]`,
+  `max-lines-per-function: ["error", 60]`, `camelcase`, `id-length: ["error", { "min": 2, "exceptions": ["i","j","k","x","y","_"] }]`;
+  `eslint-plugin-sonarjs` `cognitive-complexity: ["error", 15]`.
