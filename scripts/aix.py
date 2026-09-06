@@ -22,10 +22,17 @@ aix acts on the nearest project at or above the current folder (the one holding 
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
   aix coverage                        regenerate docs/tests/coverage-matrix.md (requirement -> test -> code gaps)
-  aix graph | complexity [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report]
-                                      the modularity metric: real graph vs ideal (transitive reduction) = reducible
-                                      %, each edge listed with its bypass; cycles, upward deps, hubs, propagation,
-                                      NCCD, folder Q. Python, JS/TS, Rust, Java; --functions: Python calls
+  aix graph [PATH...]                 the modularity metric (alias: aix complexity): real dependency graph vs its
+                                      ideal (transitive reduction) = reducible %, each edge listed with its bypass;
+                                      cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.
+                                      Python, JS/TS, Rust, Java modules; PATH... limits the folders measured
+      --functions                     Python call graph (functions and methods) instead of modules
+      --gate                          CI: exit 1 on any cycle, any upward dependency, or reducible above the limit
+      --max-reducible PCT             the limit for --gate (default: none, cycles and upward only)
+      --report                        also write docs/tests/dependency-graph.md
+      --selftest                      run the built-in known-answer cases (chain, diamond, shortcut, cycle, reuse,
+                                      layer skip, upward); proves the arithmetic before you trust a report
+                                      full explanation: aix help graph
   aix security [open|validated]       vulnerability register: which VUL rows are validated (evidence) and which
                                       are not, which audit skills still to run; --gate exits 1 if any row is open
   aix task new "Title" [--bucket next|backlog|ideas]
