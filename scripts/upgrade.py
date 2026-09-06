@@ -120,6 +120,44 @@ def copy_content(src: Path, dst: Path):
             pass
 
 
+def line_count(path: Path) -> int:
+    try:
+        return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+    except OSError:
+        return 0
+
+
+def line_delta(src: Path, dst: Path, new_text: str = None) -> str:
+    """'+a -r lines' from the project's file to what the upgrade would write (the kit file, or `new_text`)."""
+    import difflib
+    a = dst.read_text(encoding="utf-8", errors="replace").splitlines() if dst.exists() else []
+    b = new_text.splitlines() if new_text is not None else src.read_text(encoding="utf-8", errors="replace").splitlines()
+    added = removed = 0
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b).get_opcodes():
+        if tag in ("replace", "delete"):
+            removed += i2 - i1
+        if tag in ("replace", "insert"):
+            added += j2 - j1
+    return f"+{added} -{removed} lines"
+
+
+def describe(project: Path, d: str, action: str, rel: Path) -> str:
+    """One verbose line for the dry run: what happens to this file and how big the change is."""
+    src, dst = KIT / d / rel, project / d / rel
+    shown = f"{d}/{rel}" if d != "." else str(rel)
+    if action == "add":
+        return f"  add     {shown}  ({line_count(src)} lines, new in kit)"
+    if action == "remove":
+        return f"  remove  {shown}  ({line_count(dst)} lines, no longer in kit)"
+    if action == "merge":
+        kept = [h for h in KEEP_SECTIONS if section(dst.read_text(encoding="utf-8"), h)] if dst.exists() else []
+        keep = ", keeping your " + " and ".join(f"'{h[3:]}'" for h in kept) if kept else ""
+        if rel.name == "framework.yaml":
+            keep = ", keeping your disabled_skills"
+        return f"  merge   {shown}  (kit text{keep}; {line_delta(src, dst, merged_text(project, rel.name))})"
+    return f"  update  {shown}  ({line_delta(src, dst)})"
+
+
 def confirm(question: str) -> bool:
     if not sys.stdin.isatty():
         sys.exit("no terminal to confirm; rerun with --yes")
@@ -140,16 +178,16 @@ def main(args):
     print(f"upgrade {project}\n  kit {version_of(KIT)} (this checkout: {KIT})  ->  project {version_of(project)}")
     if not rows:
         print("  already up to date"); return
-    for action in ("add", "update", "remove", "merge"):
-        items = [f"{d}/{rel}" if d != "." else str(rel) for d, a, rel in rows if a == action]
-        if items:
-            print(f"  {action} ({len(items)}):")
-            for i in items[:40]:
-                print(f"    {i}")
-            if len(items) > 40:
-                print(f"    ... {len(items) - 40} more")
-    print("  untouched: docs/requirements tests security conflicts operations road-map, skills/extern, your code")
+    counts = {a: sum(1 for _, x, _ in rows if x == a) for a in ("add", "update", "remove", "merge")}
+    print("  plan: " + ", ".join(f"{n} {a}" for a, n in counts.items() if n) + (" (dry run, nothing written)" if dry else ""))
+    for area in dict.fromkeys(d for d, _, _ in rows):
+        print(f"  [{area if area != '.' else 'root'}]")
+        for d, action, rel in rows:
+            if d == area:
+                print("  " + describe(project, d, action, rel))
+    print("  untouched: docs/requirements tests security conflicts operations road-map, skills/extern, runtime folders, your code")
     if dry:
+        print("  then: relink skills in the project (aix install) and suggest aix doctor + aix validate")
         return
     if not yes and not confirm("  Proceed? Kit-owned files are overwritten; your git history is the backup. [y/N] "):
         sys.exit("aborted")
