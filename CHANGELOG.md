@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.7.3 — 2026-09-06
+- `aix help` and `aix version` print the kit name in capitals: AIX 1.7.3.
+
 ## 1.7.2 — 2026-09-06
 - `aix code style` respects context (after review feedback on a real project): tests get twice the line limit, `assert` no longer counts as a branch, no magic-number/docstring advice in tests; decorated functions (routes, commands, fixtures) have no parameter limit; React components may be PascalCase; HTTP status codes are not magic numbers.
 
