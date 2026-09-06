@@ -46,17 +46,33 @@ def rel(p: Path) -> str:
 
 # ---- module-level edges per language ----------------------------------------------------------------------
 
+def import_roots(f: Path):
+    """Directories absolute imports resolve against, like sys.path: the project root, each code root, and the
+    nearest ancestor of `f` that is not a package (no __init__.py). Never arbitrary suffixes: `import git` must
+    not match a local `.../adapters/git/` package."""
+    roots = {ROOT} | {ROOT / r for r in CODE_ROOTS if (ROOT / r).is_dir()}
+    d = f.resolve().parent
+    while d != ROOT and (d / "__init__.py").exists():
+        d = d.parent
+    roots.add(d)
+    return roots
+
+
 def python_index(files):
-    """dotted name -> file, for every ancestor-relative dotted name (so `app.orders.service` and `orders.service` both resolve)."""
+    """dotted name -> file, keyed exactly as an absolute import would name it from one of the import roots."""
     idx = {}
     for f in files:
         if f.suffix != ".py":
             continue
-        parts = list(f.resolve().relative_to(ROOT).with_suffix("").parts)
-        if parts[-1] == "__init__":
-            parts = parts[:-1]
-        for i in range(len(parts)):
-            idx.setdefault(".".join(parts[i:]), f)
+        for root in import_roots(f):
+            try:
+                parts = list(f.resolve().relative_to(root).with_suffix("").parts)
+            except ValueError:
+                continue
+            if parts[-1] == "__init__":
+                parts = parts[:-1]
+            if parts:
+                idx.setdefault(".".join(parts), f)
     return idx
 
 
