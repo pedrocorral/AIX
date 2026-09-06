@@ -572,6 +572,161 @@ def render_dead(nodes, edges, paths, functions):
     return "\n".join(lines), len(dead) + (len(df) if functions else 0)
 
 
+# ---- clones -------------------------------------------------------------------------------------------------------
+
+MIN_LINES, KGRAM, WINDOW, SIMILARITY = 6, 5, 4, 70
+KEYWORDS = set("""if else for while do return break continue switch case default try catch finally throw new delete
+typeof instanceof in of function class extends import export from const let var async await yield this super null
+true false undefined void fn let mut pub struct enum impl trait match loop use mod ref self Some None Ok Err
+public private protected static final abstract interface package void int long double float boolean char byte short
+""".split())
+TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_]\w*|[^\sA-Za-z_0-9]')
+FUNC_HEAD = {
+    "js": re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>\s*\{|(?:public|private|protected|static|async|\s)*(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\{)", re.M),
+    "rust": re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+(\w+)", re.M),
+    "java": re.compile(r"^\s*(?:public|private|protected|static|final|abstract|synchronized|\s)*[\w<>\[\], ]+\s+(\w+)\s*\([^)]*\)\s*(?:throws[^{]+)?\{", re.M),
+}
+
+
+def normalise_py(fn) -> list:
+    """Structure tokens of a Python function: node kinds, with identifiers -> NAME/ATTR/ARG and literals -> their
+    type, docstring dropped. Two functions with equal sequences are type-1/2 clones."""
+    body = fn.body[1:] if fn.body and isinstance(fn.body[0], ast.Expr) and isinstance(getattr(fn.body[0], "value", None), ast.Constant) and isinstance(fn.body[0].value.value, str) else fn.body
+    out = []
+
+    def visit(node):
+        if isinstance(node, ast.Name):
+            out.append("NAME")
+        elif isinstance(node, ast.Attribute):
+            out.append("ATTR"); visit(node.value)
+        elif isinstance(node, ast.arg):
+            out.append("ARG")
+        elif isinstance(node, ast.Constant):
+            out.append(type(node.value).__name__.upper())
+        else:
+            out.append(type(node).__name__)
+            for child in ast.iter_child_nodes(node):
+                visit(child)
+    for a in fn.args.args + fn.args.kwonlyargs:
+        visit(a)
+    for stmt in body:
+        visit(stmt)
+    return out
+
+
+def normalise_tokens(text: str) -> list:
+    """Token normalisation for JS/TS/Rust/Java bodies: identifiers -> ID, numbers -> NUM, strings -> STR, keywords and
+    punctuation kept. Comments stripped first."""
+    text = re.sub(r"//[^\n]*|/\*.*?\*/", " ", text, flags=re.S)
+    out = []
+    for tok in TOKEN.findall(text):
+        if tok[0] in "\"'`":
+            out.append("STR")
+        elif tok[0].isdigit():
+            out.append("NUM")
+        elif tok[0].isalpha() or tok[0] == "_":
+            out.append(tok if tok in KEYWORDS else "ID")
+        else:
+            out.append(tok)
+    return out
+
+
+def brace_block(text: str, start: int) -> str:
+    """Text from the first '{' at/after `start` to its matching '}'."""
+    i = text.find("{", start)
+    if i < 0:
+        return ""
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[i:j + 1]
+    return text[i:]
+
+
+def functions_for_clones(roots):
+    """(node name, file, line, n_lines, token sequence) for every function big enough to matter."""
+    out = []
+    for f in source_files(roots):
+        lang = EXT[f.suffix]
+        text = f.read_text(encoding="utf-8", errors="replace")
+        if lang == "python":
+            try:
+                tree = ast.parse(text)
+            except SyntaxError:
+                continue
+            for cls, fn in iter_functions(tree):
+                n_lines = (fn.end_lineno or fn.lineno) - fn.lineno + 1
+                if n_lines >= MIN_LINES:
+                    out.append((f"{rel(f)}:{cls + '.' if cls else ''}{fn.name}", rel(f), fn.lineno, n_lines, normalise_py(fn)))
+        else:
+            for m in FUNC_HEAD[lang].finditer(text):
+                name = next((g for g in m.groups() if g), "anon")
+                if name in KEYWORDS:
+                    continue
+                block = brace_block(text, m.end() - 1)
+                n_lines = block.count("\n") + 1
+                if n_lines >= MIN_LINES:
+                    out.append((f"{rel(f)}:{name}", rel(f), text.count("\n", 0, m.start()) + 1, n_lines, normalise_tokens(block)))
+    return out
+
+
+def fingerprints(tokens) -> set:
+    """Winnowing (Schleimer, Wilkerson & Aiken 2003): hash every k-gram, keep the minimum of each window."""
+    if len(tokens) < KGRAM:
+        return {hash(tuple(tokens))}
+    grams = [hash(tuple(tokens[i:i + KGRAM])) for i in range(len(tokens) - KGRAM + 1)]
+    if len(grams) <= WINDOW:
+        return set(grams)
+    return {min(grams[i:i + WINDOW]) for i in range(len(grams) - WINDOW + 1)}
+
+
+def find_clones(funcs, similarity):
+    """Exact groups (equal normalised sequences) and near pairs (Dice overlap of fingerprints >= similarity %)."""
+    by_hash = defaultdict(list)
+    for fx in funcs:
+        by_hash[hash(tuple(fx[4]))].append(fx)
+    exact = [g for g in by_hash.values() if len(g) > 1]
+    in_exact = {fx[0] for g in exact for fx in g}
+    prints = {fx[0]: fingerprints(fx[4]) for fx in funcs}
+    index = defaultdict(set)
+    for name, fp in prints.items():
+        for h in fp:
+            index[h].add(name)
+    seen, near = set(), []
+    info = {fx[0]: fx for fx in funcs}
+    for name, fp in prints.items():
+        candidates = {o for h in fp for o in index[h] if o != name}
+        for other in candidates:
+            pair = tuple(sorted((name, other)))
+            if pair in seen or (name in in_exact and other in in_exact):
+                continue
+            seen.add(pair)
+            a, b = prints[pair[0]], prints[pair[1]]
+            dice = 2 * len(a & b) / (len(a) + len(b)) * 100
+            if dice >= similarity:
+                near.append((dice, info[pair[0]], info[pair[1]]))
+    exact.sort(key=lambda g: -len(g) * g[0][3])
+    near.sort(key=lambda x: -(x[0] * min(x[1][3], x[2][3])))
+    return exact, near
+
+
+def render_clones(roots, similarity):
+    funcs = functions_for_clones(roots)
+    exact, near = find_clones(funcs, similarity)
+    lines = [f"Clones — {', '.join(roots)}", "",
+             f"  functions analysed {len(funcs)} (>= {MIN_LINES} lines); exact clone groups {len(exact)} (types 1-2: same structure, names and literals may differ); near-clones {len(near)} (type 3: >= {similarity:g} % shared fingerprints, winnowing k={KGRAM})", ""]
+    for g in exact[:20]:
+        lines.append(f"  EXACT  {len(g)} × ~{g[0][3]} lines: " + ", ".join(f"{fx[0]} (l.{fx[2]})" for fx in g) + "   -> keep one, make it a leaf")
+    for dice, a, b in near[:30]:
+        lines.append(f"  NEAR   {dice:3.0f} %  {a[0]} (l.{a[2]}, {a[3]} lines)  ~  {b[0]} (l.{b[2]}, {b[3]} lines)   -> extract the shared part into a leaf")
+    lines.append("  Every line is a candidate: two functions may legitimately share a shape (adapters of one port); merge only when they share a purpose.")
+    return "\n".join(lines), len(exact)
+
+
 # ---- report -----------------------------------------------------------------------------------------------
 
 def render(m, level, scope):
@@ -629,13 +784,16 @@ def selftest():
     sys.exit(1 if failed else 0)
 
 
-USAGE = "usage: aix graph [PATH...] [--functions] [--dead] [--gate] [--max-reducible PCT] [--report] [--selftest]"
+USAGE = "usage: aix graph [PATH...] [--functions] [--dead] [--clones [--similarity PCT]] [--gate] [--max-reducible PCT] [--report] [--selftest]"
 
 
 def main(args):
     if "--selftest" in args:
         return selftest()
-    functions, gate, report, dead = "--functions" in args, "--gate" in args, "--report" in args, "--dead" in args
+    functions, gate, report, dead, clones = "--functions" in args, "--gate" in args, "--report" in args, "--dead" in args, "--clones" in args
+    similarity = SIMILARITY
+    if "--similarity" in args:
+        i = args.index("--similarity"); similarity = float(args[i + 1]); del args[i:i + 2]
     max_reducible = None
     for flag in ("--max-reducible", "--max-excess"):  # --max-excess kept as an alias
         if flag in args:
@@ -644,6 +802,16 @@ def main(args):
     nodes, edges = function_graph(paths) if functions else module_graph(paths)
     if not nodes:
         sys.exit(f"no source files under {', '.join(paths)} (looked for {', '.join(EXT)})")
+    if clones:
+        text, n_exact = render_clones(paths, similarity)
+        print(text)
+        if report:
+            print(f"\n  wrote {write_report(text).relative_to(ROOT)}")
+        if gate and n_exact:
+            sys.exit(f"GATE FAILED: {n_exact} exact clone group(s)")
+        if gate:
+            print("GATE PASSED")
+        return
     if dead:
         mnodes, medges = module_graph(paths)
         mn, me, _ = collapse_facades(set(mnodes), set(medges))

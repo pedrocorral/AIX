@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.4 — 2026-09-06
+- `aix graph --clones [--similarity PCT]`: duplicated functions. Exact groups by normalised structure hash (clone types 1-2; Python via the parser, JS/TS/Rust/Java via normalised tokens), near-clones by winnowed fingerprints (type 3, MOSS algorithm), sorted by size × similarity; `--clones --gate` fails on exact groups. Verified on the kit (0) and the monolith (1 exact pair, 8 near-clones, hand-checked).
+
 ## 1.5.3 — 2026-09-06
 - `aix graph --dead`: dead modules (no entry module reaches them: entry points, tests, config, facades, `__main__` scripts) and, with `--functions`, Python functions/methods never referenced by name (decorated, dunder, exported, entry/test code excluded). Candidates listed with the rule that judged them; `--dead --gate` fails on any.
 

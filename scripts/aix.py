@@ -31,6 +31,8 @@ aix acts on the nearest project at or above the current folder (the one holding 
       --max-reducible PCT             the limit for --gate (default: none, cycles and upward only)
       --dead                          dead code instead: modules no entry point reaches; with --functions, Python
                                       functions/methods never referenced (name-based, conservative)
+      --clones [--similarity PCT]     duplicated functions instead: exact groups (same structure, other names/
+                                      literals) and near-clones above the threshold (default 70 %)
       --report                        also write docs/tests/dependency-graph.md
       --selftest                      run the built-in known-answer cases (chain, diamond, shortcut, cycle, reuse,
                                       layer skip, upward); proves the arithmetic before you trust a report
@@ -223,9 +225,10 @@ Python 3.9+ and no third-party dependencies.
                             extern skills updatable, STATE.md consistent, Python and PATH. Prints a fix per problem.
                             validate = is what we wrote right; doctor = is the tooling around it right.
   aix coverage              regenerate docs/tests/coverage-matrix.md
-  aix graph [PATH...] [--functions] [--dead] [--gate] [--max-reducible PCT] [--report] [--selftest]
+  aix graph [PATH...] [--functions] [--dead] [--clones] [--gate] [--max-reducible PCT] [--report] [--selftest]
                             the modularity metric (alias: aix complexity). --dead lists dead code instead:
-                            modules no entry point reaches, and (Python, --functions) never-referenced functions. Distance between the real dependency
+                            modules no entry point reaches, and (Python, --functions) never-referenced functions.
+                            --clones lists duplicated functions: exact groups (same structure) and near-clones. Distance between the real dependency
                             graph and its ideal, the lowest complexity that delivers the same dependencies (the
                             transitive reduction with cycles contracted; Aho, Garey & Ullman 1972). Facades are
                             collapsed, edges into stable nodes (Martin instability <= 0.25) are free reuse, wiring
@@ -456,8 +459,20 @@ Dead code (--dead)
   Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting.
   --dead --gate fails on any candidate.
 
+Clones (--clones)
+  EXACT               groups of functions with the same normalised structure: identifiers -> role, literals ->
+                      type, docstrings and comments dropped (clone types 1-2, Roy & Cordy 2007). Found exactly by
+                      hashing; Python via the parser, JS/TS/Rust/Java via normalised tokens of the function body.
+  NEAR                pairs sharing >= --similarity % (default 70) of winnowed fingerprints (Schleimer, Wilkerson
+                      & Aiken 2003, the MOSS algorithm; k-grams of 5 tokens): clone type 3, the copied-and-tweaked
+                      function. Functions under 6 lines are ignored. Sorted by size x similarity: biggest wins first.
+  Why: clones are the leaf that was never extracted, and clones later changed inconsistently are bugs (Juergens
+  et al., ICSE 2009). Every line is a candidate: adapters of one port share a shape legitimately; merge only when
+  they share a purpose. --clones --gate fails on exact groups only.
+
 Options
   --dead                dead-code report instead of the modularity report (see above)
+  --clones              clone report instead (see above); --similarity PCT sets the near-clone threshold
   --gate                exit 1 on any cycle, any upward dependency, or reducible > --max-reducible PCT (CI)
   --report              also write docs/tests/dependency-graph.md (generated, git-ignored)
   --selftest            run the built-in cases with known answers (chain, diamond, shortcut, cycle, reuse, layer skip, upward)
