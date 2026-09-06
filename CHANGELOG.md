@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.4.0 — 2026-09-06
+- `aix upgrade`: verbose per-file plan (line deltas, kept sections, removals), experimental-feature warning before the confirmation, `GEMINI.md` merged like `AGENTS.md` (keeps the always-on section), content-only copies (works on files owned by another user). Verified on a real project.
+- Front-matter parsers read YAML block scalars (`>` / `|`), so skills such as ponytail show their full description.
 - `aix upgrade [PROJECT] [--dry-run] [--yes]`: update a project's kit files from the kit checkout by ownership (kit-owned overwritten/removed, project-owned untouched, AGENTS.md and framework.yaml merged). Fix: `aix skills always|on-demand` now accepts built-in skills.
 - Design principle *modularity* (`docs/meta-docs/architecture/modularity.md`, AGENTS.md rule 8): acyclic, one-directional, sparse dependency graph; reuse leaves, never hubs; evidence cited. Wired into design-app, code-review and the definition of done.
 - `aix task done` creates `completed/YYYY-MM/INDEX.md` when the month folder is new (`aix validate` used to fail on the first completed task). [TASK-0002]

@@ -7,7 +7,7 @@ agent_runtime: claude-code
 
 ## Where we are (3 lines max)
 - Kit work: TASK-0002 (Antigravity + Gemini CLI support via `GEMINI.md` pointer) completed 2026-09-05; changes uncommitted in the working tree.
-- Kit changelog has a growing `Unreleased` section; version still 1.3.0.
+- Kit released as 1.4.0 on 2026-09-06 (CLI, upgrade, security gate, modularity, Gemini/Antigravity).
 ## Files to load for the active task (nothing else)
 -
 ## Last verified facts (tests green? migrations applied? env?)
