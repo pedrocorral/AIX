@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.1 — 2026-09-07
+- `aix install` (no `--into`) works from any folder: it acts on the kit checkout the launcher belongs to (links its skills, puts `aix` on PATH). Needed after 2.0 since the kit folder is no longer a project by itself from outside.
+
 ## 2.0.0 — 2026-09-07
 - **Layout**: everything the kit owns lives in `.aix/` (`config.yaml`, `scripts/`, `templates/`, `meta-docs/`, `skills/`, `bin/`); the project marker is `.aix/config.yaml`; root launchers are gone (the `aix` on PATH runs the project's `.aix/scripts/aix.py`); the kit no longer creates `backend/ frontend/ shared/ infra/` (project-layout.md only recommends a tree). At the root only AGENTS.md, CLAUDE.md, GEMINI.md, `docs/` (the project's ground truth) and your code remain.
 - `aix upgrade` migrates a 1.x project in place: moves the kit-owned folders under `.aix/`, removes the root launchers, rewrites the pointer texts; project docs, code and git history untouched (renames). `.aix/config.yaml` merge keeps `disabled_skills` and the `style:` block.

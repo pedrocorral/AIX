@@ -314,8 +314,8 @@ def reexec_in_project(argv):
         return  # upgrade must run from THIS checkout's scripts, not the project's older copy
     project = find_project(Path.cwd())
     if project is None:
-        if argv and argv[0] in ANYWHERE or (argv[:1] == ["install"] and "--into" in argv) or argv[:2] == ["skills", "registry"]:
-            return
+        if argv and argv[0] in ANYWHERE or argv[:1] == ["install"] or argv[:2] == ["skills", "registry"]:
+            return  # `install` with no --into acts on this checkout (the kit): link its skills, put aix on PATH
         sys.exit("aix: not inside an AIX project (no .aix/config.yaml here or above). "
                  "Use `aix install --into DIR` to add AIX to a project, or cd into one.")
     own = project / ".aix" / "scripts" / "aix.py"
