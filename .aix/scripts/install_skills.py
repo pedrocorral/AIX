@@ -61,6 +61,39 @@ def prune_dangling(project: Path):
                 p.unlink(); print(f"  {p.name:40s} -> pruned (source gone)")
 
 
+def kit_owned_files(project: Path):
+    """Files the kit owns inside a project: everything under .aix/ except config.yaml, skills/extern and the manifest."""
+    base = project / ".aix"
+    for f in base.rglob("*"):
+        rel = f.relative_to(base)
+        if f.is_file() and rel.parts[0] != "__pycache__" and "__pycache__" not in rel.parts and rel.as_posix() != "config.yaml" \
+                and not rel.as_posix().startswith("skills/extern/") and rel.as_posix() != "manifest.json":
+            yield f
+
+
+def write_manifest(project: Path):
+    """.aix/manifest.json: sha256 of every kit-owned file, so doctor and upgrade can see local edits."""
+    import hashlib, json
+    digest = {f.relative_to(project / ".aix").as_posix(): hashlib.sha256(f.read_bytes()).hexdigest() for f in kit_owned_files(project)}
+    (project / ".aix" / "manifest.json").write_text(json.dumps({"files": digest}, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+    return len(digest)
+
+
+def modified_kit_files(project: Path):
+    """Kit-owned files whose content differs from the manifest (edited locally: lost on the next upgrade)."""
+    import hashlib, json
+    m = project / ".aix" / "manifest.json"
+    if not m.exists():
+        return None
+    recorded = json.loads(m.read_text(encoding="utf-8")).get("files", {})
+    out = []
+    for f in kit_owned_files(project):
+        rel = f.relative_to(project / ".aix").as_posix()
+        if rel in recorded and hashlib.sha256(f.read_bytes()).hexdigest() != recorded[rel]:
+            out.append(rel)
+    return sorted(out)
+
+
 def install_into(project: Path, copy: bool):
     skills_dir = project / ".aix" / "skills"
     if not skills_dir.exists():
@@ -96,6 +129,8 @@ def install_into(project: Path, copy: bool):
     state = project / "docs" / "road-map" / "going-on" / "STATE.md"
     if not state.exists():
         shutil.copy(project / ".aix" / "templates" / "session-state.md", state)
+    if (project / ".aix").is_dir() and not (project / "AIX-DEVELOPMENT.md").exists():
+        write_manifest(project)  # projects only: the kit checkout is edited by design
     print(f"installed {n} skills into {project}")
 
 

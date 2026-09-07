@@ -79,8 +79,19 @@ def check_state():
         problem(f"STATE.md names {m.group(1)} but it is not in going-on/", f"`aix task start {m.group(1)}` or set active_task: none")
 
 
+def check_kit_edits():
+    """Kit-owned files edited in this project: silently overwritten by the next `aix upgrade`."""
+    if (ROOT / "AIX-DEVELOPMENT.md").exists():
+        return  # the kit checkout itself
+    edited = inst.modified_kit_files(ROOT)
+    if edited is None:
+        return problem(".aix/manifest.json missing (cannot detect local edits of kit files)", "run `aix install`")
+    for f in edited:
+        problem(f".aix/{f} was edited locally; the next `aix upgrade` overwrites it", "make the change in the kit repository (or a skill under .aix/skills/extern), then `aix upgrade`")
+
+
 def main():
-    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state):
+    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits):
         check()
     for what, fix in problems:
         print(f"PROBLEM {what}\n        fix: {fix}")

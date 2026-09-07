@@ -20,7 +20,8 @@ from graph import ROOT, CODE_ROOTS, SKIP, rel
 TEXT_EXT = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".rs", ".java", ".kt", ".yml", ".yaml", ".json", ".toml", ".env",
             ".ini", ".cfg", ".conf", ".txt", ".html", ".jinja", ".jinja2", ".j2", ".sh", ".properties", ".xml", ".tf"}
 ACCEPT = re.compile(r"aix:\s*accepted\s+(VUL-[A-Z]+-\d{3})(.*)$")
-SKIP_FILE = re.compile(r"aix:\s*skip-security-scan\b(.*)$")   # in the first 12 lines: whole file skipped, listed as such
+SKIP_FILE = re.compile(r"aix:\s*skip-security-scan\b(.*)$")   # in the first MARKER_LINES lines: whole file skipped, listed as such
+MARKER_LINES = 30
 
 # (vul, cwe, title, languages or {"*"}, regex, advice)   regexes run per line, comments stripped first
 RULES = [
@@ -159,7 +160,7 @@ def scan_file(f: Path):
         lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return out
-    for raw in lines[:12]:
+    for raw in lines[:MARKER_LINES]:
         m = SKIP_FILE.search(raw)
         if m:
             return [("SKIPPED", "", "file skipped by marker", rel(f), 1, "aix: skip-security-scan " + m.group(1).strip(), "", "skip")]

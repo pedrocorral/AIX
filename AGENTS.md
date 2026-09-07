@@ -14,6 +14,7 @@ Project built on **AIX**. Keep this file in context; load everything else on dem
 5. **No test without a `TS-*`, no `TS-*` without a requirement.** New attack surface → `VUL-*` rows as `expected`; status changes need an audit report.
 6. **Ask before destructive/irreversible actions.**
 7. Prefer one precise file over three broad ones, but never skip a file an INDEX marks as required.
+9. **`.aix/` is the kit, not the project.** Never edit it except `config.yaml` and `skills/extern/`; a fix to a kit script or skill belongs in the kit repository (`aix doctor` lists local edits; `aix upgrade` overwrites them).
 8. **Modularity.** One job per node; dependency graph acyclic, one-directional, sparse; reuse leaves (pure, no upward deps), never hubs. `.aix/meta-docs/architecture/modularity.md`. Inside a function: `conventions/readability.md` limits (`aix code style`).
 
 ## Navigation

@@ -83,6 +83,7 @@ Project-specific agent instructions therefore go in a `## Project notes` section
 
 ## Rules for agents
 - Never edit files under `.opencode/ .claude/ .github/skills .agents/ .cursor/skills`: they are generated links.
+- Never edit `.aix/` except `config.yaml` and `skills/extern/`: it is the kit. A bug in a kit script is fixed in the kit repository and arrives with `aix upgrade`; `.aix/manifest.json` records the shipped checksums, `aix doctor` reports local edits, and `aix upgrade` marks them in its plan before overwriting.
 - Never move `TASK-*` files by hand; use `aix task`.
 - Run `aix docs validate` before every hand-off; `aix docs coverage` when a task closes; `aix docs security --gate` at release.
 - Never change a VUL status without an audit report (`aix docs validate` fails); `accepted` also needs an ADR.

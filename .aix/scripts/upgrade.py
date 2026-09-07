@@ -150,10 +150,13 @@ def line_delta(src: Path, dst: Path, new_text: str = None) -> str:
     return f"+{added} -{removed} lines"
 
 
-def describe(project: Path, d: str, action: str, rel: Path) -> str:
+def describe(project: Path, d: str, action: str, rel: Path, edited=()) -> str:
     """One verbose line for the dry run: what happens to this file and how big the change is."""
     src, dst = KIT / d / rel, project / d / rel
     shown = f"{d}/{rel}" if d != "." else str(rel)
+    warn = "  !! LOCAL EDIT WILL BE LOST (move the change to the kit)" if shown.startswith(".aix/") and shown[5:] in edited else ""
+    if warn and action == "update":
+        return f"  update  {shown}  ({line_delta(src, dst)}){warn}"
     if action == "add":
         return f"  add     {shown}  ({line_count(src)} lines, new in kit)"
     if action == "remove":
@@ -228,11 +231,15 @@ def main(args):
         print("  already up to date"); return
     counts = {a: sum(1 for _, x, _ in rows if x == a) for a in ("add", "update", "remove", "merge")}
     print("  plan: " + ", ".join(f"{n} {a}" for a, n in counts.items() if n) + (" (dry run, nothing written)" if dry else ""))
+    import install_skills as inst
+    edited = set(inst.modified_kit_files(project) or [])
     for area in dict.fromkeys(d for d, _, _ in rows):
         print(f"  [{area if area != '.' else 'root'}]")
         for d, action, rel in rows:
             if d == area:
-                print("  " + describe(project, d, action, rel))
+                print("  " + describe(project, d, action, rel, edited))
+    if edited:
+        print(f"  !! {len(edited)} kit-owned file(s) were edited in this project; upgrade overwrites them (see lines above)")
     print("  untouched: docs/ (requirements, tests, security, conflicts, operations, road-map), .aix/skills/extern, your config values, runtime folders, your code")
     if dry:
         print("  then: relink skills in the project (aix install) and suggest aix doctor + aix docs validate")
@@ -242,6 +249,7 @@ def main(args):
     if not yes and not confirm("  Are you sure you want to use this? [y/N] "):
         sys.exit("aborted")
     apply(project, rows)
+    inst.write_manifest(project)
     print(f"  applied {len(rows)} changes; relinking skills in the project")
     subprocess.call([sys.executable, str(project / ".aix" / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
     print("  done. Run `aix doctor` and `aix docs validate` in the project.")

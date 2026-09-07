@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from graph import ROOT, CODE_ROOTS, SKIP, rel, source_files, iter_functions
-from codesecurity import RULES, SKIP_FILE, is_test, register_rows
+from codesecurity import RULES, SKIP_FILE, MARKER_LINES, is_test, register_rows
 
 REQUEST_ATTRS = {"args", "form", "json", "values", "data", "files", "GET", "POST", "query_params", "path_params",
                  "headers", "cookies", "body", "get_json", "get_data", "stream"}
@@ -195,7 +195,7 @@ def taint_file(file: Path, findings):
         tree = ast.parse(file.read_text(encoding="utf-8", errors="replace"))
     except SyntaxError:
         return
-    if any(SKIP_FILE.search(l) for l in file.read_text(encoding="utf-8", errors="replace").splitlines()[:12]):
+    if any(SKIP_FILE.search(l) for l in file.read_text(encoding="utf-8", errors="replace").splitlines()[:MARKER_LINES]):
         return
     funcs = {fn.name: fn for cls, fn in iter_functions(tree) if not cls}
     for cls, fn in iter_functions(tree):
@@ -312,7 +312,7 @@ def has_skip_marker(path: str, commit: str) -> bool:
         head = subprocess.run(["git", "-c", f"safe.directory={ROOT}", "show", f"{commit}:{path}"], cwd=ROOT, capture_output=True, text=True, errors="replace", timeout=30).stdout
     except Exception:
         return False
-    return any(SKIP_FILE.search(l) for l in head.splitlines()[:12])
+    return any(SKIP_FILE.search(l) for l in head.splitlines()[:MARKER_LINES])
 
 
 def history(commits=300):

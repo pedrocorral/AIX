@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0 — 2026-09-07
+- Kit-owned files are checksummed in `.aix/manifest.json` (written by `aix install` and `aix upgrade`); `aix doctor` reports locally edited kit files; `aix upgrade` marks them in the plan ("LOCAL EDIT WILL BE LOST") before overwriting. AGENTS.md rule 9: `.aix/` is the kit, not the project. Prompted by an agent patching a kit script inside a project.
+- Security scanners read the `aix: skip-security-scan` marker in the first 30 lines (was 12; the vulnerabilities module's own marker sat on line 15).
+
 ## 2.1.1 — 2026-09-07
 - `aix code <typo>` reports the unknown command and lists the valid ones instead of treating it as a path.
 
