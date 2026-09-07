@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.1.1 — 2026-09-07
+- `aix code <typo>` reports the unknown command and lists the valid ones instead of treating it as a path.
+
 ## 2.1.0 — 2026-09-07
 - `aix code vulnerabilities [--taint] [--cve] [--history]`: the deep security layer. Python taint analysis (route/command parameters, request objects, argv, environment, stdin → shell, eval, SQL, file paths, redirects, template strings, deserialisation, outbound requests; sanitisers respected; one call deep, per file) reporting the chain from source to sink; known CVEs for pinned dependencies (requirements, uv/poetry/pdm locks, package-lock, pnpm-lock, Cargo.lock) via the OSV database; secrets in git history bounded by `--commits`. Findings name VUL row and CWE; `--audit` writes the evidence report; `--gate`. Self-test on known flows, a throwaway git history and a manifest.
 

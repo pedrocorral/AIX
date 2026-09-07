@@ -801,6 +801,9 @@ def run_code(args):
         import vulnerabilities
         return vulnerabilities.main(args[1:])
     import graph
+    if args and args[0] not in CODE_MODES and not args[0].startswith("-") and not (ROOT / args[0]).exists():
+        sys.exit(f"aix code: unknown command '{args[0]}'. Commands: graph, complexity, dead, clones, style, security, vulnerabilities, stats "
+                 f"(a path may follow the command, e.g. aix code graph backend)")
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args
     graph.main(CODE_MODES[sub] + rest)
