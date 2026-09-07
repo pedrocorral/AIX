@@ -1,9 +1,9 @@
 ---
 id: TASK-0004
 title: aix code stats — terminal histogram of function sizes (mean, sd, percentiles) and the main offenders by folder/file/function
-status: pending             # pending | going-on | blocked | completed
+status: completed
 created: 2026-09-06
-completed:
+completed: 2026-09-07
 requirements: []            # FR-*/NFR-* this task delivers or touches
 tests: []                   # TS-* to automate
 security: []                # VUL-* to address

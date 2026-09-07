@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.10.0 — 2026-09-07
+- `aix code stats [PATH...] [--metric ...] [--report]`: terminal histogram of function sizes (fixed comparable bins, bars scaled to the window, limit marked), mean, sample sd, median, p90/p95, max, share over the limit; the largest functions and the files/folders pushing most functions over the limit. `--metric` switches to cognitive, cyclomatic, nesting or params. [TASK-0004]
+
 ## 1.9.0 — 2026-09-07
 - `aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]`: deterministic static checks (Python, JS/TS, Rust, Java, Dockerfiles, compose, manifests, env files) mapped to the seeded VUL rows and CWEs, following bandit/semgrep/gitleaks/eslint-plugin-security: injection, shell/eval, template strings, path traversal, unsafe deserialisation, XML entities, private keys and tokens, hard-coded secrets, TLS off, debug on, weak hashes, weak randomness, JWT unverified, insecure cookies, XSS, CSRF off, CORS *, open redirect, secrets in logs, prompt injection, LLM calls without limits, chmod 777, privileged containers, Dockerfile without USER or tag, unpinned dependencies and missing lockfiles. Findings to review, never proof; test code listed, not gated; `aix: accepted VUL-…` inline suppressions listed; `aix: skip-security-scan` file marker. `--audit` writes `docs/security/audits/AUDIT-<date>-code.md` with the evidence table, the input `aix docs security` requires. Wired into the security-audit orchestrator. [TASK-0003]
 

@@ -40,6 +40,10 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
                                       weak hashes/randomness, JWT/cookies, XSS/CSRF/CORS, secrets in logs, prompt
                                       injection, Dockerfile root/unpinned, unpinned deps. Findings to REVIEW, never
                                       proof; --audit writes the audit report the register needs as evidence
+  aix code stats [PATH...] [--metric lines|cognitive|cyclomatic|nesting|params] [--report]
+                                      distribution of function sizes as a terminal histogram scaled to the window,
+                                      mean, sd, median, p90/p95, max, share over the limit; the largest functions
+                                      and the files and folders pushing most functions over the limit
   aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
                                       readability, per function: lines, cognitive and cyclomatic complexity,
                                       nesting, parameters, names, docstring, magic numbers; limits in
@@ -243,6 +247,9 @@ one holding framework.yaml). Commands are grouped by what they act on; `aix help
                             deserialisation, secrets, TLS, debug, weak hashes, JWT, XSS/CSRF/CORS, logs, prompt
                             injection, Dockerfile, dependencies). Findings to review, never proof. --audit writes
                             the audit report the register requires as evidence for a status change.
+  aix code stats            the shape of the code base: histogram of function sizes (or cognitive, cyclomatic,
+                            nesting, parameters) scaled to the terminal, mean/sd/median/p90/p95/max, share over
+                            the limit, and the largest functions, files and folders pulling the tail.
   aix code style            readability per function (lines, cognitive and cyclomatic complexity, nesting,
                             parameters, names, docstring, magic numbers) against the limits in framework.yaml;
                             a folder or file gives a ranked table, one function (file:func) a card with
@@ -593,7 +600,26 @@ Options
   --selftest  known-vulnerable snippets must be found, safe variants must not
 Related: aix docs security (register state), skills security-audit-* (reasoning on the hits), security-threat-model."""
 
-TOPICS["code"] = """aix code graph | complexity | dead | clones | style | security   [TARGET...] [--gate] [--report]
+TOPICS["code stats"] = """aix code stats [PATH...] [--metric lines|cognitive|cyclomatic|nesting|params] [--report] [--selftest]
+
+THE SHAPE OF THE CODE BASE in one screen: where function sizes sit, how spread they are, and who is pulling the
+tail. Uses the same per-function measurements as `aix code style`.
+
+  histogram    fixed bins (1-5, 6-10, 11-20, 21-30, 31-40, 41-60, 61-100, 101-200, 201+ lines), so two projects or
+               two dates compare directly; bars scaled to the terminal width, half blocks for resolution; the bin
+               holding the limit and every bin above it are marked
+  numbers      functions, mean, sample standard deviation, median, p90, p95, max, and how many sit over the
+               framework.yaml limit (tests and framework-decorated functions use their adjusted limits)
+  offenders    the ten largest functions (* = over its limit); the five files and five folders (depth 2) that push
+               the most functions over the limit, with the total excess
+
+Reading it: a healthy code base is right-skewed with a short tail: most functions in 1-20, p90 under the limit,
+a handful of large ones you can name. A fat tail or a high sd means size is not being managed; the offender
+lists say where to start (`aix code style FILE:FUNCTION` for the card, skill refactor-readability to fix).
+--metric switches the whole view to cognitive or cyclomatic complexity, nesting depth or parameter count.
+--report writes docs/tests/code-stats.md. Python exact; JS/TS, Rust, Java approximate (as in aix code style)."""
+
+TOPICS["code"] = """aix code graph | complexity | dead | clones | style | security | stats   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (scripts/graph.py). All read the same dependency graph of the project's source
 (Python, JS/TS, Rust, Java modules; Python functions with --functions); PATH... limits the folders.
@@ -604,8 +630,9 @@ Three tools on one engine (scripts/graph.py). All read the same dependency graph
   aix code style      readability per function: lines, cognitive/cyclomatic complexity, nesting, parameters,
                       names, docstring, magic numbers; one function = a card with line-numbered advice
   aix code security   static security checks mapped to VUL rows and CWEs; --audit writes the audit evidence
+  aix code stats      histogram of function sizes (or any style metric) with mean/sd/percentiles and offenders
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
-proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security."""
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security | code stats."""
 TOPICS["docs"] = """aix docs validate | coverage | security
 
   aix docs validate   are the DOCS right? front-matter, INDEXes, IDs, links, TS -> FR, VUL statuses, field
@@ -625,7 +652,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, code security, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, code security, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -714,6 +741,9 @@ def run_code(args):
     if args and args[0] == "security":
         import codesecurity
         return codesecurity.main(args[1:])
+    if args and args[0] == "stats":
+        import stats
+        return stats.main(args[1:])
     import graph
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args
