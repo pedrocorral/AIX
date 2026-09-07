@@ -9,37 +9,34 @@ and code is its optimised implementation.
 | Folder | Purpose |
 |---|---|
 | `AGENTS.md` | The single entry point every agent reads first (≈ 80 lines). |
-| `docs/meta-docs/` | How to build apps: MVC, frontend/backend split, persistence abstraction, ORM, testing, security, project layout, Python/Java/JS stacks. |
+| `.aix/meta-docs/` | How to build apps: MVC, frontend/backend split, persistence abstraction, ORM, testing, security, project layout, Python/Java/JS stacks. |
 | `docs/requirements/` | **Ground truth** for *your* application (functional, non-functional, data model, API, ADRs). |
 | `docs/tests/` | What must be tested (one spec per requirement group) + generated coverage matrix. |
 | `docs/security/` | Vulnerability register (expected → addressed) + audit reports. |
 | `docs/conflicts/` | Open/resolved spec-vs-code conflicts awaiting or holding human decisions. |
 | `docs/operations/` | Deployment, recovery, runbooks. |
 | `docs/road-map/` | `pending/` → `going-on/` → `completed/` tasks; session state for resuming work. |
-| `skills/` | Hierarchical agent skills (one source of truth) installed into every agent runtime. `refactor/` holds one skill per `aix code` finding: how to fix it, verify, hand off. |
-| `templates/` | Canonical templates for every document type. |
-| `aix` / `aix.cmd` | The CLI (Linux/macOS bash launcher, Windows batch launcher) → `scripts/aix.py`. |
-| `scripts/` | CLI implementation: installer, validator, coverage matrix, road-map helper (Python 3.9+, no deps). |
-| `backend/ frontend/ shared/ infra/` | Where your application code lives, following `docs/meta-docs/architecture/project-layout.md`. |
+| `.aix/` | The kit: `config.yaml`, `scripts/` (the CLI), `templates/`, `meta-docs/` (how to build), `skills/` (built-in + `extern/`), `bin/` (launchers). Replaced wholesale by `aix upgrade`, except your config values and extern skills. |
+| your code | Whatever layout your stack wants (`backend/ frontend/`, `src/`, a Cargo workspace ...). The kit never creates or touches it; `.aix/meta-docs/architecture/project-layout.md` recommends a tree for new monorepos. |
 
 ## Quick start
 
 ```bash
 git clone <this-repo> my-app && cd my-app
-./aix install        # links skills into .opencode/ .github/ .claude/ .agents/ .cursor/ ; writes pointer files (Copilot, Cursor, Gemini) + road-map state
+./.aix/bin/aix install        # links skills into .opencode/ .github/ .claude/ .agents/ .cursor/ ; writes pointer files (Copilot, Cursor, Gemini) + road-map state
 aix docs validate         # sanity-check IDs, links, indexes
 ```
 
-`aix` acts on the nearest project at or above your current folder (the one holding `framework.yaml`), running that project's own copy of the CLI. Outside any project only `help`, `about`, `version`, `install --into` and `skills registry` work. `aix` is the only tool you need. Linux/macOS run the `aix` bash launcher, Windows runs `aix.cmd`; both call
-`scripts/aix.py` (Python 3.9+, no dependencies). `aix install` also links `aix` into `~/.local/bin` when that folder exists.
+`aix` acts on the nearest project at or above your current folder (the one holding `.aix/config.yaml`), running that project's own copy of the CLI. Outside any project only `help`, `about`, `version`, `install --into` and `skills registry` work. `aix` is the only tool you need. Linux/macOS run the `aix` bash launcher, Windows runs `aix.cmd`; both call
+`.aix/scripts/aix.py` (Python 3.9+, no dependencies). `aix install` also links `aix` into `~/.local/bin` when that folder exists, and that one `aix` then runs the `.aix/scripts/aix.py` of whatever project you are in.
 
 | Command | Does |
 |---|---|
 | `aix install [--into DIR] [--copy]` | Install skills into every agent runtime; `--into` first copies the kit into an existing project, asking per existing item: replace (old kept as `.bak`), skip, merge (add missing files only), all-variants, abort. `--replace-all` / `--skip-all` / `--merge-all` answer for you |
-| `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run: overwrites kit-owned paths (scripts, templates, meta-docs, built-in skills, launchers), merges AGENTS.md and framework.yaml, never touches your docs, code or extern skills |
+| `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run: overwrites kit-owned paths (scripts, templates, meta-docs, built-in skills, launchers), merges AGENTS.md and .aix/config.yaml, never touches your docs, code or extern skills |
 | `aix code security [PATH...] [--gate] [--audit]` | Deterministic static security checks mapped to the VUL register and CWEs; findings to review, never proof; `--audit` writes the audit report the register needs as evidence |
 | `aix code stats [PATH...] [--metric ...]` | Terminal histogram of function sizes (or any style metric) scaled to the window, mean/sd/median/percentiles, share over the limit, and the largest functions, files and folders |
-| `aix code style [TARGET...] [--gate]` | Readability per function: lines, cognitive and cyclomatic complexity, nesting, parameters, names, docstring, magic numbers, against limits in `framework.yaml`; a single function (`file:func`) gets a card with line-numbered advice |
+| `aix code style [TARGET...] [--gate]` | Readability per function: lines, cognitive and cyclomatic complexity, nesting, parameters, names, docstring, magic numbers, against limits in `.aix/config.yaml`; a single function (`file:func`) gets a card with line-numbered advice |
 | `aix docs validate` | Check IDs, links, indexes, front-matter (exit 1 on errors) |
 | `aix doctor` | Installation health (links, pointer files, always-on wiring, STATE.md, Python, PATH) with a fix per problem. `validate` = the docs; `doctor` = the tooling |
 | `aix docs security [open\|validated] [--gate]` | Vulnerability register: validated vs not-validated rows, audit skills still to run, statuses without evidence; `--gate` is the release check |
@@ -47,17 +44,35 @@ aix docs validate         # sanity-check IDs, links, indexes
 | `aix docs coverage` | Regenerate `docs/tests/coverage-matrix.md` |
 | `aix task new\|start\|block\|done\|list` | Road-map helper, keeps `STATE.md` in sync |
 | `aix skills [general\|specific] [category]` | Catalogue: group (general = behaviour for every session, specific = one job), level (always / orchestrator / on-demand), state, runtimes. `*` marks always-on; a general skill not always-on shows as inactive. `show`, `enable`, `disable`, `always`, `on-demand NAME` manage them |
-| `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor/Gemini pointers) unless `--on-demand` |
+| `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `.aix/skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor/Gemini pointers) unless `--on-demand` |
 | `aix help COMMAND` / `aix COMMAND --help` | Detailed help for one command, written so an agent can understand the tool (e.g. `aix help graph`) |
 | `aix about` | Full explanation of the kit: purpose, workflow, folders, IDs, skills, every command |
-| `aix version` | Kit version from `framework.yaml` |
+| `aix version` | Kit version from `.aix/config.yaml` |
 
 Then open the folder in opencode / VS Code and say:
 
 > "Read AGENTS.md and run the `core-session-resume` skill."
 
-For an **existing project** (any language): `aix install --into /path/to/project` copies `docs/`, `skills/`,
-`templates/`, `scripts/`, `AGENTS.md` and links the skills, without touching your code.
+For an **existing project** (any language): `aix install --into /path/to/project` copies `docs/`, `.aix/skills/`,
+`.aix/templates/`, `.aix/scripts/`, `AGENTS.md` and links the skills, without touching your code.
+
+## Layout (2.0)
+
+```
+my-app/
+├── AGENTS.md  CLAUDE.md  GEMINI.md      the agent contract and two one-line pointers (runtimes read them at the root)
+├── .aix/                               everything the kit owns; `aix upgrade` replaces it, keeping your config values
+│   ├── config.yaml                     version, paths, disabled skills, style limits
+│   ├── scripts/  templates/  bin/      the CLI, the document templates, the launchers
+│   ├── meta-docs/                      how to build: architecture, persistence, testing, security, conventions, workflow, stacks
+│   └── skills/                         core/ spec/ architecture/ implement/ testing/ security/ review/ refactor/ + extern/
+├── docs/                               the project's own ground truth, never touched by the kit
+│   └── requirements/  tests/  security/  conflicts/  operations/  road-map/
+├── .claude/ .opencode/ .github/ .agents/ .cursor/   generated skill links + pointer files (links are git-ignored)
+└── your code                           whatever layout your stack wants; the kit never creates it
+```
+
+Projects on the 1.x layout (kit folders at the root, `framework.yaml`) are migrated in place by `aix upgrade`.
 
 ## Core principles
 
@@ -107,6 +122,6 @@ aix code graph --gate              # CI: fails on any cycle or upward dependency
 
 Read it in this order: cycles and upward dependencies are facts, fix them first; each SHORTCUT line is one edge
 to drop or route through its bypass; reducible % and the shape numbers are for comparing over time and across
-projects. Full method: `aix help graph` and `docs/meta-docs/architecture/modularity.md`.
+projects. Full method: `aix help graph` and `.aix/meta-docs/architecture/modularity.md`.
 
-See `docs/INDEX.md` and `skills/INDEX.md` to explore. Developing AIX itself (not an app)? Read `AIX-DEVELOPMENT.md` — it is never loaded by app agents. Framework version: see `framework.yaml`.
+See `docs/INDEX.md` and `.aix/skills/INDEX.md` to explore. Developing AIX itself (not an app)? Read `AIX-DEVELOPMENT.md` — it is never loaded by app agents. Framework version: see `.aix/config.yaml`.

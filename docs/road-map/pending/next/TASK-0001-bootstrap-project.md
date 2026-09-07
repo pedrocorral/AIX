@@ -7,7 +7,7 @@ completed:
 requirements: []
 tests: []
 security: []
-context_files: [docs/requirements/product/vision.md, docs/requirements/product/glossary.md, docs/requirements/decisions/ADR-0001-adopt-aix-and-choose-stack.md, docs/meta-docs/architecture/project-layout.md]
+context_files: [docs/requirements/product/vision.md, docs/requirements/product/glossary.md, docs/requirements/decisions/ADR-0001-adopt-aix-and-choose-stack.md, .aix/meta-docs/architecture/project-layout.md]
 ---
 # TASK-0001 — Bootstrap project
 

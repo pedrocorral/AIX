@@ -10,5 +10,5 @@ title: How to write requirements
 - Fill *Actors & permissions*, *Data & privacy* and *Security & observability* even with "none" — they seed VUL rows and NFR checks.
 - Reference DM/API/NFR IDs in `related:` instead of repeating their content.
 - Keep domain vocabulary consistent with `product/glossary.md`; add terms there first.
-- Template: `templates/requirement.md`. Reviewer: skill `spec-review`.
+- Template: `.aix/templates/requirement.md`. Reviewer: skill `spec-review`.
 - Field names in DM/API docs come from `data-model/field-dictionary.md` only; add the row first.

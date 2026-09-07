@@ -1,0 +1,88 @@
+---
+id: META-CONV-CLI
+title: The aix command-line interface
+read_when: You need to run a kit command (validate, coverage, task, skills) or wonder which project it acts on.
+---
+# The `aix` CLI
+
+One command for every kit operation. `.aix/bin/aix` (bash, Linux/macOS) and `.aix/bin/aix.cmd` (Windows) call `.aix/scripts/aix.py`
+(Python 3.9+, no dependencies). Agents run it instead of editing road-map files or runtime skill folders by hand.
+
+## Which project it acts on
+`aix` walks up from the current folder to the nearest `.aix/config.yaml` and re-executes **that project's**
+`.aix/scripts/aix.py`, so every path resolves inside the project, never inside the kit checkout on PATH.
+Outside any project only `help`, `about`, `version`, `install --into` and `skills registry` work.
+
+## Commands
+| Command | Does | When an agent uses it |
+|---|---|---|
+| `aix install [--copy]` | Link every enabled skill into `.opencode/ .claude/ .github/ .agents/ .cursor/` skills dirs; write pointer files and `STATE.md` if missing; prune dangling links | After adding, removing or editing skills |
+| `aix install --into DIR` | Copy the kit into an existing project, asking per existing item ([r]eplace keeps `.bak`, [s]kip, [m]erge adds missing files only, R/S/M for all, [a]bort); `--replace-all` / `--skip-all` / `--merge-all` when no terminal | Bootstrapping a project |
+| `aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]` | Deterministic static checks mapped to VUL rows and CWEs (injection, shell/eval, deserialisation, secrets, TLS, debug, weak hashes/randomness, JWT/cookies, XSS/CSRF/CORS, logs, prompt injection, Dockerfile, dependencies). Findings to review, never proof; inline `aix: accepted VUL-…` records accepted risk; `--audit` writes `docs/security/audits/AUDIT-<date>-code.md`, the evidence the register needs | Before the security-audit-* skills; closing any task with attack surface; CI |
+| `aix code stats [PATH...] [--metric lines\|cognitive\|cyclomatic\|nesting\|params] [--report]` | Distribution of function sizes as a terminal histogram with fixed comparable bins, mean/sd/median/p90/p95/max, share over the limit, the largest functions and the files/folders pushing most over the limit | Design reviews; before and after a refactor; comparing projects |
+| `aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]` | Readability per function against `.aix/config.yaml` limits (cognitive 15, cyclomatic 10, nesting 4, params 5, lines 60): ranked table for a folder/file, full card with line-numbered findings for `file:func` / `file::Class.method`; names, docstrings, magic numbers as advice. Evidence in `conventions/readability.md` | Reviewing or writing any function; CI |
+| `aix docs validate` | Doc integrity: front-matter, INDEX completeness, IDs exist, links resolve, TS → FR, VUL statuses, field dictionary, **status drift** (`implemented`/`automated`/`mitigated` claimed without the matching code marker). Exit 1 on errors | Closing any task; pre-commit / CI |
+| `aix doctor` | Installation health: skill links in every runtime, dangling links, pointer files, always-on sections consistent, extern provenance, `STATE.md` vs `going-on/`, Python, PATH. Fix per problem, exit 1 | Session start when something seems off; after `aix install --into` |
+| `aix docs security [open\|validated] [--gate]` | Register state: rows not validated (worst first) with the audit skill to run, validated rows, rows whose status lacks evidence (audit report; ADR for `accepted`). `--gate` exits 1 if any row is open: the release check | Before an audit; closing a task with `security:` rows; release |
+| `aix code graph` / `aix code complexity` `[PATH...] [--functions] [--dead] [--clones] [--gate] [--max-reducible PCT] [--report] [--selftest]` | The modularity metric: dependency graph (modules for Python/JS/TS/Rust/Java, `--functions` for Python calls), facades collapsed, edges into stable nodes free; real graph vs ideal (transitive reduction, cycles contracted) = **reducible %**, each edge listed with its bypass; plus cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q. `--gate` fails on any cycle, upward dependency, or reducible above `--max-reducible`; `--selftest` runs known-answer cases; `--dead` lists dead modules (unreachable from entry modules) and, with `--functions`, Python functions never referenced (candidates, confirm before deleting); `--clones [--similarity PCT]` lists duplicated functions, exact groups by normalised structure and near-clones by winnowed fingerprints (the leaf never extracted; merge only when they share a purpose); `--report` writes `docs/tests/dependency-graph.md` | Design reviews; `review-code-review` on every diff; CI gate |
+| `aix docs coverage` | Regenerate `docs/tests/coverage-matrix.md` from FR files, TS `covers:` and `@implements` / `@tests` markers | Closing a task; before release |
+| `aix task new "T" [--bucket b]` / `start` / `block ID "why"` / `done` / `list` | Move `TASK-*` files through `pending → going-on ⇄ blocked → completed/YYYY-MM` and keep `STATE.md` in sync | `core-roadmap-task`, `core-session-handoff` |
+| `aix skills [general\|specific] [category]` | Catalogue (see below) | Choosing a skill; checking what is always on |
+| `aix skills info NAME` / `show NAME` | Details (group, level, runtimes, source) / the SKILL.md | Before invoking an unfamiliar skill |
+| `aix skills enable\|disable NAME` | Link/unlink everywhere; recorded in `.aix/config.yaml` `disabled_skills` | Trimming a project's skill set |
+| `aix skills registry` / `add NAME [--on-demand\|--always] [--extra a,b]` / `remove` / `update` | Third-party skills (below) | Adopting caveman, ponytail, … |
+| `aix skills always\|on-demand NAME` | Add/remove the always-on wiring for any skill | Making a behaviour permanent |
+
+`aix help COMMAND` (or `aix COMMAND --help`) prints the detailed help of one command; read it before using a command for the first time.
+
+## Skill catalogue
+`aix skills` prints `SKILL`, `STATE`, `DESCRIPTION` (description truncated to the terminal width, dropped on narrow terminals).
+
+| State | Meaning |
+|---|---|
+| `recommended` | In the registry, flagged recommended, not downloaded. Listed first. |
+| `available` | In the registry, not downloaded. Listed second. |
+| `(*) always` | Named in `AGENTS.md`; applied in every session. |
+| `on-demand` | Installed; invoked by name, by an orchestrator, or when its description matches. |
+| `disabled` | Listed in `.aix/config.yaml` `disabled_skills`; not linked into any runtime. |
+
+Two groups, usable as filters: **general** = behaviour that applies to every session (output style, decision
+method); **specific** = does one job when invoked (all AIX skills). A skill declares `group:` in its front-matter;
+extern skills take it from the registry. Adding a general skill makes it always-on unless `--on-demand`.
+
+## Always-on wiring
+No runtime has an "always apply this skill" switch; skills load by description match or by name. The only
+mechanism every runtime honours is its instructions file, so `aix skills always NAME` writes an
+`## Always-on skills` section into:
+
+| File | Read by |
+|---|---|
+| `AGENTS.md` | Claude Code (via `CLAUDE.md`), opencode, Antigravity, generic agents |
+| `.github/copilot-instructions.md` | VS Code / GitHub Copilot — points at `.github/skills/NAME/SKILL.md` |
+| `.cursor/rules/aix.mdc` | Cursor (`alwaysApply: true`) — points at `.cursor/skills/NAME/SKILL.md` |
+| `GEMINI.md` | Gemini CLI (its context file) — points at `.agents/skills/NAME/SKILL.md` |
+
+`aix skills on-demand NAME`, `remove NAME` and disabling all delete the entry. Two always-on *style* skills
+conflict; the CLI warns. Skills named in `AGENTS.md` by the session protocol (`core-session-resume`,
+`core-sdd-workflow`, `core-session-handoff`, `core-conflict-resolution`) are always-on by definition.
+
+## Third-party skills
+`.aix/skills/extern/registry.json` maps a name to a GitHub repo, sub-path, group, licence and an **evidence** line
+(who measured what, with caveats). Only entries with published measurements or wide, sustained adoption belong
+there. `aix skills add NAME` downloads the repo tarball over HTTPS (no git), copies the sub-folder to
+`.aix/skills/extern/NAME/`, rewrites the front-matter `name` to match, records provenance in `.aix-source`, links it
+into every runtime. Extern skills keep their bare name (`caveman`, not `extern-caveman`) so slash commands match
+upstream docs. `.aix/skills/extern/` is committed with the project; `aix skills update` re-downloads.
+
+## Ownership (what `aix upgrade` may overwrite)
+| Kit-owned (overwritten on upgrade) | Project-owned (never touched) | Merged |
+|---|---|---|
+| `.aix/scripts/`, `aix`, `aix.cmd`, `.aix/templates/`, `.aix/meta-docs/`, `.aix/skills/<built-in categories>/`, `CLAUDE.md` | `docs/requirements tests security conflicts operations road-map`, `.aix/skills/extern/`, runtime folders, your code | `AGENTS.md`, `GEMINI.md` (project keeps `## Always-on skills`, `## Project notes`), `.aix/config.yaml` (`disabled_skills`) |
+Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.
+
+## Rules for agents
+- Never edit files under `.opencode/ .claude/ .github/skills .agents/ .cursor/skills`: they are generated links.
+- Never move `TASK-*` files by hand; use `aix task`.
+- Run `aix docs validate` before every hand-off; `aix docs coverage` when a task closes; `aix docs security --gate` at release.
+- Never change a VUL status without an audit report (`aix docs validate` fails); `accepted` also needs an ADR.
+- Do not add registry entries without evidence; do not make a second style skill always-on.

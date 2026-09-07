@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.0 — 2026-09-07
+- **Layout**: everything the kit owns lives in `.aix/` (`config.yaml`, `scripts/`, `templates/`, `meta-docs/`, `skills/`, `bin/`); the project marker is `.aix/config.yaml`; root launchers are gone (the `aix` on PATH runs the project's `.aix/scripts/aix.py`); the kit no longer creates `backend/ frontend/ shared/ infra/` (project-layout.md only recommends a tree). At the root only AGENTS.md, CLAUDE.md, GEMINI.md, `docs/` (the project's ground truth) and your code remain.
+- `aix upgrade` migrates a 1.x project in place: moves the kit-owned folders under `.aix/`, removes the root launchers, rewrites the pointer texts; project docs, code and git history untouched (renames). `.aix/config.yaml` merge keeps `disabled_skills` and the `style:` block.
+- `aix install --into` copies `.aix/`, the three root files and the `docs/` seed. Code tools skip `.aix/` unless targeted explicitly. Validator checks both `docs/` and `.aix/meta-docs/`.
+
 ## 1.10.0 — 2026-09-07
 - `aix code stats [PATH...] [--metric ...] [--report]`: terminal histogram of function sizes (fixed comparable bins, bars scaled to the window, limit marked), mean, sample sd, median, p90/p95, max, share over the limit; the largest functions and the files/folders pushing most functions over the limit. `--metric` switches to cognitive, cyclomatic, nesting or params. [TASK-0004]
 
