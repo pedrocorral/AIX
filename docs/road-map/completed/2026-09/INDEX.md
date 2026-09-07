@@ -4,3 +4,4 @@ Tasks completed this month, newest last.
 | Task | Title | Requirements |
 |---|---|---|
 | TASK-0002 | Support Antigravity and Gemini CLI runtimes | — (kit change) |
+| TASK-0003 | aix code security — deterministic code-side security checks feeding the VUL register | — |

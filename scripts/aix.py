@@ -34,6 +34,12 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
   aix code clones [PATH...] [--similarity PCT] [--gate]
                                       duplicated functions: exact groups (same structure, other names/literals)
                                       and near-clones above the threshold (default 70 %)
+  aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]
+                                      deterministic static checks mapped to the VUL register and CWEs: injection,
+                                      shell/eval, unsafe deserialisation, secrets and tokens, TLS off, debug on,
+                                      weak hashes/randomness, JWT/cookies, XSS/CSRF/CORS, secrets in logs, prompt
+                                      injection, Dockerfile root/unpinned, unpinned deps. Findings to REVIEW, never
+                                      proof; --audit writes the audit report the register needs as evidence
   aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
                                       readability, per function: lines, cognitive and cyclomatic complexity,
                                       nesting, parameters, names, docstring, magic numbers; limits in
@@ -233,6 +239,10 @@ one holding framework.yaml). Commands are grouped by what they act on; `aix help
                             methods never referenced by name (decorated, dunder, exported, entry/test code excluded)
   aix code clones           duplicated functions: exact groups (same structure, other names/literals) and
                             near-clones above --similarity PCT (default 70). Candidates: merge on shared purpose.
+  aix code security         deterministic static checks mapped to the VUL register and CWEs (injection, shell,
+                            deserialisation, secrets, TLS, debug, weak hashes, JWT, XSS/CSRF/CORS, logs, prompt
+                            injection, Dockerfile, dependencies). Findings to review, never proof. --audit writes
+                            the audit report the register requires as evidence for a status change.
   aix code style            readability per function (lines, cognitive and cyclomatic complexity, nesting,
                             parameters, names, docstring, magic numbers) against the limits in framework.yaml;
                             a folder or file gives a ranked table, one function (file:func) a card with
@@ -545,7 +555,45 @@ Examples
   aix code style frontend/src/app/App.tsx::handleSaveNote
 The stack linters enforce the same limits in the editor: stacks/<lang>/tooling."""
 
-TOPICS["code"] = """aix code graph | complexity | dead | clones | style   [TARGET...] [--gate] [--report]
+TOPICS["code security"] = """aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]
+
+DETERMINISTIC SECURITY SCAN, mapped to the vulnerability register. Every rule names the VUL row it feeds and the
+CWE it detects, so a finding is evidence the register can act on. Rules follow bandit, semgrep, gitleaks and
+eslint-plugin-security; categories follow the OWASP Top 10 and the seeded register. No dependencies.
+
+What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests, env files)
+  VUL-INJ-001/002    SQL built from strings; shell commands (shell=True, exec/system); eval; template strings;
+                     paths from request input                                             CWE-89/78/95/1336/22
+  VUL-INPUT-001/002  pickle/marshal/yaml.load without SafeLoader, ObjectInputStream, XML entities  CWE-502/20
+  VUL-SECRET-001/002 private keys, cloud/API tokens, hard-coded passwords; TLS verification off; DEBUG on;
+                     ALLOWED_HOSTS *                                                       CWE-798/295/489/16
+  VUL-AUTHN-001/002  md5/sha1 for passwords, random for tokens; JWT unverified / alg none; cookies without
+                     Secure/HttpOnly                                                       CWE-328/338/347/614
+  VUL-WEB-001/002/003 innerHTML/dangerouslySetInnerHTML/mark_safe; CSRF disabled; CORS *; open redirect
+                                                                                          CWE-79/352/942/601
+  VUL-LOG-001        credentials in log/print lines                                        CWE-532
+  VUL-AI-001/002     prompts built by interpolation; LLM calls without an output limit      CWE-77/770
+  VUL-INFRA-001      chmod 777, privileged containers, Dockerfile without USER              CWE-732/250
+  VUL-DEP-001        unpinned requirements, unbounded npm ranges, missing lockfiles, FROM without tag  CWE-1104
+
+How to read it
+  A match is a FINDING TO REVIEW, never proof of exploitability; a row with no match is not proven clean. The
+  report says both. Findings in test code are listed but not gated (--strict gates them too).
+  Reviewed and accepted? Mark the line:   # aix: accepted VUL-INJ-002 <why>   (listed, never hidden)
+
+The important part: --audit
+  Writes docs/security/audits/AUDIT-<date>-code.md from templates/audit-report.md with the findings table filled
+  (asset, control, evidence file:line, status before -> "confirmed? review"), and rows for every rule that matched
+  nothing ("unverified by scan alone"). That file is the evidence `aix docs validate` and `aix docs security`
+  require before a VUL status may change; a human (or the security-audit-* skills) completes the Status column.
+
+Options
+  --strict    gate on test-code findings as well      --gate    exit 1 if any finding to review remains
+  --audit     write the audit report + INDEX row       --report  write docs/tests/code-security.md
+  --selftest  known-vulnerable snippets must be found, safe variants must not
+Related: aix docs security (register state), skills security-audit-* (reasoning on the hits), security-threat-model."""
+
+TOPICS["code"] = """aix code graph | complexity | dead | clones | style | security   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (scripts/graph.py). All read the same dependency graph of the project's source
 (Python, JS/TS, Rust, Java modules; Python functions with --functions); PATH... limits the folders.
@@ -555,8 +603,9 @@ Three tools on one engine (scripts/graph.py). All read the same dependency graph
   aix code clones     duplicated functions: exact groups (same structure) and near-clones (--similarity PCT)
   aix code style      readability per function: lines, cognitive/cyclomatic complexity, nesting, parameters,
                       names, docstring, magic numbers; one function = a card with line-numbered advice
+  aix code security   static security checks mapped to VUL rows and CWEs; --audit writes the audit evidence
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
-proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style."""
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security."""
 TOPICS["docs"] = """aix docs validate | coverage | security
 
   aix docs validate   are the DOCS right? front-matter, INDEXes, IDs, links, TS -> FR, VUL statuses, field
@@ -576,7 +625,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, code security, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -662,6 +711,9 @@ def run_code(args):
     if args and args[0] == "style":
         import style
         return style.main(args[1:])
+    if args and args[0] == "security":
+        import codesecurity
+        return codesecurity.main(args[1:])
     import graph
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args

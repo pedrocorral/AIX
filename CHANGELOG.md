@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.0 — 2026-09-07
+- `aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]`: deterministic static checks (Python, JS/TS, Rust, Java, Dockerfiles, compose, manifests, env files) mapped to the seeded VUL rows and CWEs, following bandit/semgrep/gitleaks/eslint-plugin-security: injection, shell/eval, template strings, path traversal, unsafe deserialisation, XML entities, private keys and tokens, hard-coded secrets, TLS off, debug on, weak hashes, weak randomness, JWT unverified, insecure cookies, XSS, CSRF off, CORS *, open redirect, secrets in logs, prompt injection, LLM calls without limits, chmod 777, privileged containers, Dockerfile without USER or tag, unpinned dependencies and missing lockfiles. Findings to review, never proof; test code listed, not gated; `aix: accepted VUL-…` inline suppressions listed; `aix: skip-security-scan` file marker. `--audit` writes `docs/security/audits/AUDIT-<date>-code.md` with the evidence table, the input `aix docs security` requires. Wired into the security-audit orchestrator. [TASK-0003]
+
 ## 1.8.0 — 2026-09-06
 - `skills/refactor/`: seven skills, one per `aix code` finding type (cycle, shortcut, hub, dead, clone, readability, modernise), each with procedure, verification and hand-off. Reports name the skill on their last line; `review-code-review` proposes it; `core-sdd-workflow` runs it after review; modularity.md and readability.md point to them. `aix help refactor`.
 

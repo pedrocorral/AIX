@@ -1,9 +1,9 @@
 ---
 id: TASK-0003
 title: aix code security — deterministic code-side security checks feeding the VUL register
-status: pending             # pending | going-on | blocked | completed
+status: completed
 created: 2026-09-06
-completed:
+completed: 2026-09-07
 requirements: []            # FR-*/NFR-* this task delivers or touches
 tests: []                   # TS-* to automate
 security: []                # VUL-* to address

@@ -7,6 +7,8 @@
 # generated reports
 docs/tests/coverage-matrix.md
 docs/tests/dependency-graph.md
+docs/tests/code-style.md
+docs/tests/code-security.md
 # usual suspects
 __pycache__/
 *.pyc
