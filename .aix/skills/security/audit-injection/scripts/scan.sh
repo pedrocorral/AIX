@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# aix: skip-security-scan this script holds grep patterns for secrets and injection
 # Deterministic injection-risk scan. Prints file:line hits only; reason about the hits, not the codebase.
 # Usage: scan.sh [paths...]  (default: backend src app)
 set -u

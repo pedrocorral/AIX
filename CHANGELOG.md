@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.1.0 — 2026-09-07
+- `aix code vulnerabilities [--taint] [--cve] [--history]`: the deep security layer. Python taint analysis (route/command parameters, request objects, argv, environment, stdin → shell, eval, SQL, file paths, redirects, template strings, deserialisation, outbound requests; sanitisers respected; one call deep, per file) reporting the chain from source to sink; known CVEs for pinned dependencies (requirements, uv/poetry/pdm locks, package-lock, pnpm-lock, Cargo.lock) via the OSV database; secrets in git history bounded by `--commits`. Findings name VUL row and CWE; `--audit` writes the evidence report; `--gate`. Self-test on known flows, a throwaway git history and a manifest.
+
 ## 2.0.2 — 2026-09-07
 - `aix install` from inside a project: the kit fixes the `~/.local/bin/aix` link first (the aix on PATH is always the kit's launcher, never a project's copy), then relinks the project's skills; in a 1.x project it prints the upgrade hint instead of refusing.
 

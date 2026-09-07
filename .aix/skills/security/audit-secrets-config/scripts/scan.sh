@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# aix: skip-security-scan this script holds grep patterns for secrets and injection
 # Deterministic secrets/config scan. Uses gitleaks/detect-secrets if present, else regex fallback.
 set -u
 if command -v gitleaks >/dev/null; then echo "## gitleaks"; gitleaks detect --no-banner --redact -v 2>&1 | tail -40

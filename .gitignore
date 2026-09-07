@@ -10,6 +10,7 @@ docs/tests/dependency-graph.md
 docs/tests/code-style.md
 docs/tests/code-security.md
 docs/tests/code-stats.md
+docs/tests/code-vulnerabilities.md
 # usual suspects
 __pycache__/
 *.pyc

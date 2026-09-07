@@ -44,6 +44,11 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
                                       distribution of function sizes as a terminal histogram scaled to the window,
                                       mean, sd, median, p90/p95, max, share over the limit; the largest functions
                                       and the files and folders pushing most functions over the limit
+  aix code vulnerabilities [PATH...] [--taint] [--cve] [--history] [--commits N] [--strict] [--gate] [--audit]
+                                      the deep security layer: Python taint paths (input sources to shell, eval,
+                                      SQL, file, redirect, template, deserialisation, outbound-request sinks; one
+                                      call deep, per file), known CVEs for pinned dependencies via the OSV database
+                                      (network), and secrets in git history. Evidence to review; --audit writes it
   aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
                                       readability, per function: lines, cognitive and cyclomatic complexity,
                                       nesting, parameters, names, docstring, magic numbers; limits in
@@ -247,6 +252,10 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
                             deserialisation, secrets, TLS, debug, weak hashes, JWT, XSS/CSRF/CORS, logs, prompt
                             injection, Dockerfile, dependencies). Findings to review, never proof. --audit writes
                             the audit report the register requires as evidence for a status change.
+  aix code vulnerabilities  the deep security layer: Python taint paths from input sources to dangerous sinks
+                            (with the chain), known CVEs for pinned dependencies via the OSV database, secrets in
+                            git history. Evidence to review, never proof; --audit writes the report the register
+                            needs. Not an authorisation/logic review: that stays with the security-audit-* skills.
   aix code stats            the shape of the code base: histogram of function sizes (or cognitive, cyclomatic,
                             nesting, parameters) scaled to the terminal, mean/sd/median/p90/p95/max, share over
                             the limit, and the largest functions, files and folders pulling the tail.
@@ -632,7 +641,38 @@ lists say where to start (`aix code style FILE:FUNCTION` for the card, skill ref
 --metric switches the whole view to cognitive or cyclomatic complexity, nesting depth or parameter count.
 --report writes docs/tests/code-stats.md. Python exact; JS/TS, Rust, Java approximate (as in aix code style)."""
 
-TOPICS["code"] = """aix code graph | complexity | dead | clones | style | security | stats   [TARGET...] [--gate] [--report]
+TOPICS["code vulnerabilities"] = """aix code vulnerabilities [PATH...] [--taint] [--cve] [--history] [--commits N] [--strict] [--gate] [--audit] [--report] [--selftest]
+
+THE DEEP SECURITY LAYER, below `aix code security` (patterns) and above `aix docs security` (the register).
+Three analyses, all on by default, each selectable:
+
+  --taint     Python, through the parser, one file at a time. Sources: parameters of decorated functions (route
+              handlers, commands; FastAPI Depends() excluded), request.args/form/json/headers/cookies/..., sys.argv,
+              os.environ, input(), stdin. Taint follows assignments, f-strings, concatenation, loops and calls into
+              functions defined in the same file (one level). Sinks: subprocess with shell=True, os.system,
+              eval/exec, execute()/raw() without parameters, open/send_file/os.remove/shutil/Path, redirect,
+              render_template_string/Template, yaml.load/pickle/marshal, requests/httpx/urlopen (SSRF).
+              Sanitisers clear it: int/float/bool/len, shlex.quote, html/markupsafe escape, bleach.clean,
+              secure_filename, uuid.UUID, re.fullmatch, a Path.resolve() in a function that checks is_relative_to.
+              Output: "input reaches <sink>" with the chain (which variable, assigned where, from which source).
+              Limits: Python only; a value crossing files is not followed; a taint path is static evidence that
+              input CAN reach a sink, not proof of exploitability in production.
+  --cve       pinned dependencies from requirements*.txt (==), uv.lock / poetry.lock / pdm.lock, package-lock.json,
+              pnpm-lock.yaml, Cargo.lock, sent in one batch to the OSV database (api.osv.dev). Reports the advisory
+              id, summary and the first fixed version, per VUL-DEP-001. Needs the network; when unreachable it says
+              so, skips, and the gate is not failed by it.
+  --history   `git log -p --all` over the last --commits N (default 300) through the secret rules of aix code
+              security (private keys, cloud/API tokens, hard-coded passwords). A leaked secret in history is live
+              until rotated, even if the file was cleaned. Files carrying `aix: skip-security-scan` are skipped at
+              the commit where they carried it.
+
+Every finding names the VUL row and the CWE. Test code is listed, not gated (--strict gates it).
+--audit writes docs/security/audits/AUDIT-<date>-vulnerabilities.md with the evidence table filled: the input
+`aix docs security` needs before a status changes. --gate fails on any finding to review.
+What this still is not: an authorisation or business-logic review (the security-audit-* skills), a runtime test,
+or a scan of the deployed environment."""
+
+TOPICS["code"] = """aix code graph | complexity | dead | clones | style | security | vulnerabilities | stats   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (.aix/scripts/graph.py). All read the same dependency graph of the project's source
 (Python, JS/TS, Rust, Java modules; Python functions with --functions); PATH... limits the folders.
@@ -643,9 +683,10 @@ Three tools on one engine (.aix/scripts/graph.py). All read the same dependency 
   aix code style      readability per function: lines, cognitive/cyclomatic complexity, nesting, parameters,
                       names, docstring, magic numbers; one function = a card with line-numbered advice
   aix code security   static security checks mapped to VUL rows and CWEs; --audit writes the audit evidence
+  aix code vulnerabilities  deep checks: Python taint paths, known CVEs (OSV), secrets in git history
   aix code stats      histogram of function sizes (or any style metric) with mean/sd/percentiles and offenders
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
-proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security | code stats."""
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security | code vulnerabilities | code stats."""
 TOPICS["docs"] = """aix docs validate | coverage | security
 
   aix docs validate   are the DOCS right? front-matter, INDEXes, IDs, links, TS -> FR, VUL statuses, field
@@ -665,7 +706,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, code security, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -756,6 +797,9 @@ def run_code(args):
     if args and args[0] == "stats":
         import stats
         return stats.main(args[1:])
+    if args and args[0] == "vulnerabilities":
+        import vulnerabilities
+        return vulnerabilities.main(args[1:])
     import graph
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args

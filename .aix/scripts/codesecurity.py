@@ -67,7 +67,7 @@ RULES = [
     ("VUL-SECRET-001", "CWE-798", "private key in repository", {"*"},
      r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY", "remove, rotate the key, load from a secret store"),
     ("VUL-SECRET-001", "CWE-798", "cloud / API token literal", {"*"},
-     r"(?:AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|sk-ant-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN)",
+     r"(?:AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|sk-ant-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35})",
      "revoke and rotate now; read it from the environment or a secret manager"),
     ("VUL-SECRET-001", "CWE-798", "hard-coded password / secret literal", {"*"},
      r"(?i)\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)\b\s*[:=]\s*['\"][^'\"$%{}<>\s]{6,}['\"]",
