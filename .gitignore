@@ -19,3 +19,6 @@ node_modules/
 .env
 .env.*
 !.env.example
+# presentations and other binaries do not belong in the kit
+*.pdf
+*.pptx
