@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.2 — 2026-09-07
+- `aix install` from inside a project: the kit fixes the `~/.local/bin/aix` link first (the aix on PATH is always the kit's launcher, never a project's copy), then relinks the project's skills; in a 1.x project it prints the upgrade hint instead of refusing.
+
 ## 2.0.1 — 2026-09-07
 - `aix install` (no `--into`) works from any folder: it acts on the kit checkout the launcher belongs to (links its skills, puts `aix` on PATH). Needed after 2.0 since the kit folder is no longer a project by itself from outside.
 

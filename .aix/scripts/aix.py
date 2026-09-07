@@ -308,20 +308,31 @@ def skill_count():
 ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version"}  # need no project
 
 
+def is_kit() -> bool:
+    """This checkout is the kit itself (AIX-DEVELOPMENT.md is never copied into projects)."""
+    return (ROOT / "AIX-DEVELOPMENT.md").exists()
+
+
 def reexec_in_project(argv):
     """Run the project's own copy of the CLI so every module resolves ROOT to the project, not to this checkout."""
     if argv[:1] == ["upgrade"]:
         return  # upgrade must run from THIS checkout's scripts, not the project's older copy
+    plain_install = argv[:1] == ["install"] and "--into" not in argv
+    if plain_install and is_kit():
+        expose_on_path()  # the aix on PATH is always the kit's launcher, never a project's copy; fix it first, from anywhere
     project = find_project(Path.cwd())
     if project is None:
-        if argv and argv[0] in ANYWHERE or argv[:1] == ["install"] or argv[:2] == ["skills", "registry"]:
-            return  # `install` with no --into acts on this checkout (the kit): link its skills, put aix on PATH
+        if argv and argv[0] in ANYWHERE or plain_install or argv[:2] == ["skills", "registry"]:
+            return  # `install` with no --into then links this checkout's own skills
         sys.exit("aix: not inside an AIX project (no .aix/config.yaml here or above). "
                  "Use `aix install --into DIR` to add AIX to a project, or cd into one.")
     own = project / ".aix" / "scripts" / "aix.py"
     if project != ROOT and own.exists():
         os.execv(sys.executable, [sys.executable, str(own), *argv])
     if project != ROOT and (project / "framework.yaml").exists():
+        if plain_install:
+            print(f"note: {project} uses the 1.x layout; run `aix upgrade` there to migrate it to .aix/")
+            return
         sys.exit(f"aix: {project} uses the 1.x layout; run `aix upgrade` (from this kit) to migrate it to .aix/")
     if project != ROOT:
         sys.exit(f"aix: {project} has .aix/ but no .aix/scripts/aix.py; run `aix install --into {project}`")
@@ -707,8 +718,7 @@ def cmd_install(args):
         inst.copy_kit_into(into, mode)
         inst.install_into(into, copy)
     else:
-        inst.install_into(inst.KIT_ROOT, copy)
-        expose_on_path()
+        inst.install_into(inst.KIT_ROOT, copy)  # PATH link is handled in reexec_in_project, by the kit only
 
 
 def cmd_task(args):
