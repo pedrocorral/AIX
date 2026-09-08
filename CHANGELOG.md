@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.2.1 — 2026-09-08
+- `aix install` by a user who does not own the kit checkout: links already pointing at the right place are left untouched, and a permission error on the kit is a clear message instead of a crash (the PATH link for that user is already done). Unknown `aix install` options are rejected.
+
 ## 2.2.0 — 2026-09-07
 - Kit-owned files are checksummed in `.aix/manifest.json` (written by `aix install` and `aix upgrade`); `aix doctor` reports locally edited kit files; `aix upgrade` marks them in the plan ("LOCAL EDIT WILL BE LOST") before overwriting. AGENTS.md rule 9: `.aix/` is the kit, not the project. Prompted by an agent patching a kit script inside a project.
 - Security scanners read the `aix: skip-security-scan` marker in the first 30 lines (was 12; the vulnerabilities module's own marker sat on line 15).

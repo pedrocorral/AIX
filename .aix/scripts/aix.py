@@ -748,6 +748,10 @@ def expose_on_path():
 
 def cmd_install(args):
     import install_skills as inst
+    known = {"--copy", "--into", "--replace-all", "--skip-all", "--merge-all"}
+    bad = [a for a in args if a.startswith("--") and a not in known]
+    if bad:
+        sys.exit(f"aix install: unknown option {' '.join(bad)}. Options: --copy, --into DIR, --replace-all, --skip-all, --merge-all (aix help install)")
     copy, into = "--copy" in args, None
     if "--into" in args:
         i = args.index("--into")

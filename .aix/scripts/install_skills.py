@@ -27,6 +27,8 @@ def leaf_skills(skills_dir: Path):
 
 
 def link_or_copy(src: Path, dst: Path, copy: bool):
+    if not copy and dst.is_symlink() and dst.resolve() == src.resolve():
+        return "linked"  # already right: touch nothing (the kit checkout may belong to another user)
     if dst.is_symlink() or dst.exists():
         if dst.is_symlink() or dst.is_file():
             dst.unlink()
@@ -97,10 +99,19 @@ def modified_kit_files(project: Path):
 def install_into(project: Path, copy: bool):
     skills_dir = project / ".aix" / "skills"
     if not skills_dir.exists():
-        sys.exit(f"no skills/ folder in {project}")
+        sys.exit(f"no .aix/skills folder in {project}")
+    try:
+        prune_dangling(project)
+        n = _install_links(project, skills_dir, copy, disabled_skills(project))
+        _pointer_files(project)
+    except PermissionError as e:
+        sys.exit(f"aix install: cannot write {e.filename}: {project} belongs to another user, whose skill links are already in place "
+                 f"(they run `aix install` there). Your PATH link is done; your own projects need `aix install --into DIR`.")
+    print(f"installed {n} skills into {project}")
+
+
+def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
     n = 0
-    off = disabled_skills(project)
-    prune_dangling(project)
     for src, flat in leaf_skills(skills_dir):
         if flat in off:
             for t in TARGETS:
@@ -113,7 +124,11 @@ def install_into(project: Path, copy: bool):
             mode = link_or_copy(src, project / t / flat, copy)
         n += 1
         print(f"  {flat:40s} -> {', '.join(TARGETS)} ({mode})")
-    # pointer files for runtimes that do not read AGENTS.md
+    return n
+
+
+def _pointer_files(project: Path):
+    """Pointer files for runtimes that do not read AGENTS.md, STATE.md, and the kit-file manifest (projects only)."""
     gh = project / ".github" / "copilot-instructions.md"
     if not gh.exists():
         gh.parent.mkdir(parents=True, exist_ok=True)
@@ -122,8 +137,7 @@ def install_into(project: Path, copy: bool):
     if not cur.exists():
         cur.parent.mkdir(parents=True, exist_ok=True)
         cur.write_text("---\ndescription: AIX agent contract\nalwaysApply: true\n---\nRead and follow `AGENTS.md` at the repository root before doing anything. Skills are in `.cursor/skills/`.\n")
-    # Gemini CLI reads GEMINI.md (not AGENTS.md) and skills from .agents/skills; Antigravity reads AGENTS.md and .agents/skills natively
-    gem = project / "GEMINI.md"
+    gem = project / "GEMINI.md"  # Gemini CLI reads GEMINI.md and .agents/skills; Antigravity reads AGENTS.md and .agents/skills natively
     if not gem.exists():
         gem.write_text("Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.agents/skills/` (installed from `.aix/skills/` by `aix install`).\n")
     state = project / "docs" / "road-map" / "going-on" / "STATE.md"
@@ -131,7 +145,6 @@ def install_into(project: Path, copy: bool):
         shutil.copy(project / ".aix" / "templates" / "session-state.md", state)
     if (project / ".aix").is_dir() and not (project / "AIX-DEVELOPMENT.md").exists():
         write_manifest(project)  # projects only: the kit checkout is edited by design
-    print(f"installed {n} skills into {project}")
 
 
 CHOICES = "[r]eplace  [s]kip  [m]erge  [R]eplace all  [S]kip all  [M]erge all  [a]bort"
