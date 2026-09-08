@@ -331,8 +331,8 @@ def reexec_in_project(argv):
         expose_on_path()  # the aix on PATH is always the kit's launcher, never a project's copy; fix it first, from anywhere
     project = find_project(Path.cwd())
     if project is None:
-        if argv and argv[0] in ANYWHERE or plain_install or argv[:2] == ["skills", "registry"]:
-            return  # `install` with no --into then links this checkout's own skills
+        if argv and argv[0] in ANYWHERE or argv[:1] == ["install"] or argv[:2] == ["skills", "registry"]:
+            return  # install: --into copies the kit into DIR; without --into it links this checkout's own skills
         sys.exit("aix: not inside an AIX project (no .aix/config.yaml here or above). "
                  "Use `aix install --into DIR` to add AIX to a project, or cd into one.")
     own = project / ".aix" / "scripts" / "aix.py"

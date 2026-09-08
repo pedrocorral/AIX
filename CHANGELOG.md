@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.2.2 — 2026-09-08
+- `aix install --into DIR` works again from a folder that is not a project (regression from 2.0.2).
+
 ## 2.2.1 — 2026-09-08
 - `aix install` by a user who does not own the kit checkout: links already pointing at the right place are left untouched, and a permission error on the kit is a clear message instead of a crash (the PATH link for that user is already done). Unknown `aix install` options are rejected.
 
