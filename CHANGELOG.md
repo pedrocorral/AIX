@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.10.1 — 2026-09-11
+
+- `aix doctor` no longer lists an instruction without globs or `always` as an AGENTS.md block when the index says it is not one.
+
 ## 2.10.0 — 2026-09-11
 
 - Optional kit language standards `aix/languages/python`, `aix/languages/typescript`, `aix/languages/java`, `aix/languages/rust` (`.aix/instructions/languages/`): each states decisions (version floor, toolchain that must pass, errors and logging, structure) in about forty lines, scoped by file extension, meant to be replaced by an organisation's own. The kit profiles `fastapi-react` (python, typescript) and `kedro` (python) include them.

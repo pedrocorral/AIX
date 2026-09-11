@@ -103,7 +103,7 @@ def check_layers():
         print(f"profile: {idx['profile']}")
     ins = idx.get("instructions", {})
     if ins:
-        blocks = sorted(k for k, v in ins.items() if v.get("block") or not (v.get("applyTo") or v.get("always")))
+        blocks = sorted(k for k, v in ins.items() if (v["block"] if "block" in v else not (v.get("applyTo") or v.get("always"))))
         scoped = sorted(k for k in ins if k not in blocks)
         print(f"instructions: {len(blocks)} AGENTS.md blocks ({', '.join(blocks)})")
         if scoped:
