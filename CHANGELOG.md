@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.1 — 2026-09-11
+
+- `aix rules` is an alias of `aix instructions` (the Cursor / Claude Code / Windsurf name for the same files).
+
 ## 2.8.0 — 2026-09-11
 
 - `aix instructions [list] | info ID | show ID | enable ID | disable ID`: the instruction files are first-class next to skills. `list` shows every instruction any layer offers with its state (active, optional (off), disabled, not in profile), layer and kind (block that builds AGENTS.md, scoped by globs, always). `enable`/`disable` switch one file and re-run the install; state lives in `.aix/config.yaml` (`instructions:`, `disabled_instructions:`), survives `aix upgrade`, and wins over the active profile. Profiles stay the way to switch a whole set (router + instructions + skill implementations).

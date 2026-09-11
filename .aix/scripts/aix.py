@@ -77,6 +77,7 @@ The instructions                      (aix instructions ...)
   aix instructions info ID | show ID  details | the file
   aix instructions enable|disable ID  turn one on (optional kit standards such as aix/stacks/fastapi-backend) or off;
                                       remembered in .aix/config.yaml; profiles are for switching whole sets
+  aix rules ...                       the same command; Cursor, Claude Code and Windsurf call these files rules
 
 Profiles and overrides                (aix profile ...; .aix/custom/, ~/.config/aix/)
   aix profile [list] | show NAME | use NAME | off
@@ -714,7 +715,7 @@ Every finding names the VUL row and the CWE. Test code is listed, not gated (--s
 What this still is not: an authorisation or business-logic review (the security-audit-* skills), a runtime test,
 or a scan of the deployed environment."""
 
-TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID
+TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID      (alias: aix rules ...)
 
 Instructions are the second kind of thing a layer ships, next to skills. Two kinds:
   block     `block: true`, `section`, `order` — a section of AGENTS.md itself; `aix install` assembles the file from
@@ -785,7 +786,7 @@ Details: aix help docs validate | docs coverage | docs security."""
 TOPICS["code complexity"] = TOPICS["code graph"]
 TOPICS["code dead"] = TOPICS["code graph"]
 TOPICS["code clones"] = TOPICS["code graph"]
-for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("validate", "docs validate"), ("coverage", "docs coverage"), ("security", "docs security")):
+for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("validate", "docs validate"), ("coverage", "docs coverage"), ("security", "docs security"), ("rules", "instructions")):
     TOPICS[_old] = TOPICS[_new]
 
 
@@ -911,7 +912,7 @@ def cmd_task(args):
 
 
 ALIASES = {"graph": ["code", "graph"], "complexity": ["code", "graph"], "validate": ["docs", "validate"],
-           "coverage": ["docs", "coverage"], "security": ["docs", "security"]}
+           "coverage": ["docs", "coverage"], "security": ["docs", "security"], "rules": ["instructions"]}
 CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--clones"]}
 
 

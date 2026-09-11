@@ -97,7 +97,8 @@ alternatives with the `use:` line to switch. A class that exists only in a layer
 (Cursor) and a `## Scoped instructions` section in AGENTS.md/GEMINI.md for every other runtime; generated files
 are git-ignored. **Profiles** (`profiles/<name>.yaml`: router, instructions, skills) are saved sets of these
 choices: `aix profile use NAME`. A single instruction is switched with `aix instructions enable|disable ID` (state in
-`.aix/config.yaml` `instructions:` and `disabled_instructions:`); an explicit enable or disable wins over the profile. The organisation router (a profile's `router:` or `custom/AGENTS.md`) becomes the
+`.aix/config.yaml` `instructions:` and `disabled_instructions:`); an explicit enable or disable wins over the profile. `aix rules` is an alias of `aix instructions`: Copilot and the
+AGENTS.md spec say instructions, Cursor, Claude Code and Windsurf say rules; the files are the same thing. The organisation router (a profile's `router:` or `custom/AGENTS.md`) becomes the
 `## Organisation` section of AGENTS.md, GEMINI.md and the Copilot pointer. See `aix help profile`.
 
 ## Instruction blocks (AGENTS.md is assembled)
