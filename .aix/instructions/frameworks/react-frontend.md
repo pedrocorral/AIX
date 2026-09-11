@@ -1,5 +1,5 @@
 ---
-id: aix/stacks/react-frontend
+id: aix/frameworks/react-frontend
 name: "React Frontend Standards"
 description: "Use when creating or changing a React and TypeScript frontend: components, hooks, routes, data fetching, state, generated API types, Vitest or Playwright tests, ESLint, Vite or TypeScript configuration."
 applyTo: "frontend/**/*.{ts,tsx,js,jsx,css,json},shared/**/*.{ts,tsx,js,json,css},eslint.config.*,tsconfig*.json,vite.config.*,vitest.config.*,playwright.config.*"

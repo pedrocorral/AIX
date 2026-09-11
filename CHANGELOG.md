@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.8.3 — 2026-09-11
+
+- `aix upgrade` now refreshes `.aix/profiles/` too (kit profiles were left at the installed version).
+- The kit's opt-in technology standards are now `aix/frameworks/fastapi-backend`, `aix/frameworks/react-frontend` and `aix/frameworks/kedro-pipelines` (folder `.aix/instructions/frameworks/`, was `stacks`). A stack is a combination such as FastAPI plus React, which is what a profile is; each of these files covers one framework. `aix upgrade` rewrites the old ids in `.aix/config.yaml`.
+
 ## 2.8.2 — 2026-09-11
 
 - `aix doctor` reports the AGENTS.md blocks and the scoped instructions separately (the blocks were labelled "scoped").

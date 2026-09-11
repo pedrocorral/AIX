@@ -1,5 +1,5 @@
 ---
-id: aix/stacks/kedro-pipelines
+id: aix/frameworks/kedro-pipelines
 name: "Kedro Pipeline Standards"
 description: "Use when creating or changing a Kedro project: nodes, pipelines, the pipeline registry, the data catalog, parameters, hooks, datasets, pipeline tests, Ruff or typing configuration."
 applyTo: "**/pipelines/**/*.py,**/pipeline_registry.py,**/settings.py,**/hooks.py,conf/**/*.yml,conf/**/*.yaml,pyproject.toml"

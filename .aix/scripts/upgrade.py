@@ -2,7 +2,7 @@
 """aix upgrade — bring a project's copy of the kit up to this kit checkout, without touching the project's own work.
 
 Ownership decides what happens to each path:
-  kit-owned   (overwritten, removed if gone from the kit): .aix/scripts, .aix/templates, .aix/meta-docs, .aix/bin,
+  kit-owned   (overwritten, removed if gone from the kit): .aix/scripts, .aix/templates, .aix/meta-docs, .aix/bin, .aix/instructions, .aix/profiles,
               .aix/skills/<every category except extern>, CLAUDE.md
   project-own (never touched): docs/requirements, tests, security, conflicts, operations, road-map, .aix/skills/extern,
               runtime folders, code
@@ -14,7 +14,7 @@ import filecmp, re, shutil, subprocess, sys
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[2]
-KIT_OWNED_DIRS = [".aix/scripts", ".aix/templates", ".aix/meta-docs", ".aix/bin", ".aix/instructions"]
+KIT_OWNED_DIRS = [".aix/scripts", ".aix/templates", ".aix/meta-docs", ".aix/bin", ".aix/instructions", ".aix/profiles"]
 KIT_OWNED_FILES = ["CLAUDE.md"]
 MERGED_FILES = ["AGENTS.md", "GEMINI.md", ".aix/config.yaml"]  # GEMINI.md carries the always-on section like AGENTS.md
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
@@ -93,6 +93,7 @@ def merged_text(project: Path, name) -> str:
                 out = out.rstrip("\n") + "\n\n" + keep
         return out
     out = kit_text  # config.yaml: kit text, but the project's disabled_skills line and style: block win
+    proj_text = proj_text.replace("aix/stacks/", "aix/frameworks/")  # 2.8.3 renamed the kit's framework standards
     for key in ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source"):
         m = re.search(rf"^{key}:.*$", proj_text, re.M)
         if m:

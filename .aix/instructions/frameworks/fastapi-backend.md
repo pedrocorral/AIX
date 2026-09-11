@@ -1,5 +1,5 @@
 ---
-id: aix/stacks/fastapi-backend
+id: aix/frameworks/fastapi-backend
 name: "FastAPI Backend Standards"
 description: "Use when creating or changing a FastAPI backend: routers, Pydantic models, dependencies, services, repositories, settings, migrations, backend tests, Ruff or mypy configuration."
 applyTo: "backend/**/*.py,backend/**/*.toml,backend/**/*.yml,backend/**/*.yaml"
