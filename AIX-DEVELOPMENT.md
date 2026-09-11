@@ -221,6 +221,40 @@ Rules:
 - Prerequisite: `config.yaml` `paths:` still lists 1.x locations (`docs/meta-docs`, `skills`, `templates`) and
   `code_roots`; fix when the resolver starts reading them.
 
-## 12. Numbers to remember
+## 12. Skill identity, overrides and implementations (designed 2026-09-11; first slice being built as 2.3.0)
+Precedents: Debian `update-alternatives` (a generic name links to one of several alternatives; master/slave groups
+switch together), Kubernetes IngressClass (a class names its implementation), ESLint presets + per-rule overrides,
+npm scoped packages for names, Git/Nix/OCI content hashes for identity.
+
+Three levels of identity, one job each:
+| Level | Form | Job |
+|---|---|---|
+| class | `testing/write-unit-tests` — the folder name the runtimes link | what the skill is FOR; owns the `description` that triggers it |
+| implementation | `@acme/write-unit-tests-pytest@1.2.0` (front matter `id:`) | HOW it is done; namespaced, versioned, human-readable |
+| content hash | SHA-256 of the canonicalised files, computed at install | the true identity: proves what is linked, detects forks/duplicates |
+
+Rules:
+- The runtime always sees one folder per class, named as today, linked to the chosen implementation. The class
+  description never changes between implementations, so a switch changes what a skill does, never when it fires.
+- An override is a folder at the class path in a higher layer (§11): same path replaces, new path adds, an empty
+  `DISABLED` file removes. Several implementations may sit side by side under a class
+  (`skills/core/session-handoff/@acme-jira/`); one line in `config.yaml` (`use: {core/session-handoff: "@acme/…"}`)
+  picks the active one. Precedence: explicit choice in config > project layer > person layer > organisation layer >
+  kit default; `aix skills info NAME` prints the winner, its id, hash and the rule that chose it.
+- `aix install` writes `.aix/index.json`: every class, the linked implementation id, layer, version and hash.
+  `aix doctor` reports overrides and any linked content that no longer matches its hash.
+- A **theme** is only a saved set of such choices (`themes/<name>.yaml`: class -> implementation), applied at once
+  and still overridable per class. Later, not in the first slice.
+- A **class contract** (inputs/outputs, e.g. "takes a TS-*, writes tests with `@tests` markers, sets status
+  automated") is what makes two implementations interchangeable; `aix docs validate` will check it. Not mandatory
+  in the first slice; add it the day a class has a second implementation.
+- Instructions get the same treatment one size down: AGENTS.md blocks with class ids (`agents/session`, …),
+  overridable per block. Later slice.
+
+First slice (2.3.0): project `.aix/custom/skills/` and person `~/.config/aix/skills/` overrides (replace / add /
+DISABLED), the index with hashes, `skills info` and `doctor` showing layers. Then `--from` (organisation), then
+config `use:` for side-by-side implementations, then instruction blocks, then themes.
+
+## 13. Numbers to remember
 
 Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 36 skills, 24 seeded VUL rows, 4 example requirements/TS.
