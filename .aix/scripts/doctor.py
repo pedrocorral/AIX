@@ -90,8 +90,23 @@ def check_kit_edits():
         problem(f".aix/{f} was edited locally; the next `aix upgrade` overwrites it", "make the change in the kit repository (or a skill under .aix/skills/extern), then `aix upgrade`")
 
 
+def check_layers():
+    """Overrides are fine; a linked implementation whose content changed since `aix install` is not (the index lies)."""
+    import layers
+    changed = layers.drift(ROOT)
+    if changed is None:
+        return problem(".aix/index.json missing (which implementation is active is unknown)", "run `aix install`")
+    for cls in changed:
+        problem(f"skill {cls}: linked content changed since the last install (index hash differs)", "run `aix install` to re-index (and review who changed it)")
+    idx = layers.read_index(ROOT)
+    over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit"]
+    if over or idx["disabled"]:
+        print("layers: " + (", ".join(over) if over else "no overrides") + (";  disabled by layers: " + ", ".join(idx["disabled"]) if idx["disabled"] else "")
+              + ("" if idx.get("user_layer") else "  (user layer not applied: no terminal / AIX_NO_USER)"))
+
+
 def main():
-    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits):
+    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers):
         check()
     for what, fix in problems:
         print(f"PROBLEM {what}\n        fix: {fix}")

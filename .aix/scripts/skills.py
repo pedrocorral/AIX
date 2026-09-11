@@ -49,8 +49,10 @@ def cmd_list(group=None, category=None):
         if state == "always":  # marker starts two columns early, overwriting the end of the name if needed
             line = f"{line[:39]}{'(*) always':16s}"
         print(line + (info["description"][:room] if room > 20 else ""))
+    overrides = [c for c, i in cat.items() if i.get("layer") not in (None, "kit")]
     print(f"\n{n} of {len(cat)} skills. (*) always = applied in every session; recommended / available = known, "
-          "not downloaded (aix skills add NAME). Details: aix skills info NAME")
+          "not downloaded (aix skills add NAME). Details: aix skills info NAME"
+          + (f"\n{len(overrides)} from custom layers: " + ", ".join(f"{c} ({cat[c]['layer']})" for c in overrides) if overrides else ""))
 
 
 def cmd_info(flat):
@@ -59,10 +61,18 @@ def cmd_info(flat):
         import extern
         return extern.cmd_registry(only=flat)
     info = cat.get(flat) or sys.exit(f"unknown skill '{flat}' (see `aix skills list`)")
+    import layers
     src = info["path"] / ".aix-source"
+    md = info["path"] / "SKILL.md"
+    shown = info["path"].relative_to(ROOT) if info["path"].is_relative_to(ROOT) else info["path"]
     print(f"{flat}\n  state:       {state_of(flat, always, off)}\n  group:       {info['group']}"
           f"\n  level:       {level(flat, info, always)}\n  category:    {info['category']}"
-          f"\n  installed:   {', '.join(installed_in(flat)) or '-'}\n  path:        {info['path'].relative_to(ROOT)}")
+          f"\n  installed:   {', '.join(installed_in(flat)) or '-'}\n  path:        {shown}"
+          f"\n  layer:       {info['layer']}" + ("" if info["layer"] == "kit" else (" (override)" if info["shadowed"] else " (new class)"))
+          + f"\n  id:          {layers.front_matter_value(md, 'id') or flat}" + (f"@{layers.front_matter_value(md, 'version')}" if layers.front_matter_value(md, 'version') else "")
+          + f"\n  hash:        {layers.content_hash(info['path'])[:16]}")
+    for layer, path in info.get("shadowed", []):
+        print(f"  shadows:     {layer} copy at {path}")
     if src.exists():
         print(f"  source:      {src.read_text(encoding='utf-8').strip()}")
     print(f"  description: {info['description']}")

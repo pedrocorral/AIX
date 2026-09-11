@@ -111,8 +111,17 @@ def install_into(project: Path, copy: bool):
 
 
 def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
+    import layers
+    active, layer_disabled = layers.resolve(project)
+    for flat, layer in layer_disabled.items():  # removed by a DISABLED file in a higher layer
+        for t in TARGETS:
+            p = project / t / flat
+            if p.is_symlink() or p.is_file(): p.unlink()
+            elif p.is_dir(): shutil.rmtree(p)
+        print(f"  {flat:40s} -> disabled by the {layer} layer")
     n = 0
-    for src, flat in leaf_skills(skills_dir):
+    for flat, info in sorted(active.items()):
+        src = info["path"]
         if flat in off:
             for t in TARGETS:
                 p = project / t / flat
@@ -123,7 +132,9 @@ def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
         for t in TARGETS:
             mode = link_or_copy(src, project / t / flat, copy)
         n += 1
-        print(f"  {flat:40s} -> {', '.join(TARGETS)} ({mode})")
+        origin = "" if info["layer"] == "kit" else f"  [{info['layer']} layer" + (" override]" if info["shadowed"] else ", new]")
+        print(f"  {flat:40s} -> {', '.join(TARGETS)} ({mode}){origin}")
+    layers.write_index(project)
     return n
 
 

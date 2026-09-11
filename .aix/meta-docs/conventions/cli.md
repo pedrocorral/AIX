@@ -75,6 +75,16 @@ there. `aix skills add NAME` downloads the repo tarball over HTTPS (no git), cop
 into every runtime. Extern skills keep their bare name (`caveman`, not `extern-caveman`) so slash commands match
 upstream docs. `.aix/skills/extern/` is committed with the project; `aix skills update` re-downloads.
 
+## Overriding a skill (layers)
+A skill class is the folder name the runtimes link (`core-session-handoff`); its implementation is whichever layer
+wins. Layers, later wins: kit `.aix/skills/` < organisation `.aix/org/skills/` (later slice) < person
+`~/.config/aix/skills/` (terminal sessions only; never CI) < project `.aix/custom/skills/` (committed). A folder at
+the same class path replaces; a new path adds a class; an empty `DISABLED` file removes one. The class
+`description` must stay the same across implementations (it is what triggers the skill). `aix install` links the
+winner and writes `.aix/index.json` (layer, id, version, content hash); `aix skills info NAME` and `aix doctor`
+show which layer won and whether the linked content still matches. Implementations may carry `id:` and
+`version:` in their front matter (`@acme/find-doc`, `1.0.0`).
+
 ## Ownership (what `aix upgrade` may overwrite)
 | Kit-owned (overwritten on upgrade) | Project-owned (never touched) | Merged |
 |---|---|---|

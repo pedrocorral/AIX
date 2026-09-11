@@ -70,7 +70,8 @@ The road-map                          (aix task ...)
 
 The skills                            (aix skills ...)
   aix skills [general|specific] [cat] catalogue: name, state (always / on-demand / disabled), description
-  aix skills info NAME | show NAME    details (group, level, runtimes, source) | the SKILL.md
+  aix skills info NAME | show NAME    details (group, level, runtimes, layer, id, hash, source) | the SKILL.md
+                                      overrides: .aix/custom/skills/<class>/ (project) or ~/.config/aix/skills/<class>/ (you)
   aix skills enable|disable NAME...   link/unlink a skill everywhere; remembered in .aix/config.yaml
   aix skills registry                 known third-party skills (caveman, ponytail, ...) with evidence
   aix skills add NAME [--on-demand]   download a registry skill into .aix/skills/extern/, link it everywhere;
@@ -538,7 +539,15 @@ Groups (filters): general = behaviour that applies to every session (style, meth
   always    write the "## Always-on skills" section into AGENTS.md, .github/copilot-instructions.md,
             .cursor/rules/aix.mdc and GEMINI.md (no runtime has an always-apply switch; the instruction files are
             the only mechanism every tool honours); on-demand removes it
-  registry  the known third-party skills with their evidence line (only entries with evidence belong there)""",
+  registry  the known third-party skills with their evidence line (only entries with evidence belong there)
+
+Overrides (layers, AIX-DEVELOPMENT.md §11-12): a skill folder at the same class path in .aix/custom/skills/
+(this project, committed) or ~/.config/aix/skills/ (you; applied only in a terminal session, never in CI, off with
+AIX_NO_USER=1, forced with AIX_USER=1, relocated with AIX_USER_DIR) replaces the kit's implementation; a new path
+adds a class; an empty DISABLED file in a class folder removes it. The runtime always sees one folder per class.
+`aix install` links the winner and writes .aix/index.json (layer, id, version, content hash per class);
+`aix skills info NAME` shows layer, id, hash and the copies it shadows; `aix doctor` lists overrides and reports
+linked content that changed since the install.""",
 
 "about": "aix about      prints the full description of the kit: purpose, workflow, folders, IDs, skills, every command.",
 "version": "aix version    prints the kit version from .aix/config.yaml.",

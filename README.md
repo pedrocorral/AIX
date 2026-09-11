@@ -45,6 +45,7 @@ aix docs validate         # sanity-check IDs, links, indexes
 | `aix docs coverage` | Regenerate `docs/tests/coverage-matrix.md` |
 | `aix task new\|start\|block\|done\|list` | Road-map helper, keeps `STATE.md` in sync |
 | `aix skills [general\|specific] [category]` | Catalogue: group (general = behaviour for every session, specific = one job), level (always / orchestrator / on-demand), state, runtimes. `*` marks always-on; a general skill not always-on shows as inactive. `show`, `enable`, `disable`, `always`, `on-demand NAME` manage them |
+| `.aix/custom/skills/<class>/`, `~/.config/aix/skills/<class>/` | Override a skill for this project or for yourself: same path replaces, new path adds, `DISABLED` removes; `aix skills info` shows the winning layer and hash |
 | `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `.aix/skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor/Gemini pointers) unless `--on-demand` |
 | `aix help COMMAND` / `aix COMMAND --help` | Detailed help for one command, written so an agent can understand the tool (e.g. `aix help graph`) |
 | `aix about` | Full explanation of the kit: purpose, workflow, folders, IDs, skills, every command |

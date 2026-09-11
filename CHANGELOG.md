@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.3.0 — 2026-09-11
+- Skill overrides by layer (AIX-DEVELOPMENT.md §11-12, first slice): a folder at the same class path in `.aix/custom/skills/` (project, committed) or `~/.config/aix/skills/` (person; applied only with a terminal, never in CI or with `AIX_NO_USER=1`; `AIX_USER_DIR` relocates it) replaces the kit's implementation; a new path adds a class; an empty `DISABLED` file removes one. `aix install` links the winning implementation under the class name and writes `.aix/index.json` (layer, id, version, content hash per class; git-ignored). `aix skills info` shows layer, id, hash and shadowed copies; `aix skills` lists overrides; `aix doctor` reports linked content that changed since the last install. `aix docs validate` checks custom skills too.
+
 Versioning: majors only for breaking changes (layout, removed commands, AGENTS.md contract); minors for new functionality, counting past 9 (`x.10`, `x.11`, …); patches for fixes. Details in `AIX-DEVELOPMENT.md` §10.
 
 ## 2.2.2 — 2026-09-08

@@ -1,20 +1,22 @@
 # AIX manifest. Tools and scripts read this; agents rarely need to.
 name: aix
-version: 2.2.2
+version: 2.3.0
 spec: https://agentskills.io   # skills follow the Agent Skills open format (SKILL.md + YAML front-matter)
 entrypoint: AGENTS.md
-paths:
+paths:                    # where things live in a project (2.0 layout); the code tools search code_roots by default
   docs: docs
-  meta_docs: docs/meta-docs
   requirements: docs/requirements
   tests: docs/tests
   security: docs/security
   roadmap: docs/road-map
   conflicts: docs/conflicts
   operations: docs/operations
-  skills_source: skills
-  templates: templates
-  code_roots: [backend, frontend, shared, infra]
+  kit: .aix
+  meta_docs: .aix/meta-docs
+  skills: .aix/skills
+  templates: .aix/templates
+  custom: .aix/custom       # this project's overrides (committed); person: ~/.config/aix ; organisation: .aix/org
+  code_roots: [backend, frontend, shared, infra, src, app, tests, lib]
 skill_targets:            # where `aix install` links every leaf skill (name = folder path joined with '-')
   - .opencode/skills      # opencode (native)
   - .claude/skills        # Claude Code, also read by opencode and VS Code

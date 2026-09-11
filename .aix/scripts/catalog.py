@@ -55,16 +55,18 @@ def skill_group(md: Path, text: str, flat: str, reg: dict) -> str:
 
 def catalogue():
     """All leaf skills: dict flat-name -> {path, category, group, description, orchestrator}."""
+    import layers
     out, reg = {}, registry_groups()
-    for md in sorted(SKILLS.rglob("SKILL.md")):
-        rel = md.parent.relative_to(SKILLS)
+    active, _ = layers.resolve(ROOT)
+    for flat, info in sorted(active.items()):
+        md = info["path"] / "SKILL.md"
         text = md.read_text(encoding="utf-8")
-        flat = "-".join(rel.parts[1:]) if rel.parts[0] == "extern" else "-".join(rel.parts)
         out[flat] = {
-            "path": md.parent, "category": rel.parts[0],
+            "path": info["path"], "category": info["path"].parent.name,
             "group": skill_group(md, text, flat, reg),
             "description": front_matter(text, "description"),
             "orchestrator": "orchestrator" in text.lower()[:600],
+            "layer": info["layer"], "shadowed": info["shadowed"],
         }
     return out
 

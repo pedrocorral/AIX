@@ -36,12 +36,18 @@ def frontmatter(p: Path):
 
 
 def check_skills():
-    for md in SKILLS.rglob("SKILL.md"):
+    trees = [SKILLS, ROOT / ".aix" / "custom" / "skills", ROOT / ".aix" / "org" / "skills"]
+    for base in [b for b in trees if b.is_dir()]:
+        for md in base.rglob("SKILL.md"):
+            _check_skill(md, base)
+
+
+def _check_skill(md, base):
         fm, _ = frontmatter(md)
-        parts = md.parent.relative_to(SKILLS).parts
+        parts = md.parent.relative_to(base).parts
         flat = "-".join(parts[1:]) if parts[0] == "extern" else "-".join(parts)
         if not fm:
-            errors.append(f"{md}: missing front-matter"); continue
+            errors.append(f"{md}: missing front-matter"); return
         if fm.get("name") != flat:
             errors.append(f"{md}: name '{fm.get('name')}' != folder path '{flat}'")
         if len(fm.get("description", "")) < 40:
