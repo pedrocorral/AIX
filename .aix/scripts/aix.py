@@ -380,6 +380,8 @@ into ~/.local/bin when that folder exists. Idempotent: run it after adding, remo
                  [r]eplace (yours kept as <item>.bak)  [s]kip  [m]erge (folders: add missing files only)
                  [R]/[S]/[M] same answer for the rest  [a]bort
   --replace-all | --skip-all | --merge-all   answer every collision without a terminal (CI)
+  Without --from, a checkout whose own .aix/custom/ is filled (an organisation's fork) installs as that
+                 organisation: its custom/ becomes the project's .aix/org/ and its git URL is recorded as source:.
   --from SOURCE  (with --into) a path or git URL. A kit checkout (has .aix/): its .aix/ is the payload and its
                  .aix/custom/ becomes the project's organisation layer (.aix/org/). A bare layer folder (skills/,
                  instructions/, profiles/, templates/): payload from this kit, folder becomes .aix/org/. Git URLs are
@@ -804,6 +806,16 @@ def expose_on_path():
     print(f"PATH: linked {link} -> {ROOT / '.aix' / 'bin' / 'aix'}" + ("" if on_path else f" (add {bin_dir} to PATH)"))
 
 
+def checkout_source() -> str:
+    """How a project should refer back to this checkout: its git remote URL when it has one, else its path."""
+    import subprocess
+    try:
+        url = subprocess.run(["git", "-c", f"safe.directory={ROOT}", "remote", "get-url", "origin"], cwd=ROOT, capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        url = ""
+    return url or str(ROOT)
+
+
 def cmd_install(args):
     import install_skills as inst
     known = {"--copy", "--into", "--from", "--replace-all", "--skip-all", "--merge-all"}
@@ -827,9 +839,14 @@ def cmd_install(args):
     if into:
         mode = "replace" if "--replace-all" in args else "skip" if "--skip-all" in args else "merge" if "--merge-all" in args else "ask"
         org_layer = None
+        own_custom = ROOT / ".aix" / "custom"
+        self_source = not src and own_custom.is_dir() and any(p for p in own_custom.rglob("*") if p.is_file())
+        if self_source:
+            src = checkout_source()  # recorded for later upgrades; the files come from this checkout right now
+            print(f"  this checkout has a filled .aix/custom/: installing as an organisation (source recorded as {src})")
         if src:
             import source as srcmod
-            kind, payload_root, org_layer = srcmod.classify(srcmod.fetch(src))
+            kind, payload_root, org_layer = ("kit", ROOT, own_custom) if self_source else srcmod.classify(srcmod.fetch(src))
             if kind == "kit":
                 inst.KIT_ROOT = payload_root  # the organisation's vendored kit is the payload
                 print(f"  source: kit checkout at {payload_root}" + (" with an organisation layer" if org_layer else ""))

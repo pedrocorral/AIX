@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.6.1 — 2026-09-11
+- `aix install --into DIR` run from a checkout whose `.aix/custom/` is filled installs as an organisation: the customisation lands as the project's `.aix/org/` and the checkout's git URL (or path) is recorded as `source:`. `custom/`, `org/` and the index never travel as payload.
+
 ## 2.6.0 — 2026-09-11
 - `aix install --into DIR --from SOURCE`: install a project from an organisation. SOURCE is a path or git URL (cloned into `~/.cache/aix/sources/`) to either the organisation's kit checkout (its `.aix/` is the payload, its `.aix/custom/` becomes the project's `.aix/org/`) or a bare layer folder. `source:` is recorded in config.yaml and `aix upgrade` refreshes `.aix/org/` from it.
 - `examples/acme/`: a complete fictional organisation layer used as the fixture: 36 skill implementations with `class:` and `@acme/…` ids (fifteen manual-only, some with references, scripts, agent metadata), 8 scoped instructions (Django, Vue, Dagster, engineering, documentation, shared packages, plain language, web-app profile), two profiles, documentation templates, a router fragment.

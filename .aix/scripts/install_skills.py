@@ -239,7 +239,7 @@ def merge_dir(src: Path, dst: Path):
     """Add files from src that dst lacks; never overwrite. Returns number of files added."""
     added = 0
     for f in src.rglob("*"):
-        if f.is_dir():
+        if f.is_dir() or any(part in ("custom", "org", "__pycache__") for part in f.relative_to(src).parts) or f.name == "index.json":
             continue
         target = dst / f.relative_to(src)
         if not target.exists():
@@ -257,7 +257,10 @@ def replace_item(src: Path, dst: Path):
     elif bak.exists() or bak.is_symlink():
         bak.unlink()
     dst.rename(bak)
-    shutil.copytree(src, dst) if src.is_dir() else shutil.copy(src, dst)
+    shutil.copytree(src, dst, ignore=PAYLOAD_IGNORE) if src.is_dir() else shutil.copy(src, dst)
+
+
+PAYLOAD_IGNORE = shutil.ignore_patterns("custom", "org", "index.json", "__pycache__", "*.pyc")  # layers and per-machine files never travel as payload
 
 
 def copy_kit_into(project: Path, on_collision: str = "ask"):
@@ -267,7 +270,7 @@ def copy_kit_into(project: Path, on_collision: str = "ask"):
     for item in KIT_PAYLOAD:
         src, dst = KIT_ROOT / item, project / item
         if not dst.exists():
-            shutil.copytree(src, dst) if src.is_dir() else shutil.copy(src, dst)
+            shutil.copytree(src, dst, ignore=PAYLOAD_IGNORE) if src.is_dir() else shutil.copy(src, dst)
             print(f"  added: {item}")
             continue
         choice = ask_collision(item, src.is_dir(), remembered)
