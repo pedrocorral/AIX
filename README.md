@@ -125,4 +125,4 @@ Read it in this order: cycles and upward dependencies are facts, fix them first;
 to drop or route through its bypass; reducible % and the shape numbers are for comparing over time and across
 projects. Full method: `aix help graph` and `.aix/meta-docs/architecture/modularity.md`.
 
-See `docs/INDEX.md` and `.aix/skills/INDEX.md` to explore. Developing AIX itself (not an app)? Read `AIX-DEVELOPMENT.md` — it is never loaded by app agents. Framework version: see `.aix/config.yaml`.
+See `docs/INDEX.md` and `.aix/skills/INDEX.md` to explore. Developing AIX itself (not an app)? Read `AIX-DEVELOPMENT.md` — it is never loaded by app agents. Framework version: see `.aix/config.yaml`. Versioning: majors only for changes that break how a project uses the kit, minors for new functionality and they count past 9 (`x.10`, `x.11`, …), patches for fixes; see `AIX-DEVELOPMENT.md` §10.

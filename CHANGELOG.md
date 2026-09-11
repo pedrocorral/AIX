@@ -1,5 +1,7 @@
 # Changelog
 
+Versioning: majors only for breaking changes (layout, removed commands, AGENTS.md contract); minors for new functionality, counting past 9 (`x.10`, `x.11`, …); patches for fixes. Details in `AIX-DEVELOPMENT.md` §10.
+
 ## 2.2.2 — 2026-09-08
 - `aix install --into DIR` works again from a folder that is not a project (regression from 2.0.2).
 
