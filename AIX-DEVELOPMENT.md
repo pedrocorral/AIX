@@ -260,6 +260,16 @@ profiles, templates) as the fixture. 2.7.0 instruction blocks (2.8.0 adds `aix i
 stack standards (FastAPI, React, Kedro) with kit profiles. Next: the class contract, user-level instruction files, a
 self-test that installs from examples/acme.
 
+### 12.x Registry skills as implementations (2.11.0)
+
+A registry entry may name a `class`. `aix skills add NAME` then installs the download as one more implementation of that
+class: front matter rewritten (`name` = class flat name, `class:`, `id: "@owner/NAME"`), class recorded in `.aix-source`,
+selection written to config `use:`; `remove` drops both, `update` re-applies the rewrite. Entries without `class` keep
+the bare-name behaviour. The mapping in the entry is a judgement, like an organisation's `class:`; the validator only
+checks that name equals the class flat name. Test: `aix skills add grill-me && aix skills info coach-grill-me` shows
+layer kit, id `@mattpocock/grill-me`, chosen by config; `aix skills use coach-grill-me default` returns to the kit's;
+`aix skills remove grill-me` leaves no `use:` line and a healthy doctor.
+
 ## 13. Numbers to remember
 
 Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 71 skills, 24 seeded VUL rows, 4 example requirements/TS.

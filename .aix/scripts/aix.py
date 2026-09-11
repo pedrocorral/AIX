@@ -94,7 +94,7 @@ The skills                            (aix skills ...)
   aix skills info NAME | show NAME    details (group, level, runtimes, layer, id, hash, source) | the SKILL.md
                                       overrides: .aix/custom/skills/<class>/ (project) or ~/.config/aix/skills/<class>/ (you)
   aix skills enable|disable NAME...   link/unlink a skill everywhere; remembered in .aix/config.yaml
-  aix skills registry                 known third-party skills (caveman, ponytail, ...) with evidence
+  aix skills registry                 known third-party skills (caveman, ponytail, mattpocock/skills, ...) with evidence
   aix skills add NAME [--on-demand]   download a registry skill into .aix/skills/extern/, link it everywhere;
                                       general skills become always-on unless --on-demand
   aix skills remove|update NAME       drop it / re-download it;  aix skills always|on-demand NAME
@@ -568,8 +568,11 @@ Catalogue: SKILL, STATE, DESCRIPTION (cut at the terminal width). States:
   disabled                  listed in .aix/config.yaml disabled_skills; linked into no runtime
 Groups (filters): general = behaviour that applies to every session (style, method); specific = one job.
   info      group, level (always/orchestrator/on-demand), category, runtimes it is linked into, source
-  add       download a registry skill (GitHub tarball, no git) into .aix/skills/extern/NAME, bare name, linked
-            everywhere; general skills become always-on unless --on-demand; --extra adds siblings from the repo
+  add       download a registry skill (GitHub tarball, no git) into .aix/skills/extern/NAME. An entry with a
+            `class` (aix skills registry shows it) becomes that kit class's implementation, selected at once
+            (`use:` in config; `aix skills use CLASS default` returns to the kit's); one without keeps its bare
+            name and is linked everywhere; general skills become always-on unless --on-demand; --extra adds
+            siblings from the repo
   always    write the "## Always-on skills" section into AGENTS.md, .github/copilot-instructions.md,
             .cursor/rules/aix.mdc and GEMINI.md (no runtime has an always-apply switch; the instruction files are
             the only mechanism every tool honours); on-demand removes it

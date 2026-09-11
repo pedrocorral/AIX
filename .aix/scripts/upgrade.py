@@ -3,7 +3,7 @@
 
 Ownership decides what happens to each path:
   kit-owned   (overwritten, removed if gone from the kit): .aix/scripts, .aix/templates, .aix/meta-docs, .aix/bin, .aix/instructions, .aix/profiles,
-              .aix/skills/<every category except extern>, CLAUDE.md
+              .aix/skills/<every category except extern>, .aix/skills/extern/registry.json, CLAUDE.md
   project-own (never touched): docs/requirements, tests, security, conflicts, operations, road-map, .aix/skills/extern,
               runtime folders, code
   merged:     AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
@@ -15,7 +15,7 @@ from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[2]
 KIT_OWNED_DIRS = [".aix/scripts", ".aix/templates", ".aix/meta-docs", ".aix/bin", ".aix/instructions", ".aix/profiles"]
-KIT_OWNED_FILES = ["CLAUDE.md"]
+KIT_OWNED_FILES = ["CLAUDE.md", ".aix/skills/extern/registry.json"]   # the registry is kit text; downloads next to it stay the project's
 MERGED_FILES = ["AGENTS.md", "GEMINI.md", ".aix/config.yaml"]  # GEMINI.md carries the always-on section like AGENTS.md
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
               "framework.yaml": ".aix/config.yaml"}

@@ -70,7 +70,7 @@ conflict; the CLI warns. Skills named in `AGENTS.md` by the session protocol (`c
 `core-sdd-workflow`, `core-session-handoff`, `core-conflict-resolution`) are always-on by definition.
 
 ## Third-party skills
-`.aix/skills/extern/registry.json` maps a name to a GitHub repo, sub-path, group, licence and an **evidence** line
+`.aix/skills/extern/registry.json` maps a name to a GitHub repo, sub-path, group, licence, optional **class** and an **evidence** line
 (who measured what, with caveats). Only entries with published measurements or wide, sustained adoption belong
 there. `aix skills add NAME` downloads the repo tarball over HTTPS (no git), copies the sub-folder to
 `.aix/skills/extern/NAME/`, rewrites the front-matter `name` to match, records provenance in `.aix-source`, links it
@@ -126,3 +126,17 @@ Project-specific agent instructions therefore go in a `## Project notes` section
 - Run `aix docs validate` before every hand-off; `aix docs coverage` when a task closes; `aix docs security --gate` at release.
 - Never change a VUL status without an audit report (`aix docs validate` fails); `accepted` also needs an ADR.
 - Do not add registry entries without evidence; do not make a second style skill always-on.
+
+### Registry skills and classes
+
+An entry may carry `class` (`"coach/grill-me"`). Then `aix skills add grill-me` does not add a second skill next to the
+kit's: it downloads the folder into `.aix/skills/extern/grill-me/`, rewrites the front matter (`name: coach-grill-me`,
+`class: coach/grill-me`, `id: "@mattpocock/grill-me"`, upstream text otherwise untouched), records the class in
+`.aix-source`, and selects it with `use: {coach-grill-me: "@mattpocock/grill-me"}` in `.aix/config.yaml`. The runtimes
+see one folder, `coach-grill-me`, whose content is now upstream's. `aix skills info coach-grill-me` lists the kit's
+version as the alternative; `aix skills use coach-grill-me default` goes back to it without deleting the download;
+`aix skills remove grill-me` deletes the download and the selection; `aix skills update` re-fetches and re-applies
+the rewrite. Entries without `class` (caveman, ponytail, karpathy-guidelines) are things the kit has no class for and
+keep their bare name. The class in an entry is the registry author's mapping, the same judgement an organisation makes
+when it declares `class:` in its own skills; correct it in the entry if it is wrong.
+

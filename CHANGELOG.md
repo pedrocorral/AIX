@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.11.0 — 2026-09-11
+
+- Registry entries may carry `class`: `aix skills add NAME` then installs the download as an implementation of that kit class (front matter rewritten to the class name, `class:` and `id: "@owner/NAME"`), selects it in config `use:`, and the runtimes see it under the class folder instead of a second skill with overlapping triggers. `aix skills use CLASS default` returns to the kit's; `remove` drops the selection; `update` re-applies the rewrite. Documented in cli.md ("Registry skills and classes") and AIX-DEVELOPMENT §12.
+- `aix upgrade` now refreshes `.aix/skills/extern/registry.json` (new registry entries never reached projects).
+- Registry: the 25 skills of mattpocock/skills (MIT, ~260k stars) mapped to kit classes; superpowers' systematic-debugging mapped to `debug/diagnose`.
+
 ## 2.10.1 — 2026-09-11
 
 - `aix doctor` no longer lists an instruction without globs or `always` as an AGENTS.md block when the index says it is not one.

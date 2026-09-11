@@ -1,5 +1,5 @@
 {
-  "_comment": "Known third-party skills for `aix skills add NAME`. Only entries with published evidence or wide, sustained adoption. Keep `evidence` honest: who measured, what, and the caveats. `group`: general = behaviour that applies to every session (style, method); specific = does one job when invoked. `recommended: true` lists the skill first with state `recommended` (be sparing).",
+  "_comment": "Known third-party skills for `aix skills add NAME`. Only entries with published evidence or wide, sustained adoption. Keep `evidence` honest: who measured, what, and the caveats. `group`: general = behaviour that applies to every session (style, method); specific = does one job when invoked. `recommended: true` lists the skill first with state `recommended` (be sparing). `class` (e.g. \"coach/grill-me\"): the skill is an implementation of that kit class; `add` selects it and the runtimes see it under the class name. Without `class` the skill keeps its bare name (something the kit has no class for).",
   "caveman": {
     "repo": "JuliusBrussee/caveman",
     "path": "skills/caveman",
@@ -52,7 +52,8 @@
       "writing-plans",
       "test-driven-development"
     ],
-    "group": "specific"
+    "group": "specific",
+    "class": "debug/diagnose"
   },
   "verification-before-completion": {
     "repo": "obra/superpowers",
@@ -62,6 +63,256 @@
     "description": "Forbids claiming done without running the verification; evidence before completion claims.",
     "evidence": "No controlled benchmark. Part of obra/superpowers (~190k stars). Complements AIX definition-of-done; cheap (short SKILL.md).",
     "also": [],
+    "group": "specific"
+  },
+  "ask-matt": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/ask-matt",
+    "kind": "method",
+    "license": "MIT",
+    "class": "core/which-skill",
+    "description": "Ask which skill or flow fits your situation. A router over the skills in this repo.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "codebase-design": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/codebase-design",
+    "kind": "method",
+    "license": "MIT",
+    "class": "architecture/deep-modules",
+    "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "code-review": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/code-review",
+    "kind": "method",
+    "license": "MIT",
+    "class": "review/code-review",
+    "description": "Review the changes since a fixed point along two axes: Standards (documented coding standards) and Spec (what the originating issue asked for), in parallel sub-agents, reported side by side.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "diagnosing-bugs": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/diagnosing-bugs",
+    "kind": "method",
+    "license": "MIT",
+    "class": "debug/diagnose",
+    "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says diagnose or debug this, or reports something broken, throwing, failing or slow.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "domain-modeling": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/domain-modeling",
+    "kind": "method",
+    "license": "MIT",
+    "class": "architecture/domain-model",
+    "description": "Build and sharpen a project's domain model: ubiquitous language, architectural decisions, maintained by other skills.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "grill-with-docs": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/grill-with-docs",
+    "kind": "method",
+    "license": "MIT",
+    "class": "coach/grill-with-docs",
+    "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADRs and glossary) as we go.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "implement": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/implement",
+    "kind": "method",
+    "license": "MIT",
+    "class": "implement/feature",
+    "description": "Implement a piece of work based on a spec or set of tickets.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "improve-codebase-architecture": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/improve-codebase-architecture",
+    "kind": "method",
+    "license": "MIT",
+    "class": "architecture/improve",
+    "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "prototype": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/prototype",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/prototype",
+    "description": "Build a throwaway prototype to answer a design question: sanity-check a state model or logic, or explore what a UI should look like.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "research": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/research",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/research",
+    "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "resolving-merge-conflicts": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/resolving-merge-conflicts",
+    "kind": "method",
+    "license": "MIT",
+    "class": "debug/merge-conflicts",
+    "description": "Use when you need to resolve an in-progress git merge or rebase conflict.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "setup-matt-pocock-skills": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/setup-matt-pocock-skills",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/setup-tracker",
+    "description": "Configure a repo for the engineering skills: issue tracker, triage label vocabulary, domain doc layout. Run once before first use of the other engineering skills.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "tdd": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/tdd",
+    "kind": "method",
+    "license": "MIT",
+    "class": "implement/tdd",
+    "description": "Test-driven development: build features or fix bugs test-first, red-green-refactor, integration tests.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "to-spec": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/to-spec",
+    "kind": "method",
+    "license": "MIT",
+    "class": "spec/write-requirement",
+    "description": "Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "to-tickets": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/to-tickets",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/to-tickets",
+    "description": "Break a plan, spec or the current conversation into tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "triage": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/triage",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/triage",
+    "description": "Move issues and external PRs through a state machine of triage roles: categorise, verify, grill if needed, write agent-ready briefs.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "wayfinder": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/wayfinder",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/wayfinder",
+    "description": "Plan a huge chunk of work as a shared map of decision tickets on the issue tracker and resolve them one at a time.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "wizard": {
+    "repo": "mattpocock/skills",
+    "path": "skills/engineering/wizard",
+    "kind": "method",
+    "license": "MIT",
+    "class": "workflow/wizard",
+    "description": "Generate an interactive bash wizard that walks a human through steps only they can perform: infrastructure, credentials, CI secrets, one-off migrations.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "grill-me": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/grill-me",
+    "kind": "method",
+    "license": "MIT",
+    "class": "coach/grill-me",
+    "description": "A relentless interview to sharpen a plan or design.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "grilling": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/grilling",
+    "kind": "method",
+    "license": "MIT",
+    "class": "coach/grill",
+    "description": "Grill the user relentlessly about a plan, decision or idea, on any 'grill' trigger phrase.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "handoff": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/handoff",
+    "kind": "method",
+    "license": "MIT",
+    "class": "core/session-handoff",
+    "description": "Compact the current conversation into a handoff document for another agent to pick up.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "teach": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/teach",
+    "kind": "method",
+    "license": "MIT",
+    "class": "coach/teach",
+    "description": "Teach the user a new skill or concept, within this workspace.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "to-questionnaire": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/to-questionnaire",
+    "kind": "method",
+    "license": "MIT",
+    "class": "coach/questionnaire",
+    "description": "Turn a decision you cannot fully answer into a questionnaire for someone else to fill in.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "wait-what": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/wait-what",
+    "kind": "method",
+    "license": "MIT",
+    "class": "coach/wait-what",
+    "description": "Stop. That last message did not land: re-pitch it.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
+    "group": "specific"
+  },
+  "writing-for-agents": {
+    "repo": "mattpocock/skills",
+    "path": "skills/productivity/writing-for-agents",
+    "kind": "method",
+    "license": "MIT",
+    "class": "spec/write-for-agents",
+    "description": "Writing documents for agents: skills, AGENTS.md, CLAUDE.md, docs reached by a pointer.",
+    "evidence": "No controlled benchmark. mattpocock/skills (~260k stars, ~22k forks, MIT, Sept 2026), the most adopted skill collection for the spec -> tickets -> implement loop; ask-matt routes across them. Descriptions from upstream.",
     "group": "specific"
   }
 }

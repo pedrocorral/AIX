@@ -4,7 +4,12 @@
 Known skills live in .aix/skills/extern/registry.json (name -> GitHub repo + sub-path + evidence). `add` downloads the
 repo tarball over HTTPS (no git needed), copies the skill folder to .aix/skills/extern/<name>/, records provenance in
 .aix-source and links it into every runtime. `--always` also names it in AGENTS.md, .github/copilot-instructions.md,
-.cursor/rules/aix.mdc and GEMINI.md so every session applies it. Extern skills keep their bare name (no category prefix)."""
+.cursor/rules/aix.mdc and GEMINI.md so every session applies it.
+
+Two kinds of entry. Without `class`, the skill keeps its bare name (caveman, ponytail): something the kit has no class
+for. With `class` (e.g. "coach/grill-me"), the download is one more implementation of that kit class: its SKILL.md gets
+`name: <class flat>`, `class:` and `id: "@owner/name"`, `add` selects it (config `use:`) and the runtimes see it as the
+class folder (coach-grill-me); `aix skills use CLASS default` goes back to the kit's; `remove` drops the selection."""
 import io, json, re, shutil, sys, tarfile, urllib.request
 from datetime import date
 from pathlib import Path
@@ -63,10 +68,18 @@ def fix_name(skill_md: Path, name: str):
         skill_md.write_text(t2, encoding="utf-8")
 
 
+def fix_class(skill_md: Path, cls: str, iid: str):
+    """Make a downloaded skill an implementation of a kit class: name = class flat name, class:, id: in the front matter."""
+    t = skill_md.read_text(encoding="utf-8")
+    t = re.sub(r"^(class|id):.*\n", "", t, flags=re.M)
+    t = re.sub(r"^name:.*$", f"name: {cls.replace('/', '-')}\nclass: {cls}\nid: \"{iid}\"", t, count=1, flags=re.M)
+    skill_md.write_text(t, encoding="utf-8")
+
+
 def runtime_tools():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import install_skills, catalog
-    return install_skills, catalog
+    import install_skills, skills
+    return install_skills, skills
 
 
 def install_one(name: str, entry: dict):
@@ -78,10 +91,20 @@ def install_one(name: str, entry: dict):
     if not (dest / "SKILL.md").exists():
         shutil.rmtree(dest)
         sys.exit(f"{entry['repo']}/{entry['path']} has no SKILL.md")
-    fix_name(dest / "SKILL.md", name)
+    cls = entry.get("class")
+    iid = f"@{entry['repo'].split('/')[0]}/{name}"
+    fix_class(dest / "SKILL.md", cls, iid) if cls else fix_name(dest / "SKILL.md", name)
     prov = {"repo": entry["repo"], "path": entry["path"], "group": entry.get("group", "specific"), "fetched": date.today().isoformat()}
+    if cls:
+        prov["class"] = cls
     (dest / ".aix-source").write_text(json.dumps(prov, indent=2) + "\n", encoding="utf-8")
-    inst, _ = runtime_tools()
+    inst, sk = runtime_tools()
+    if cls:
+        flat = cls.replace("/", "-")
+        sk.set_use(flat, iid)
+        inst.install_into(ROOT, copy=False)
+        print(f"  {name}: {entry['repo']}/{entry['path']} -> .aix/skills/extern/{name}; now the implementation of {flat} (id {iid}; back with `aix skills use {flat} default`)")
+        return
     for t in inst.TARGETS:
         inst.link_or_copy(dest, ROOT / t / name, copy=False)
     print(f"  {name}: {entry['repo']}/{entry['path']} -> .aix/skills/extern/{name} (linked into all runtimes)")
@@ -127,11 +150,12 @@ def cmd_registry(group=None, only=None):
         if (group and e.get("group", "specific") != group) or (only and n != only):
             continue
         state = "installed" if (EXTERN / n).exists() else "available"
-        print(f"{n:32s} {e.get('group', 'specific'):9s} {e['kind']:7s} {state:10s} {e['repo']}  [{e['license']}]")
+        print(f"{n:32s} {e.get('group', 'specific'):9s} {e['kind']:7s} {state:10s} {e['repo']}  [{e['license']}]" + (f"  class {e['class']}" if e.get("class") else ""))
         print(f"    {e['description']}\n    evidence: {e['evidence']}")
         if e.get("also"):
             print(f"    same repo, add with: aix skills add {n} --extra " + ",".join(e["also"]))
-    print(f"\n{len(reg)} known skills. Edit .aix/skills/extern/registry.json to add more (require evidence).")
+    print(f"\n{len(reg)} known skills. Edit .aix/skills/extern/registry.json to add more (require evidence). "
+          "An entry with `class` is installed as that kit class's implementation (selected on add); one without keeps its bare name.")
 
 
 def cmd_add(names, always: bool, on_demand: bool, extra):
@@ -158,6 +182,15 @@ def cmd_remove(names):
         dest = EXTERN / name
         if not dest.exists():
             sys.exit(f"{name} is not installed under .aix/skills/extern/")
+        src = json.loads((dest / ".aix-source").read_text(encoding="utf-8")) if (dest / ".aix-source").exists() else {}
+        if src.get("class"):
+            flat = src["class"].replace("/", "-")
+            shutil.rmtree(dest)
+            sk.set_use(flat, None)
+            inst, _ = runtime_tools()
+            inst.install_into(ROOT, copy=False)
+            print(f"  removed {name}; {flat} is back to layer precedence")
+            continue
         sk.unlink_everywhere(name)
         shutil.rmtree(dest)
         mark_always(name, False)
@@ -168,7 +201,7 @@ def cmd_update(names):
     targets = names or [p.name for p in EXTERN.iterdir() if (p / ".aix-source").exists()]
     for name in targets:
         src = json.loads((EXTERN / name / ".aix-source").read_text(encoding="utf-8"))
-        install_one(name, {"repo": src["repo"], "path": src["path"], "group": src.get("group", "specific")})
+        install_one(name, {k: src[k] for k in ("repo", "path", "group", "class") if k in src})
 
 
 def cmd_always(name: str, on: bool):
