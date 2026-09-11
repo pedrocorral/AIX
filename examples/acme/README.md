@@ -14,6 +14,8 @@ cd my-app && aix profile use web-app        # or data-pipelines
   Twelve are manual-only. Some carry `references/`, `scripts/` or `agents/openai.yaml`.
 - 8 scoped instructions (Django backend, Vue frontend, Dagster pipelines, engineering discipline, documentation,
   shared packages, plain language, the web-app profile) with `applyTo` globs; two profiles select them.
+- Two instruction blocks: one replaces the kit's `aix/agents/output` block (ACME commit format), one adds a
+  `Compliance (ACME)` section to AGENTS.md.
 - Documentation templates under `templates/project-docs/`.
 
 A real organisation forks the kit repository and fills `.aix/custom/` with the same shape; upstream releases arrive

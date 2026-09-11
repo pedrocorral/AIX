@@ -110,8 +110,28 @@ def check_layers():
               + ("" if idx.get("user_layer") else "  (user layer not applied: no terminal / AIX_NO_USER)"))
 
 
+def check_agents_blocks():
+    """AGENTS.md is assembled from .aix/instructions blocks; a hand edit outside the managed sections is lost on install."""
+    import layers, tempfile, shutil
+    blocks = [v for v in layers.instructions(ROOT, layers.active_profile(ROOT)).values() if v["block"]]
+    if not blocks or not (ROOT / "AGENTS.md").exists():
+        return
+    expected_ids = {b["id"] if "id" in b else None for b in blocks}
+    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    for b in sorted(blocks, key=lambda v: v["order"]):
+        if b["section"] and f"## {b['section']}" not in text:
+            problem(f"AGENTS.md lacks the block section '{b['section']}' ({b['layer']} layer)", "run `aix install` (AGENTS.md is assembled from .aix/instructions blocks)")
+    for line in text.splitlines():
+        if line.startswith("## ") and line.strip() not in inst_headers(blocks):
+            problem(f"AGENTS.md has a section not produced by any block or managed by aix: '{line.strip()}'", "move its text into a block under .aix/custom/instructions/ (block: true, section, order) and run `aix install`")
+
+
+def inst_headers(blocks):
+    return {f"## {b['section']}" for b in blocks if b["section"]} | set(inst.MANAGED)
+
+
 def main():
-    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers):
+    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_agents_blocks):
         check()
     for what, fix in problems:
         print(f"PROBLEM {what}\n        fix: {fix}")

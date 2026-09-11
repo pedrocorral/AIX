@@ -59,10 +59,14 @@ def _check_skill(md, base):
 
 def check_instructions():
     for base in [ROOT / ".aix" / "instructions", ROOT / ".aix" / "custom" / "instructions", ROOT / ".aix" / "org" / "instructions"]:
-        for md in (base.glob("*.md") if base.is_dir() else []):
+        for md in (base.rglob("*.md") if base.is_dir() else []):
             fm, _ = frontmatter(md)
             if not fm or not fm.get("id"):
                 errors.append(f"{md.relative_to(ROOT)}: instruction needs front-matter with `id:`"); continue
+            if fm.get("block") == "true" and not fm.get("section") and fm.get("order", "0") != "0":
+                errors.append(f"{md.relative_to(ROOT)}: a block needs `section:` (its H2 title) unless it is the header (order 0)")
+            if fm.get("block") == "true":
+                continue  # blocks are AGENTS.md text; the description is for people, no trigger length needed
             if len(fm.get("description", "")) < 40:
                 warnings.append(f"{md.relative_to(ROOT)}: description too short for the runtimes to pick it")
 

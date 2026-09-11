@@ -1,0 +1,4 @@
+description: Kedro data pipelines (the kit's default data profile)
+router: |
+  Pipeline, node, catalog, parameter and registry changes follow `aix/stacks/kedro-pipelines`.
+instructions: [aix/stacks/kedro-pipelines]

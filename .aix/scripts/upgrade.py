@@ -14,7 +14,7 @@ import filecmp, re, shutil, subprocess, sys
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[2]
-KIT_OWNED_DIRS = [".aix/scripts", ".aix/templates", ".aix/meta-docs", ".aix/bin"]
+KIT_OWNED_DIRS = [".aix/scripts", ".aix/templates", ".aix/meta-docs", ".aix/bin", ".aix/instructions"]
 KIT_OWNED_FILES = ["CLAUDE.md"]
 MERGED_FILES = ["AGENTS.md", "GEMINI.md", ".aix/config.yaml"]  # GEMINI.md carries the always-on section like AGENTS.md
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",

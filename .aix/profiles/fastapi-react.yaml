@@ -1,0 +1,4 @@
+description: FastAPI backend and React frontend monorepo (the kit's default full-stack profile)
+router: |
+  Backend changes follow `aix/stacks/fastapi-backend`; frontend and shared contracts follow `aix/stacks/react-frontend`.
+instructions: [aix/stacks/fastapi-backend, aix/stacks/react-frontend]

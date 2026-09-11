@@ -725,7 +725,14 @@ Several implementations of one class may coexist across layers; the winner is: c
 highest layer (project > user > org > kit) > canonical path. `aix skills info CLASS` shows the winner, why, and the
 alternatives with the exact `use:` line to switch.
 
-SCOPED INSTRUCTIONS: instructions/*.md in a layer, front matter `id`, `description`, `applyTo` (comma or list
+INSTRUCTION BLOCKS: AGENTS.md itself is assembled by `aix install` from instructions marked `block: true` with
+`section:` and `order:`; the kit's contract is .aix/instructions/agents/ (header, authority, rules, navigation,
+session, output). A layer replaces a block with the same id or adds a section with a new one. Managed sections
+(Organisation, Scoped instructions, Always-on skills, Project notes) are kept; write by hand only in Project notes.
+Kit instructions with `optional: true` (the FastAPI, React and Kedro stack standards) apply only when a profile or
+config `instructions:` names them: kit profiles fastapi-react and kedro do.
+
+SCOPED INSTRUCTIONS: instructions/**/*.md in a layer, front matter `id`, `description`, `applyTo` (comma or list
 of globs), `always: true`. Rendered by `aix install` as .github/instructions/aix-<id>.instructions.md (Copilot
 native, applyTo), .cursor/rules/aix-<id>.mdc (globs / alwaysApply), and a "## Scoped instructions" section in
 AGENTS.md and GEMINI.md that tells every other runtime which file to read when touching matching paths. Generated

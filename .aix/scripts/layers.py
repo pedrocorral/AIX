@@ -13,8 +13,9 @@ or, when absent, its path. Its `name:` must equal the class flat name (the runti
 name the implementation. Same class in a higher layer replaces; a new class adds; an empty `DISABLED` file removes.
 Several implementations of one class may coexist; `config.yaml`  use: {class: id}  or a profile picks one; otherwise
 the highest layer wins, and inside a layer the canonical path (the class path) wins.
-Instructions: `instructions/*.md` with front matter `id`, `description`, optional `applyTo` (globs) and `always`.
-Later layer with the same id replaces. Rendered per runtime by `aix install`.
+Instructions: `instructions/**/*.md` with front matter `id`, `description`; either SCOPED (`applyTo` globs, `always`)
+and rendered per runtime, or a BLOCK (`block: true`, `section`, `order`) assembled into AGENTS.md itself. The kit's
+own AGENTS.md is the blocks under `.aix/instructions/agents/`; a layer replaces a block by id or adds a section.
 Profiles: `profiles/<name>.yaml` = a saved set of choices (instructions, skills, always-on, router)."""
 import hashlib, json, os, re, sys
 from pathlib import Path
@@ -188,18 +189,21 @@ def instructions(project: Path = ROOT, profile: dict = None):
         base = root / "instructions"
         if not base.is_dir():
             continue
-        for md in sorted(base.glob("*.md")):
+        for md in sorted(base.rglob("*.md")):
             fm = front_matter(md)
             if not fm.get("id"):
                 continue
             globs = fm.get("applyTo", "")
             globs = [g.strip() for g in (globs if isinstance(globs, list) else str(globs).split(",")) if g.strip()]
             out[fm["id"]] = {"path": md, "layer": layer, "name": fm.get("name", fm["id"]), "description": fm.get("description", ""),
-                             "applyTo": globs, "always": fm.get("always") is True}
+                             "applyTo": globs, "always": fm.get("always") is True,
+                             "block": fm.get("block") is True, "section": str(fm.get("section", "")), "order": int(fm.get("order", 100) or 100),
+                             "optional": fm.get("optional") is True}
+    wanted = set(config(project).get("instructions") or [])
     if profile and isinstance(profile.get("instructions"), list):
-        wanted = set(profile["instructions"])
+        wanted |= set(profile["instructions"])
         out = {k: v for k, v in out.items() if k in wanted or v["layer"] == "kit"}
-    return out
+    return {k: v for k, v in out.items() if not v["optional"] or k in wanted}
 
 
 # ---- profiles -----------------------------------------------------------------------------------------------------

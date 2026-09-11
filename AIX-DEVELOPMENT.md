@@ -255,8 +255,9 @@ Rules:
 Done: 2.3.0 overrides + index; 2.4.0 `class:` + `use:` + coexisting implementations, scoped instructions rendered
 per runtime, profiles; 2.5.0 kit defaults for every class of a full catalogue; 2.6.0 `aix install --from` (organisation
 layer, path or git URL, `source:` followed by upgrade) and `examples/acme/` (36 implementations, 8 instructions, 2
-profiles, templates) as the fixture. Next: instruction blocks for AGENTS.md's own rules, the class contract, user-level
-instruction files, a self-test that installs from examples/acme.
+profiles, templates) as the fixture. 2.7.0 instruction blocks: AGENTS.md assembled from `.aix/instructions/agents/*` (overridable per layer), optional kit
+stack standards (FastAPI, React, Kedro) with kit profiles. Next: the class contract, user-level instruction files, a
+self-test that installs from examples/acme.
 
 ## 13. Numbers to remember
 

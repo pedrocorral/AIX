@@ -143,10 +143,46 @@ def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
 INS_HEADER = "## Scoped instructions"
 
 
+MANAGED = ("## Organisation", "## Scoped instructions", "## Always-on skills", "## Project notes")
+
+
+def render_agents(project: Path, profile) -> bool:
+    """Assemble AGENTS.md from the instruction blocks (kit defaults, overridden or extended by layers); the managed
+    sections written by other commands are kept as they are. Returns True when the file changed."""
+    import layers
+    blocks = sorted((v for v in layers.instructions(project, profile).values() if v["block"]), key=lambda v: (v["order"], v["section"]))
+    if not blocks:
+        return False
+    out = []
+    for b in blocks:
+        body = b["path"].read_text(encoding="utf-8")
+        body = body[body.find("\n---", 3) + 4:].strip("\n") if body.startswith("---") else body.strip("\n")
+        out.append((f"## {b['section']}\n" if b["section"] else "") + body + "\n")
+    text = "\n".join(out)
+    f = project / "AGENTS.md"
+    old = f.read_text(encoding="utf-8") if f.exists() else ""
+    for header in MANAGED:
+        kept = _section_text(old, header)
+        if kept:
+            text = text.rstrip("\n") + "\n\n" + kept
+    changed = text != old
+    f.write_text(text, encoding="utf-8")
+    return changed
+
+
+def _section_text(text: str, header: str) -> str:
+    if header not in text:
+        return ""
+    body = text.split(header, 1)[1].split("\n## ", 1)[0]
+    return header + body.rstrip("\n") + "\n"
+
+
 def render_instructions(project: Path, profile):
+    if render_agents(project, profile):
+        print("  AGENTS.md assembled from instruction blocks")
     """Scoped instructions -> native files per runtime (git-ignored, regenerated) + a managed section in AGENTS.md/GEMINI.md."""
     import layers, re
-    ins = layers.instructions(project, profile)
+    ins = {k: v for k, v in layers.instructions(project, profile).items() if not v["block"]}
     gh, cur = project / ".github" / "instructions", project / ".cursor" / "rules"
     for d, pat in ((gh, "aix-*.instructions.md"), (cur, "aix-*.mdc")):
         for old in (d.glob(pat) if d.is_dir() else []):
@@ -154,6 +190,7 @@ def render_instructions(project: Path, profile):
     lines = []
     for iid, v in sorted(ins.items()):
         slug = re.sub(r"[^a-z0-9]+", "-", iid.lower()).strip("-")
+        slug = slug[4:] if slug.startswith("aix-") else slug  # the file already carries the aix- prefix
         body = v["path"].read_text(encoding="utf-8")
         body = body[body.find("\n---", 3) + 4:].lstrip("\n") if body.startswith("---") else body
         gh.mkdir(parents=True, exist_ok=True); cur.mkdir(parents=True, exist_ok=True)

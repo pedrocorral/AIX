@@ -99,6 +99,17 @@ are git-ignored. **Profiles** (`profiles/<name>.yaml`: router, instructions, ski
 choices: `aix profile use NAME`. The organisation router (a profile's `router:` or `custom/AGENTS.md`) becomes the
 `## Organisation` section of AGENTS.md, GEMINI.md and the Copilot pointer. See `aix help profile`.
 
+## Instruction blocks (AGENTS.md is assembled)
+AGENTS.md is not edited by hand: `aix install` assembles it from **blocks**, instruction files with `block: true`,
+`section:` (the H2 title) and `order:`. The kit's own contract is six blocks under `.aix/instructions/agents/`
+(`aix/agents/header`, `authority`, `rules`, `navigation`, `session`, `output`). A layer replaces a block by using
+the same `id:` (an organisation can rewrite the session protocol or the output format) or adds a section with a
+new id and order. The managed sections (`## Organisation`, `## Scoped instructions`, `## Always-on skills`,
+`## Project notes`) are kept across renders; `## Project notes` is where a project writes by hand. `aix doctor`
+reports a section that no block produced. Kit instructions marked `optional: true` (the stack standards
+`aix/stacks/fastapi-backend`, `react-frontend`, `kedro-pipelines`) apply only when a profile or `instructions:`
+in config names them; the kit ships the profiles `fastapi-react` and `kedro` for that.
+
 ## Ownership (what `aix upgrade` may overwrite)
 | Kit-owned (overwritten on upgrade) | Project-owned (never touched) | Merged |
 |---|---|---|

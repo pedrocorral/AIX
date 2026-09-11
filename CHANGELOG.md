@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.7.0 — 2026-09-11
+- Instruction blocks: AGENTS.md is assembled by `aix install` from instructions with `block: true`, `section` and `order`; the kit's contract lives in `.aix/instructions/agents/` (header, authority, rules, navigation, session, output) and a layer replaces a block by id or adds a section. Managed sections are preserved; `aix doctor` reports hand-written sections outside them. Rule order in AGENTS.md fixed (8 modularity, 9 the kit folder).
+- Kit stack standards as opt-in scoped instructions (`optional: true`): `aix/stacks/fastapi-backend`, `react-frontend`, `kedro-pipelines`, selected by the new kit profiles `fastapi-react` and `kedro` or by `instructions:` in config.
+- ACME example gains an output-block override and a compliance block.
+
 ## 2.6.1 — 2026-09-11
 - `aix install --into DIR` run from a checkout whose `.aix/custom/` is filled installs as an organisation: the customisation lands as the project's `.aix/org/` and the checkout's git URL (or path) is recorded as `source:`. `custom/`, `org/` and the index never travel as payload.
 
