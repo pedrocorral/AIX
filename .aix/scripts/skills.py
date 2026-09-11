@@ -12,8 +12,12 @@ def level(flat, info, always):
     return "always" if flat in always else "orchestrator" if info["orchestrator"] else "on-demand"
 
 
-def state_of(flat, always, off):
-    return "disabled" if flat in off else "always" if flat in always else "on-demand"
+def state_of(flat, always, off, cat=None):
+    if flat in off:
+        return "disabled"
+    if flat in always:
+        return "always"
+    return "manual" if cat and cat.get(flat, {}).get("manual") else "on-demand"
 
 
 def available_from_registry(cat):
@@ -44,13 +48,13 @@ def cmd_list(group=None, category=None):
         if (group and info["group"] != group) or (category and info["category"] != category):
             continue
         n += 1
-        state = info.get("available") or state_of(flat, always, off)
+        state = info.get("available") or state_of(flat, always, off, cat)
         line = f"{flat:42s} {state:11s} "
         if state == "always":  # marker starts two columns early, overwriting the end of the name if needed
             line = f"{line[:39]}{'(*) always':16s}"
         print(line + (info["description"][:room] if room > 20 else ""))
     overrides = [c for c, i in cat.items() if i.get("layer") not in (None, "kit")]
-    print(f"\n{n} of {len(cat)} skills. (*) always = applied in every session; recommended / available = known, "
+    print(f"\n{n} of {len(cat)} skills. (*) always = applied in every session; manual = only when you invoke it; recommended / available = known, "
           "not downloaded (aix skills add NAME). Details: aix skills info NAME"
           + (f"\n{len(overrides)} from custom layers: " + ", ".join(f"{c} ({cat[c]['layer']})" for c in overrides) if overrides else ""))
 
@@ -65,14 +69,14 @@ def cmd_info(flat):
     src = info["path"] / ".aix-source"
     md = info["path"] / "SKILL.md"
     shown = info["path"].relative_to(ROOT) if info["path"].is_relative_to(ROOT) else info["path"]
-    print(f"{flat}\n  state:       {state_of(flat, always, off)}\n  group:       {info['group']}"
+    print(f"{flat}\n  state:       {state_of(flat, always, off, cat)}\n  group:       {info['group']}"
           f"\n  level:       {level(flat, info, always)}\n  category:    {info['category']}"
           f"\n  installed:   {', '.join(installed_in(flat)) or '-'}\n  path:        {shown}"
-          f"\n  layer:       {info['layer']}" + ("" if info["layer"] == "kit" else (" (override)" if info["shadowed"] else " (new class)"))
-          + f"\n  id:          {layers.front_matter_value(md, 'id') or flat}" + (f"@{layers.front_matter_value(md, 'version')}" if layers.front_matter_value(md, 'version') else "")
+          f"\n  layer:       {info['layer']}" + ("" if info["layer"] == "kit" else (" (override)" if info["shadowed"] else " (new class)")) + f"; chosen by {info['chosen_by']}"
+          + f"\n  id:          {info.get('id') or flat}" + (f"@{info['version']}" if info.get("version") else "")
           + f"\n  hash:        {layers.content_hash(info['path'])[:16]}")
-    for layer, path in info.get("shadowed", []):
-        print(f"  shadows:     {layer} copy at {path}")
+    for layer, path, iid in info.get("shadowed", []):
+        print(f"  also:        {iid} ({layer} layer) at {path}  -> select with config `use: {{{flat}: {iid}}}`")
     if src.exists():
         print(f"  source:      {src.read_text(encoding='utf-8').strip()}")
     print(f"  description: {info['description']}")

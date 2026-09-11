@@ -68,6 +68,16 @@ The docs                              (aix docs ...)
 The road-map                          (aix task ...)
   aix task new "Title" [--bucket next|backlog|ideas] | start|block|done TASK-0007 ["reason"] | list
 
+Profiles and overrides                (aix profile ...; .aix/custom/, ~/.config/aix/)
+  aix profile [list] | show NAME | use NAME | off
+                                      a profile is a saved set of choices shipped by a layer (profiles/NAME.yaml):
+                                      which scoped instructions apply, which implementation of each skill class,
+                                      the organisation router text
+  .aix/custom/skills/<class>/         override a skill for this project (same class replaces, new adds, DISABLED removes)
+  .aix/custom/instructions/*.md       scoped instructions (front matter id, description, applyTo globs) rendered
+                                      natively for Copilot and Cursor and listed in AGENTS.md
+  ~/.config/aix/skills/<class>/       your personal skill overrides (terminal sessions only, never committed)
+
 The skills                            (aix skills ...)
   aix skills [general|specific] [cat] catalogue: name, state (always / on-demand / disabled), description
   aix skills info NAME | show NAME    details (group, level, runtimes, layer, id, hash, source) | the SKILL.md
@@ -681,6 +691,31 @@ Every finding names the VUL row and the CWE. Test code is listed, not gated (--s
 What this still is not: an authorisation or business-logic review (the security-audit-* skills), a runtime test,
 or a scan of the deployed environment."""
 
+TOPICS["profile"] = """aix profile [list] | show NAME | use NAME | off
+
+A PROFILE is a saved set of customisation choices, shipped by a layer as profiles/<name>.yaml (kit, organisation
+`.aix/org/`, or this project's `.aix/custom/`). Choosing one records `profile: NAME` in .aix/config.yaml and re-runs
+the install. Keys, all optional:
+  description: one line
+  router: |               text placed as the "## Organisation" section of AGENTS.md, GEMINI.md and the Copilot pointer
+  instructions: [ids]     which scoped instructions apply (others from custom layers are left out; kit ones stay)
+  skills:                 class -> implementation id, e.g.  testing/write-unit-tests: "@acme/pytest-tests"
+An explicit `use:` entry in config.yaml still wins over the profile for that class.
+
+SKILL CLASSES AND IMPLEMENTATIONS: a skill folder implements a class, named by `class:` in its front matter
+(e.g. testing/write-unit-tests) or by its path. `name:` must be the class flat name (runtimes link by it);
+`id:` and `version:` name the implementation; `disable-model-invocation: true` makes it manual-only.
+Several implementations of one class may coexist across layers; the winner is: config `use:` > profile >
+highest layer (project > user > org > kit) > canonical path. `aix skills info CLASS` shows the winner, why, and the
+alternatives with the exact `use:` line to switch.
+
+SCOPED INSTRUCTIONS: instructions/*.md in a layer, front matter `id`, `description`, `applyTo` (comma or list
+of globs), `always: true`. Rendered by `aix install` as .github/instructions/aix-<id>.instructions.md (Copilot
+native, applyTo), .cursor/rules/aix-<id>.mdc (globs / alwaysApply), and a "## Scoped instructions" section in
+AGENTS.md and GEMINI.md that tells every other runtime which file to read when touching matching paths. Generated
+files are git-ignored and regenerated; the sources in custom/ are what you commit. The user layer cannot carry
+instructions (they would end up in committed files)."""
+
 TOPICS["code"] = """aix code graph | complexity | dead | clones | style | security | vulnerabilities | stats   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (.aix/scripts/graph.py). All read the same dependency graph of the project's source
@@ -715,7 +750,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -822,6 +857,38 @@ def run_code(args):
     graph.main(CODE_MODES[sub] + rest)
 
 
+def run_profile(args):
+    """aix profile [list] | show NAME | use NAME | off  — a profile is a saved set of choices from a layer."""
+    import layers, re
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    profs = layers.profiles(ROOT)
+    current = layers.config(ROOT).get("profile") or ""
+    if sub == "list":
+        for name, p in profs.items():
+            mark = "*" if name == current else " "
+            print(f"{mark} {name:20s} {p['layer']:8s} {p.get('description', '')}")
+        print("\n* = active (aix profile use NAME | aix profile off)" if profs else "no profiles (a layer ships them in profiles/<name>.yaml)")
+    elif sub == "show" and rest:
+        p = profs.get(rest[0]) or sys.exit(f"no profile '{rest[0]}'")
+        print(p["path"].read_text(encoding="utf-8"))
+    elif sub in ("use", "off"):
+        name = rest[0] if sub == "use" and rest else ""
+        if sub == "use" and name not in profs:
+            sys.exit(f"no profile '{name}' (aix profile list)")
+        cfg = ROOT / ".aix" / "config.yaml"
+        text = cfg.read_text(encoding="utf-8")
+        line = f"profile: {name}" if name else ""
+        if re.search(r"^profile:.*$", text, re.M):
+            text = re.sub(r"^profile:.*\n?", (line + "\n") if line else "", text, count=1, flags=re.M)
+        elif line:
+            text = text.rstrip("\n") + "\n" + line + "   # managed by `aix profile use|off`\n"
+        cfg.write_text(text, encoding="utf-8")
+        print(f"profile {'set to ' + name if name else 'cleared'}; applying")
+        cmd_install([])
+    else:
+        sys.exit("usage: aix profile [list] | show NAME | use NAME | off")
+
+
 def run_docs(args):
     sub, rest = (args[0], args[1:]) if args else ("", [])
     if sub == "validate":
@@ -865,6 +932,8 @@ def main(argv):
     elif cmd == "skills":
         import skills
         skills.main(args)
+    elif cmd == "profile":
+        run_profile(args)
     elif cmd in ("version", "-V", "--version"):
         print(f"AIX {version()}")
     else:

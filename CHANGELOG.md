@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.0 — 2026-09-11
+- Skill classes and implementations: `class:` in front matter lets an implementation live under its own folder name; `id:`/`version:` name it; several implementations of one class may coexist, chosen by `use:` in config.yaml, by the active profile, or by layer precedence; `aix skills info` shows the winner, why, and the alternatives. `disable-model-invocation: true` shows as state `manual`.
+- Scoped instructions: `instructions/*.md` in a layer (id, description, applyTo, always), rendered by `aix install` as native Copilot `.instructions.md` files, Cursor `.mdc` rules and a `## Scoped instructions` section in AGENTS.md/GEMINI.md; validated by `aix docs validate`.
+- Profiles: `profiles/<name>.yaml` (router, instructions, skills) shipped by a layer; `aix profile list|show|use|off`. The organisation router becomes the `## Organisation` section of AGENTS.md, GEMINI.md and the Copilot pointer.
+
 ## 2.3.0 — 2026-09-11
 - Skill overrides by layer (AIX-DEVELOPMENT.md §11-12, first slice): a folder at the same class path in `.aix/custom/skills/` (project, committed) or `~/.config/aix/skills/` (person; applied only with a terminal, never in CI or with `AIX_NO_USER=1`; `AIX_USER_DIR` relocates it) replaces the kit's implementation; a new path adds a class; an empty `DISABLED` file removes one. `aix install` links the winning implementation under the class name and writes `.aix/index.json` (layer, id, version, content hash per class; git-ignored). `aix skills info` shows layer, id, hash and shadowed copies; `aix skills` lists overrides; `aix doctor` reports linked content that changed since the last install. `aix docs validate` checks custom skills too.
 

@@ -57,7 +57,7 @@ def catalogue():
     """All leaf skills: dict flat-name -> {path, category, group, description, orchestrator}."""
     import layers
     out, reg = {}, registry_groups()
-    active, _ = layers.resolve(ROOT)
+    active, _ = layers.resolve(ROOT, layers.active_profile(ROOT))
     for flat, info in sorted(active.items()):
         md = info["path"] / "SKILL.md"
         text = md.read_text(encoding="utf-8")
@@ -66,7 +66,7 @@ def catalogue():
             "group": skill_group(md, text, flat, reg),
             "description": front_matter(text, "description"),
             "orchestrator": "orchestrator" in text.lower()[:600],
-            "layer": info["layer"], "shadowed": info["shadowed"],
+            "layer": info["layer"], "shadowed": info["shadowed"], "manual": info["manual"], "id": info["id"], "version": info["version"], "chosen_by": info["chosen_by"],
         }
     return out
 

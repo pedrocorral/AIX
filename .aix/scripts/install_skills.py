@@ -112,7 +112,8 @@ def install_into(project: Path, copy: bool):
 
 def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
     import layers
-    active, layer_disabled = layers.resolve(project)
+    profile = layers.active_profile(project)
+    active, layer_disabled = layers.resolve(project, profile)
     for flat, layer in layer_disabled.items():  # removed by a DISABLED file in a higher layer
         for t in TARGETS:
             p = project / t / flat
@@ -132,10 +133,65 @@ def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
         for t in TARGETS:
             mode = link_or_copy(src, project / t / flat, copy)
         n += 1
-        origin = "" if info["layer"] == "kit" else f"  [{info['layer']} layer" + (" override]" if info["shadowed"] else ", new]")
+        origin = "" if info["layer"] == "kit" and not info["chosen_by"].startswith("config") else f"  [{info['chosen_by']}]"
         print(f"  {flat:40s} -> {', '.join(TARGETS)} ({mode}){origin}")
+    render_instructions(project, profile)
     layers.write_index(project)
     return n
+
+
+INS_HEADER = "## Scoped instructions"
+
+
+def render_instructions(project: Path, profile):
+    """Scoped instructions -> native files per runtime (git-ignored, regenerated) + a managed section in AGENTS.md/GEMINI.md."""
+    import layers, re
+    ins = layers.instructions(project, profile)
+    gh, cur = project / ".github" / "instructions", project / ".cursor" / "rules"
+    for d, pat in ((gh, "aix-*.instructions.md"), (cur, "aix-*.mdc")):
+        for old in (d.glob(pat) if d.is_dir() else []):
+            old.unlink()
+    lines = []
+    for iid, v in sorted(ins.items()):
+        slug = re.sub(r"[^a-z0-9]+", "-", iid.lower()).strip("-")
+        body = v["path"].read_text(encoding="utf-8")
+        body = body[body.find("\n---", 3) + 4:].lstrip("\n") if body.startswith("---") else body
+        gh.mkdir(parents=True, exist_ok=True); cur.mkdir(parents=True, exist_ok=True)
+        apply = ",".join(v["applyTo"]) if v["applyTo"] else "**"
+        (gh / f"aix-{slug}.instructions.md").write_text(f"---\ndescription: \"{v['description']}\"\napplyTo: \"{apply}\"\n---\n{body}", encoding="utf-8")
+        (cur / f"aix-{slug}.mdc").write_text(f"---\ndescription: {v['description']}\nglobs: {apply}\nalwaysApply: {'true' if v['always'] or not v['applyTo'] else 'false'}\n---\n{body}", encoding="utf-8")
+        shown = v["path"].relative_to(project) if v["path"].is_relative_to(project) else v["path"]
+        scope = "always" if v["always"] or not v["applyTo"] else "when touching " + ", ".join(v["applyTo"])
+        lines.append(f"- `{iid}` ({scope}): read `{shown}` — {v['description']}")
+    section = (INS_HEADER + "\nRead these before working on matching files:\n" + "\n".join(lines) + "\n\n") if lines else ""
+    for f in (project / "AGENTS.md", project / "GEMINI.md"):
+        if f.exists():
+            f.write_text(_replace_section(f.read_text(encoding="utf-8"), INS_HEADER, section), encoding="utf-8")
+    org = (profile or {}).get("router") or _org_fragment(project)
+    org_section = ("## Organisation\n" + org.strip() + "\n\n") if org else ""
+    for f in (project / "AGENTS.md", project / "GEMINI.md", project / ".github" / "copilot-instructions.md"):
+        if f.exists():
+            f.write_text(_replace_section(f.read_text(encoding="utf-8"), "## Organisation", org_section), encoding="utf-8")
+    if lines:
+        print(f"  rendered {len(lines)} scoped instruction(s) -> .github/instructions/aix-*.instructions.md, .cursor/rules/aix-*.mdc, AGENTS.md")
+
+
+def _org_fragment(project: Path) -> str:
+    for d in (project / ".aix" / "custom", project / ".aix" / "org"):
+        f = d / "AGENTS.md"
+        if f.exists():
+            return f.read_text(encoding="utf-8")
+    return ""
+
+
+def _replace_section(text: str, header: str, section: str) -> str:
+    """Replace (or append, or remove when empty) the managed H2 `header` block."""
+    if header in text:
+        head, rest = text.split(header, 1)
+        tail = rest.split("\n## ", 1)
+        remainder = ("## " + tail[1]) if len(tail) > 1 else ""
+        return head + section + remainder
+    return (text.rstrip("\n") + "\n\n" + section) if section else text
 
 
 def _pointer_files(project: Path):

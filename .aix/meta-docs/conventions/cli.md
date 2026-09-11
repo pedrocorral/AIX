@@ -85,6 +85,19 @@ winner and writes `.aix/index.json` (layer, id, version, content hash); `aix ski
 show which layer won and whether the linked content still matches. Implementations may carry `id:` and
 `version:` in their front matter (`@acme/find-doc`, `1.0.0`).
 
+## Classes, implementations, scoped instructions, profiles
+A skill folder implements a **class** (`class:` in front matter, e.g. `testing/write-unit-tests`, or its path);
+`name:` must be the class flat name; `id:`/`version:` name the implementation; `disable-model-invocation: true`
+makes it manual-only (state `manual`). Several implementations may coexist across layers; the winner is
+`use:` in `config.yaml` > the active profile > highest layer > canonical path, and `aix skills info` shows the
+alternatives with the `use:` line to switch. A class that exists only in a layer is simply added under its name.
+**Scoped instructions** live in a layer's `instructions/*.md` (front matter `id`, `description`, `applyTo` globs,
+`always`); `aix install` renders them as `.github/instructions/aix-*.instructions.md` (Copilot), `.cursor/rules/aix-*.mdc`
+(Cursor) and a `## Scoped instructions` section in AGENTS.md/GEMINI.md for every other runtime; generated files
+are git-ignored. **Profiles** (`profiles/<name>.yaml`: router, instructions, skills) are saved sets of these
+choices: `aix profile use NAME`. The organisation router (a profile's `router:` or `custom/AGENTS.md`) becomes the
+`## Organisation` section of AGENTS.md, GEMINI.md and the Copilot pointer. See `aix help profile`.
+
 ## Ownership (what `aix upgrade` may overwrite)
 | Kit-owned (overwritten on upgrade) | Project-owned (never touched) | Merged |
 |---|---|---|

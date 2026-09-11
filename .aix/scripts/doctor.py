@@ -99,7 +99,12 @@ def check_layers():
     for cls in changed:
         problem(f"skill {cls}: linked content changed since the last install (index hash differs)", "run `aix install` to re-index (and review who changed it)")
     idx = layers.read_index(ROOT)
-    over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit"]
+    if idx.get("profile"):
+        print(f"profile: {idx['profile']}")
+    ins = idx.get("instructions", {})
+    if ins:
+        print(f"instructions: {len(ins)} scoped ({', '.join(sorted(ins))})")
+    over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit" or r.get("chosen_by", "").startswith("config")]
     if over or idx["disabled"]:
         print("layers: " + (", ".join(over) if over else "no overrides") + (";  disabled by layers: " + ", ".join(idx["disabled"]) if idx["disabled"] else "")
               + ("" if idx.get("user_layer") else "  (user layer not applied: no terminal / AIX_NO_USER)"))

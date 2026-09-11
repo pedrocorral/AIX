@@ -48,10 +48,23 @@ def _check_skill(md, base):
         flat = "-".join(parts[1:]) if parts[0] == "extern" else "-".join(parts)
         if not fm:
             errors.append(f"{md}: missing front-matter"); return
+        cls = fm.get("class", "").strip('"')
+        if cls:
+            flat = "-".join(cls.split("/")[1:]) if cls.startswith("extern/") else cls.replace("/", "-")
         if fm.get("name") != flat:
-            errors.append(f"{md}: name '{fm.get('name')}' != folder path '{flat}'")
+            errors.append(f"{md}: name '{fm.get('name')}' must equal the class flat name '{flat}' (the runtimes link by it); put the implementation's own name in `id:`")
         if len(fm.get("description", "")) < 40:
             warnings.append(f"{md}: description too short to trigger reliably")
+
+
+def check_instructions():
+    for base in [ROOT / ".aix" / "instructions", ROOT / ".aix" / "custom" / "instructions", ROOT / ".aix" / "org" / "instructions"]:
+        for md in (base.glob("*.md") if base.is_dir() else []):
+            fm, _ = frontmatter(md)
+            if not fm or not fm.get("id"):
+                errors.append(f"{md.relative_to(ROOT)}: instruction needs front-matter with `id:`"); continue
+            if len(fm.get("description", "")) < 40:
+                warnings.append(f"{md.relative_to(ROOT)}: description too short for the runtimes to pick it")
 
 
 def check_indexes():
@@ -141,6 +154,7 @@ def check_vul_register():
 
 
 if __name__ == "__main__":
+    check_instructions()
     check_status_drift()
     check_vul_evidence()
     check_skills(); check_indexes(); check_references(collect_ids()); check_field_dictionary(); check_vul_register()

@@ -24,3 +24,5 @@ node_modules/
 # presentations and other binaries do not belong in the kit
 *.pdf
 *.pptx
+.github/instructions/aix-*.instructions.md
+.cursor/rules/aix-*.mdc

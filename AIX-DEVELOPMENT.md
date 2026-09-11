@@ -251,9 +251,9 @@ Rules:
 - Instructions get the same treatment one size down: AGENTS.md blocks with class ids (`agents/session`, …),
   overridable per block. Later slice.
 
-First slice (2.3.0): project `.aix/custom/skills/` and person `~/.config/aix/skills/` overrides (replace / add /
-DISABLED), the index with hashes, `skills info` and `doctor` showing layers. Then `--from` (organisation), then
-config `use:` for side-by-side implementations, then instruction blocks, then themes.
+Done: 2.3.0 overrides + index; 2.4.0 `class:` + `use:` + coexisting implementations, scoped instructions rendered
+per runtime, profiles (`aix profile`). Next: `aix install --from` (organisation layer), instruction blocks for
+AGENTS.md's own rules, the class contract, ACME example organisation under `examples/acme/`.
 
 ## 13. Numbers to remember
 
