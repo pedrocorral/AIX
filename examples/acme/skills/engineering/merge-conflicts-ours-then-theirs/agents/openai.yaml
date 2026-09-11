@@ -1,0 +1,3 @@
+interface:
+  display_name: Resolve merge conflicts (ACME)
+  short_description: two-pass conflict resolution

@@ -77,6 +77,16 @@ my-app/
 
 Projects on the 1.x layout (kit folders at the root, `framework.yaml`) are migrated in place by `aix upgrade`.
 
+## Organisations, profiles, personal overrides
+
+An organisation forks the kit and fills `.aix/custom/` with the same shape as `.aix/`: skill implementations
+(`class:` + `id: "@org/…"`), scoped instructions (`applyTo` globs, rendered natively for Copilot and Cursor and
+listed in AGENTS.md for the rest), profiles (saved sets of choices) and templates. Projects install with
+`aix install --into my-app --from <fork url>` and follow it with `aix upgrade`; the kit's own updates reach the fork
+by a normal git merge. `examples/acme/` is a complete fictional organisation to copy from.
+The same shape works one level down for one project (`.aix/custom/`) and for one person (`~/.config/aix/`, never
+committed). `aix skills info CLASS` always says which layer won and why.
+
 ## Core principles
 
 1. **Requirements are the ground truth.** Code that disagrees with `docs/requirements/` is a defect

@@ -215,6 +215,16 @@ def main(args):
     project = Path(args[0]).resolve() if args else find_project(Path.cwd())
     if project is None or not ((project / ".aix" / "config.yaml").exists() or (project / "framework.yaml").exists()):
         sys.exit("aix upgrade: no project found (nearest .aix/config.yaml, or a 1.x framework.yaml); pass the project path")
+    import source as srcmod
+    src = srcmod.configured(project)
+    if src:
+        kind, payload_root, org_layer = srcmod.classify(srcmod.fetch(src, refresh=not dry))
+        global KIT
+        if kind == "kit":
+            KIT = payload_root
+        print(f"  source: {src} ({kind}{', organisation layer refreshed' if org_layer and not dry else ''})")
+        if org_layer and not dry:
+            srcmod.install_org(project, org_layer)
     if old_layout(project):
         if not dry and not yes and not confirm("  Migrate this project's kit files into .aix/ (2.0 layout)? [y/N] "):
             sys.exit("aborted")

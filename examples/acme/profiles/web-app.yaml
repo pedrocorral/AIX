@@ -1,0 +1,9 @@
+description: Django backend, Vue frontend, shared contracts package
+router: |
+  Follow the ACME web-app profile (`acme/web-app-profile`): Django backend under `backend/`, Vue frontend under `frontend/`, contracts in `packages/contracts/`.
+  Backend changes follow `acme/backend-django`; frontend and contracts follow `acme/frontend-vue`; everything follows `acme/engineering`.
+  Documentation follows `acme/documentation` and `acme/plain-language`; shared packages follow `acme/shared-packages`.
+instructions: [acme/web-app-profile, acme/backend-django, acme/frontend-vue, acme/engineering, acme/documentation, acme/shared-packages, acme/plain-language]
+skills:
+  implement/endpoint: "@acme/django-endpoint"
+  testing/validate-ui: "@acme/ui-evidence-video"

@@ -12,6 +12,9 @@ aix acts on the nearest project at or above the current folder (the one holding 
 
 The kit
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
+      --from SOURCE                   with --into: take the kit and/or the organisation layer from SOURCE (a path or
+                                      git URL: an organisation's kit checkout, or a bare layer folder); recorded as
+                                      source: in config.yaml so aix upgrade follows it
       --into asks per existing item: [r]eplace [s]kip [m]erge [R/S/M] all [a]bort  (replace keeps <item>.bak)
       --replace-all | --skip-all | --merge-all   answer for every collision without asking (CI, no terminal)
   aix upgrade [PROJECT] [--dry-run] [--yes]
@@ -377,6 +380,12 @@ into ~/.local/bin when that folder exists. Idempotent: run it after adding, remo
                  [r]eplace (yours kept as <item>.bak)  [s]kip  [m]erge (folders: add missing files only)
                  [R]/[S]/[M] same answer for the rest  [a]bort
   --replace-all | --skip-all | --merge-all   answer every collision without a terminal (CI)
+  --from SOURCE  (with --into) a path or git URL. A kit checkout (has .aix/): its .aix/ is the payload and its
+                 .aix/custom/ becomes the project's organisation layer (.aix/org/). A bare layer folder (skills/,
+                 instructions/, profiles/, templates/): payload from this kit, folder becomes .aix/org/. Git URLs are
+                 cloned into ~/.cache/aix/sources/. `source:` is recorded in config.yaml; `aix upgrade` refreshes
+                 .aix/org/ from it (git pull for URLs). An organisation = a fork of the kit with a filled .aix/custom/,
+                 kept current with upstream by a normal git merge (its custom/ never collides with upstream's, empty).
 Related: aix upgrade (update an already installed project), aix doctor (check the result).""",
 
 "upgrade": """aix upgrade [PROJECT] [--dry-run] [--yes]   (experimental)
@@ -797,7 +806,7 @@ def expose_on_path():
 
 def cmd_install(args):
     import install_skills as inst
-    known = {"--copy", "--into", "--replace-all", "--skip-all", "--merge-all"}
+    known = {"--copy", "--into", "--from", "--replace-all", "--skip-all", "--merge-all"}
     bad = [a for a in args if a.startswith("--") and a not in known]
     if bad:
         sys.exit(f"aix install: unknown option {' '.join(bad)}. Options: --copy, --into DIR, --replace-all, --skip-all, --merge-all (aix help install)")
@@ -806,10 +815,33 @@ def cmd_install(args):
         i = args.index("--into")
         if i + 1 >= len(args):
             sys.exit("aix install --into needs a directory")
+        if args[i + 1].startswith("-"):
+            sys.exit("aix install --into needs a directory")
         into = Path(args[i + 1]).resolve()
+    src = None
+    if "--from" in args:
+        i = args.index("--from")
+        if i + 1 >= len(args) or not into:
+            sys.exit("aix install --from SOURCE needs --into DIR")
+        src = args[i + 1]
     if into:
         mode = "replace" if "--replace-all" in args else "skip" if "--skip-all" in args else "merge" if "--merge-all" in args else "ask"
+        org_layer = None
+        if src:
+            import source as srcmod
+            kind, payload_root, org_layer = srcmod.classify(srcmod.fetch(src))
+            if kind == "kit":
+                inst.KIT_ROOT = payload_root  # the organisation's vendored kit is the payload
+                print(f"  source: kit checkout at {payload_root}" + (" with an organisation layer" if org_layer else ""))
+            else:
+                print(f"  source: organisation layer at {org_layer} (kit payload from this checkout)")
         inst.copy_kit_into(into, mode)
+        if src:
+            import source as srcmod
+            if org_layer:
+                srcmod.install_org(into, org_layer)
+                print(f"  organisation layer -> {into / '.aix' / 'org'}")
+            srcmod.record(into, src)
         inst.install_into(into, copy)
     else:
         inst.install_into(inst.KIT_ROOT, copy)  # PATH link is handled in reexec_in_project, by the kit only

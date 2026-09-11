@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.0 — 2026-09-11
+- `aix install --into DIR --from SOURCE`: install a project from an organisation. SOURCE is a path or git URL (cloned into `~/.cache/aix/sources/`) to either the organisation's kit checkout (its `.aix/` is the payload, its `.aix/custom/` becomes the project's `.aix/org/`) or a bare layer folder. `source:` is recorded in config.yaml and `aix upgrade` refreshes `.aix/org/` from it.
+- `examples/acme/`: a complete fictional organisation layer used as the fixture: 36 skill implementations with `class:` and `@acme/…` ids (fifteen manual-only, some with references, scripts, agent metadata), 8 scoped instructions (Django, Vue, Dagster, engineering, documentation, shared packages, plain language, web-app profile), two profiles, documentation templates, a router fragment.
+
 ## 2.5.0 — 2026-09-11
 - 28 new kit skills so that every class an organisation catalogue typically uses has a good default: `core/which-skill`; `spec/write-skill`, `write-for-agents`, `plain-language`; `architecture/trace`, `deep-modules`, `domain-model`, `improve`; `implement/code-python`, `code-typescript`; `testing/validate-ui`; new categories `debug/` (diagnose with a hypothesis-loop script, merge-conflicts), `workflow/` (plan-feature, to-tickets, triage with a label vocabulary, wayfinder, research, prototype, setup-tracker, wizard) and `coach/` (grill, grill-me, grill-with-docs, teach, questionnaire, wait-what, scaffold-exercises). Thirteen are manual-only. 71 kit skills in ten categories.
 

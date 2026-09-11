@@ -1,0 +1,8 @@
+description: Dagster data pipelines with modelling packages
+router: |
+  Follow `acme/dagster-pipelines` for assets, jobs, resources, schedules, partitions and pipeline tests.
+  Everything follows `acme/engineering`; documentation follows `acme/documentation` and `acme/plain-language`.
+  Modelling packages under `packages/` follow `acme/shared-packages`.
+instructions: [acme/dagster-pipelines, acme/engineering, acme/documentation, acme/shared-packages, acme/plain-language]
+skills:
+  workflow/prototype: "@acme/prototype-in-notebook"
