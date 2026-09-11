@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.10.0 — 2026-09-11
+
+- Optional kit language standards `aix/languages/python`, `aix/languages/typescript`, `aix/languages/java`, `aix/languages/rust` (`.aix/instructions/languages/`): each states decisions (version floor, toolchain that must pass, errors and logging, structure) in about forty lines, scoped by file extension, meant to be replaced by an organisation's own. The kit profiles `fastapi-react` (python, typescript) and `kedro` (python) include them.
+
 ## 2.9.0 — 2026-09-11
 
 - `aix skills use NAME ID` and `aix skills use NAME default`: choose the implementation of a skill class from the command line instead of editing `use:` in `.aix/config.yaml` by hand. The choice wins over the profile and over layer precedence; `info` lists the ids on offer.

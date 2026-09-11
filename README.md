@@ -88,7 +88,7 @@ listed in AGENTS.md for the rest), profiles (saved sets of choices) and template
 by a normal git merge. `examples/acme/` is a complete fictional organisation to copy from.
 Instructions follow the same model: AGENTS.md is assembled from blocks that a layer can replace or extend, and
 scoped standards (`applyTo` globs) render natively per runtime. The kit ships FastAPI, React and Kedro standards as
-opt-in: `aix instructions enable aix/frameworks/fastapi-backend` for one, or the profiles `aix profile use fastapi-react | kedro` for the set.
+opt-in, as are language conventions for Python, TypeScript, Java and Rust (`aix/languages/*`): `aix instructions enable aix/frameworks/fastapi-backend` for one, or the profiles `aix profile use fastapi-react | kedro` for the set.
 The same shape works one level down for one project (`.aix/custom/`) and for one person (`~/.config/aix/`, never
 committed). `aix skills info CLASS` always says which layer won and why.
 
