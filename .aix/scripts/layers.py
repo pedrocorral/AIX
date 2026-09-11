@@ -258,7 +258,7 @@ def write_index(project: Path = ROOT):
                      "chosen_by": i["chosen_by"], "hash": content_hash(i["path"]),
                      "shadowed": [{"layer": l, "path": str(p), "id": d} for l, p, d in i["shadowed"]]} for cls, i in sorted(active.items())}
     data = {"skills": entries, "disabled": disabled, "user_layer": user_layer_enabled(),
-            "instructions": {k: {"layer": v["layer"], "path": str(v["path"]), "applyTo": v["applyTo"], "always": v["always"]} for k, v in ins.items()},
+            "instructions": {k: {"layer": v["layer"], "path": str(v["path"]), "applyTo": v["applyTo"], "always": v["always"], "block": v["block"]} for k, v in ins.items()},
             "profile": config(project).get("profile") or ""}
     (project / ".aix" / "index.json").write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return active, disabled, ins

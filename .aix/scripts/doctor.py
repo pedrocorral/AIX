@@ -103,7 +103,11 @@ def check_layers():
         print(f"profile: {idx['profile']}")
     ins = idx.get("instructions", {})
     if ins:
-        print(f"instructions: {len(ins)} scoped ({', '.join(sorted(ins))})")
+        blocks = sorted(k for k, v in ins.items() if v.get("block") or not (v.get("applyTo") or v.get("always")))
+        scoped = sorted(k for k in ins if k not in blocks)
+        print(f"instructions: {len(blocks)} AGENTS.md blocks ({', '.join(blocks)})")
+        if scoped:
+            print(f"instructions: {len(scoped)} scoped ({', '.join(scoped)})")
     over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit" or r.get("chosen_by", "").startswith("config")]
     if over or idx["disabled"]:
         print("layers: " + (", ".join(over) if over else "no overrides") + (";  disabled by layers: " + ", ".join(idx["disabled"]) if idx["disabled"] else "")

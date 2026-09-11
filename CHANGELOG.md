@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.2 — 2026-09-11
+
+- `aix doctor` reports the AGENTS.md blocks and the scoped instructions separately (the blocks were labelled "scoped").
+
 ## 2.8.1 — 2026-09-11
 
 - `aix rules` is an alias of `aix instructions` (the Cursor / Claude Code / Windsurf name for the same files).
