@@ -76,7 +76,7 @@ def cmd_info(flat):
           + f"\n  id:          {info.get('id') or flat}" + (f"@{info['version']}" if info.get("version") else "")
           + f"\n  hash:        {layers.content_hash(info['path'])[:16]}")
     for layer, path, iid in info.get("shadowed", []):
-        print(f"  also:        {iid} ({layer} layer) at {path}  -> select with config `use: {{{flat}: {iid}}}`")
+        print(f"  also:        {iid} ({layer} layer) at {path}  -> aix skills use {flat} {iid}")
     if src.exists():
         print(f"  source:      {src.read_text(encoding='utf-8').strip()}")
     print(f"  description: {info['description']}")
@@ -107,6 +107,44 @@ def cmd_enable(flat):
     print(f"enabled {flat} (linked into all runtimes)")
 
 
+def set_use(flat, iid):
+    """Write (iid) or drop (iid=None) the `use:` entry of one class in .aix/config.yaml."""
+    import re
+    cfg = ROOT / ".aix" / "config.yaml"
+    text = cfg.read_text(encoding="utf-8")
+    m = re.search(r"^use:[^\n]*\n((?:[ \t]+\S[^\n]*\n?)*)", text, re.M)
+    entries = {}
+    if m:
+        for line in m.group(1).splitlines():
+            k, _, v = line.strip().partition(":")
+            if k and v.strip():
+                entries[k.strip()] = v.split("#")[0].strip().strip("'\"")
+    entries = {k: v for k, v in entries.items() if k.replace("/", "-") != flat}
+    if iid:
+        entries[flat] = iid
+    block = "" if not entries else "use:   # skill implementation per class, managed by `aix skills use`\n" + "".join(f"  {k}: \"{v}\"\n" for k, v in sorted(entries.items()))
+    text = text[:m.start()] + block + text[m.end():] if m else (text.rstrip("\n") + "\n" + block if block else text)
+    cfg.write_text(text, encoding="utf-8")
+
+
+def cmd_use(flat, iid):
+    """aix skills use CLASS ID | CLASS default: pick the implementation of a class, or return to layer precedence."""
+    import layers
+    cat = catalogue()
+    if flat not in cat:
+        sys.exit(f"unknown skill '{flat}' (aix skills list)")
+    ids = {cat[flat].get("id") or flat: cat[flat]["layer"]} | {i: l for l, _, i in cat[flat].get("shadowed", [])}
+    if iid == "default":
+        set_use(flat, None)
+    elif iid not in ids:
+        sys.exit(f"{flat} has no implementation '{iid}'. Known: " + ", ".join(f"{i} ({l} layer)" for i, l in ids.items()))
+    else:
+        set_use(flat, iid)
+    inst.install_into(ROOT, copy=False)
+    print(f"{flat}: now " + ("layer precedence" if iid == "default" else iid))
+    cmd_info(flat)
+
+
 GROUPS = ("general", "specific")
 
 
@@ -128,6 +166,8 @@ def main(args):
         cmd_show(rest[0])
     elif sub == "info" and rest:
         cmd_info(rest[0])
+    elif sub == "use" and len(rest) == 2:
+        cmd_use(rest[0], rest[1])
     elif sub == "disable" and rest:
         for f in rest: cmd_disable(f)
     elif sub == "enable" and rest:

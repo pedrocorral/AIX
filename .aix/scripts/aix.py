@@ -559,7 +559,7 @@ Every report names the skill on its last line; review-code-review proposes it; c
 
 "skills": """aix skills [list|general|specific [category]] | info NAME | show NAME | enable|disable NAME...
            | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] | remove NAME... | update [NAME...]
-           | always NAME | on-demand NAME
+           | always NAME | on-demand NAME | use NAME ID | use NAME default
 
 Catalogue: SKILL, STATE, DESCRIPTION (cut at the terminal width). States:
   recommended / available   known in .aix/skills/extern/registry.json, not downloaded (listed first)
@@ -581,7 +581,10 @@ AIX_NO_USER=1, forced with AIX_USER=1, relocated with AIX_USER_DIR) replaces the
 adds a class; an empty DISABLED file in a class folder removes it. The runtime always sees one folder per class.
 `aix install` links the winner and writes .aix/index.json (layer, id, version, content hash per class);
 `aix skills info NAME` shows layer, id, hash and the copies it shadows; `aix doctor` lists overrides and reports
-linked content that changed since the install.""",
+linked content that changed since the install.
+Choosing between implementations of one class: `aix skills use NAME ID` writes  use: {NAME: ID}  into
+.aix/config.yaml and relinks (an explicit choice wins over the profile and over layer precedence);
+`aix skills use NAME default` removes it. `info` lists the ids on offer.""",
 
 "about": "aix about      prints the full description of the kit: purpose, workflow, folders, IDs, skills, every command.",
 "version": "aix version    prints the kit version from .aix/config.yaml.",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.0 — 2026-09-11
+
+- `aix skills use NAME ID` and `aix skills use NAME default`: choose the implementation of a skill class from the command line instead of editing `use:` in `.aix/config.yaml` by hand. The choice wins over the profile and over layer precedence; `info` lists the ids on offer.
+
 ## 2.8.4 — 2026-09-11
 
 - `aix instructions list` uses the same columns as `aix skills list` (name, state, description); layer and kind moved to `info`.

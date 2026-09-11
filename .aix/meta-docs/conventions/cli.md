@@ -32,6 +32,7 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 | `aix skills [general\|specific] [category]` | Catalogue (see below) | Choosing a skill; checking what is always on |
 | `aix skills info NAME` / `show NAME` | Details (group, level, runtimes, source) / the SKILL.md | Before invoking an unfamiliar skill |
 | `aix skills enable\|disable NAME` | Link/unlink everywhere; recorded in `.aix/config.yaml` `disabled_skills` | Trimming a project's skill set |
+| `aix skills use NAME ID` / `use NAME default` | Pick which implementation of a class is linked; recorded in `.aix/config.yaml` `use:`; `default` returns to profile then layer precedence | An organisation ships two implementations of one class |
 | `aix skills registry` / `add NAME [--on-demand\|--always] [--extra a,b]` / `remove` / `update` | Third-party skills (below) | Adopting caveman, ponytail, … |
 | `aix skills always\|on-demand NAME` | Add/remove the always-on wiring for any skill | Making a behaviour permanent |
 
