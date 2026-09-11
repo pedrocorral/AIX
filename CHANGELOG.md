@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.4 — 2026-09-11
+
+- `aix instructions list` uses the same columns as `aix skills list` (name, state, description); layer and kind moved to `info`.
+
 ## 2.8.3 — 2026-09-11
 
 - `aix upgrade` now refreshes `.aix/profiles/` too (kit profiles were left at the installed version).

@@ -945,12 +945,12 @@ def run_instructions(args):
     allins = layers.all_instructions(ROOT)
     if sub == "list":
         width = shutil.get_terminal_size((100, 20)).columns
-        print(f"{'INSTRUCTION':36s} {'STATE':16s} {'LAYER':8s} {'KIND':22s} DESCRIPTION")
+        print(f"{'INSTRUCTION':36s} {'STATE':14s} DESCRIPTION")
         for iid, v in sorted(allins.items(), key=lambda kv: (kv[1]["block"], kv[0])):
-            kind = f"block: {v['section']}" if v["block"] else ("scoped: " + str(v["applyTo"])[:12] if v["applyTo"] else "always")
-            print(f"{iid:36s} {v['state']:16s} {v['layer']:8s} {kind[:22]:22s} {v['description'][:max(10, width - 90)]}")
-        print(f"\n{len(allins)} instructions. active = rendered on install; optional (off) = enable with `aix instructions enable ID` or a profile; "
-              "disabled = in config disabled_instructions. Blocks build AGENTS.md; scoped ones render per runtime.")
+            print(f"{iid:36s} {v['state']:14s} {v['description'][:max(10, width - 52)]}")
+        active = sum(1 for v in allins.values() if v["state"] == "active")
+        print(f"\n{active} of {len(allins)} instructions active. optional (off) = enable with aix instructions enable ID or a profile; "
+              "disabled = switched off here. Details (layer, kind, path): aix instructions info ID")
         return
     if not rest:
         sys.exit("usage: aix instructions [list] | info ID | show ID | enable ID | disable ID")
