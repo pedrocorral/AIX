@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.5.0 — 2026-09-11
+- 28 new kit skills so that every class an organisation catalogue typically uses has a good default: `core/which-skill`; `spec/write-skill`, `write-for-agents`, `plain-language`; `architecture/trace`, `deep-modules`, `domain-model`, `improve`; `implement/code-python`, `code-typescript`; `testing/validate-ui`; new categories `debug/` (diagnose with a hypothesis-loop script, merge-conflicts), `workflow/` (plan-feature, to-tickets, triage with a label vocabulary, wayfinder, research, prototype, setup-tracker, wizard) and `coach/` (grill, grill-me, grill-with-docs, teach, questionnaire, wait-what, scaffold-exercises). Thirteen are manual-only. 71 kit skills in ten categories.
+
 ## 2.4.0 — 2026-09-11
 - Skill classes and implementations: `class:` in front matter lets an implementation live under its own folder name; `id:`/`version:` name it; several implementations of one class may coexist, chosen by `use:` in config.yaml, by the active profile, or by layer precedence; `aix skills info` shows the winner, why, and the alternatives. `disable-model-invocation: true` shows as state `manual`.
 - Scoped instructions: `instructions/*.md` in a layer (id, description, applyTo, always), rendered by `aix install` as native Copilot `.instructions.md` files, Cursor `.mdc` rules and a `## Scoped instructions` section in AGENTS.md/GEMINI.md; validated by `aix docs validate`.

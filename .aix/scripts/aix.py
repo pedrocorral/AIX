@@ -200,7 +200,7 @@ API/DM field names appear in the field dictionary.
 6. SKILLS  (skills/)
 --------------------
 Small skills in the Agent Skills open format (SKILL.md with YAML front-matter), each doing one job,
-organised in seven categories:
+organised in ten categories:
 
   core/          sdd-workflow (orchestrator), session-resume, session-handoff, conflict-resolution, roadmap-task,
                  find-doc
@@ -214,6 +214,11 @@ organised in seven categories:
                  audit-logging-monitoring, audit-ai-llm, audit-infra
   review/        code-review, doc-drift-check
   refactor/      cycle, shortcut, hub, dead, clone, readability, modernise (one per `aix code` finding type)
+  workflow/      plan-feature, to-tickets, triage, wayfinder, research, prototype, setup-tracker, wizard
+  debug/         diagnose, merge-conflicts
+  coach/         grill, grill-me, grill-with-docs, teach, questionnaire, wait-what, scaffold-exercises
+  plus           core/which-skill; spec/write-skill, write-for-agents, plain-language; architecture/trace,
+                 deep-modules, domain-model, improve; implement/code-python, code-typescript; testing/validate-ui
 
 The nested folder is the single source of truth. `aix install` links every leaf skill, under its flat name
 (security/audit-injection -> security-audit-injection), into the folders each runtime reads:

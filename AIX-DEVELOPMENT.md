@@ -21,7 +21,7 @@ Original brief (verbatim intent, condensed):
 | Requirement from the brief | Where it is satisfied |
 |---|---|
 | Skills + docs in nested hierarchy; agent finds the path with minimum tokens | `.aix/skills/<cat>/<name>/SKILL.md`; `INDEX.md` in every docs folder; `AGENTS.md` navigation table; `.aix/meta-docs/conventions/token-economy.md` |
-| Skills split per task (Google-style) | 36 skills in 7 categories, orchestrators chain sub-skills |
+| Skills split per task (Google-style) | 71 skills in 7 categories, orchestrators chain sub-skills |
 | MVC best practices; Python web / data-science / AI apps | `.aix/meta-docs/architecture/mvc.md`; `.aix/meta-docs/stacks/python/{webapp-general,data-science-app,ai-app,tooling}.md` |
 | `.aix/meta-docs/` complete enough to design a new app | `.aix/meta-docs/INDEX.md` prescribes a reading order; `architecture-design-app` skill executes it |
 | Frontend/backend differentiation | `architecture/frontend-backend-separation.md` + ownership matrix |
@@ -257,4 +257,4 @@ AGENTS.md's own rules, the class contract, ACME example organisation under `exam
 
 ## 13. Numbers to remember
 
-Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 36 skills, 24 seeded VUL rows, 4 example requirements/TS.
+Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 71 skills, 24 seeded VUL rows, 4 example requirements/TS.
