@@ -194,6 +194,33 @@ Built 2026-09-04/05 in a chat session, then compared against two alternative des
 - **Patch** (`x.y.Z`) for fixes and doc changes; small releases are preferred because each one fixes one thing.
 - Every release: bump `.aix/config.yaml`, a `CHANGELOG.md` entry under the version, a git tag `vX.Y.Z`.
 
-## 11. Numbers to remember
+## 11. Customisation layers (designed 2026-09-11, NOT implemented yet — planned as 2.3.0)
+Drop-in model (systemd drop-ins, Kustomize overlays, Oh My Zsh `custom/`): a layer is a folder of the same shape as
+`.aix/`; a file at the same path replaces, a new path adds, an empty `DISABLED` file in a skill folder removes;
+`config.yaml` and `AGENTS.md` are never replaced but merged (keys; AGENTS.md fragment -> a managed section).
+Every layer is optional. Precedence, later wins:
+
+| Layer | Where | Who owns it | Committed? |
+|---|---|---|---|
+| kit | `.aix/` | the kit (upstream, vendored) | yes, kit-owned (manifest) |
+| organisation | `.aix/custom/` **in the kit repository an organisation installs from**; arrives in projects as `.aix/org/` | the organisation | yes, in the org's kit repo; refreshed in projects by `aix upgrade` |
+| person | `~/.config/aix/` | the developer | never |
+| project | `.aix/custom/` in the project | the project | yes, with the project |
+
+Rules:
+- Upstream `pedrocorral/AIX` keeps `.aix/custom/` empty. An organisation = a copy of the kit with a filled `custom/`;
+  `aix upgrade` there refreshes `.aix/` and leaves `custom/` alone; `aix doctor` flags overrides whose upstream file
+  changed. Projects install with `aix install --into DIR --from <git url | path>`; the source is recorded in
+  `config.yaml` so `aix upgrade` follows the organisation from then on.
+- The person layer may only touch uncommitted places: the runtime link folders (git-ignored), the user-level
+  instruction files the runtimes already read (`~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, ...), and the limits of
+  a hand-run session. It applies inside the kit checkout too (harmless by construction). Reproducible checks
+  (`docs validate`, code gates, doctor) ignore it when there is no terminal (CI) or with `--no-user`.
+- The project layer is the only customisation committed with the project.
+- `aix doctor` and `aix skills info NAME` name the layer that won for every overridden path.
+- Prerequisite: `config.yaml` `paths:` still lists 1.x locations (`docs/meta-docs`, `skills`, `templates`) and
+  `code_roots`; fix when the resolver starts reading them.
+
+## 12. Numbers to remember
 
 Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 36 skills, 24 seeded VUL rows, 4 example requirements/TS.
