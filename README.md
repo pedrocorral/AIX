@@ -46,6 +46,7 @@ aix docs validate         # sanity-check IDs, links, indexes
 | `aix task new\|start\|block\|done\|list` | Road-map helper, keeps `STATE.md` in sync |
 | `aix skills [general\|specific] [category]` | Catalogue: group (general = behaviour for every session, specific = one job), level (always / orchestrator / on-demand), state, runtimes. `*` marks always-on; a general skill not always-on shows as inactive. `show`, `enable`, `disable`, `always`, `on-demand NAME` manage them |
 | `.aix/custom/skills/<class>/`, `~/.config/aix/skills/<class>/` | Override a skill for this project or for yourself: same path replaces, new path adds, `DISABLED` removes; `aix skills info` shows the winning layer and hash |
+| `aix instructions [list] \| info ID \| show ID \| enable ID \| disable ID` | The instruction files every layer offers: blocks that build AGENTS.md and scoped standards rendered per runtime; switch one on or off |
 | `aix profile use NAME` | Apply a profile shipped by a layer: scoped instructions (rendered natively for Copilot and Cursor), one implementation per skill class, the organisation router |
 | `aix skills registry` / `add NAME [--always]` / `remove` / `update` | Known third-party skills with evidence (caveman, ponytail, karpathy-guidelines, superpowers' systematic-debugging, verification-before-completion). `add` downloads into `.aix/skills/extern/` and links everywhere; general skills become always-on (named in AGENTS.md and the Copilot/Cursor/Gemini pointers) unless `--on-demand` |
 | `aix help COMMAND` / `aix COMMAND --help` | Detailed help for one command, written so an agent can understand the tool (e.g. `aix help graph`) |
@@ -86,7 +87,7 @@ listed in AGENTS.md for the rest), profiles (saved sets of choices) and template
 by a normal git merge. `examples/acme/` is a complete fictional organisation to copy from.
 Instructions follow the same model: AGENTS.md is assembled from blocks that a layer can replace or extend, and
 scoped standards (`applyTo` globs) render natively per runtime. The kit ships FastAPI, React and Kedro standards as
-opt-in profiles (`aix profile use fastapi-react | kedro`).
+opt-in: `aix instructions enable aix/stacks/fastapi-backend` for one, or the profiles `aix profile use fastapi-react | kedro` for the set.
 The same shape works one level down for one project (`.aix/custom/`) and for one person (`~/.config/aix/`, never
 committed). `aix skills info CLASS` always says which layer won and why.
 

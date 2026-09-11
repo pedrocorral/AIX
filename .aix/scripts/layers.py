@@ -199,11 +199,35 @@ def instructions(project: Path = ROOT, profile: dict = None):
                              "applyTo": globs, "always": fm.get("always") is True,
                              "block": fm.get("block") is True, "section": str(fm.get("section", "")), "order": int(fm.get("order", 100) or 100),
                              "optional": fm.get("optional") is True}
-    wanted = set(config(project).get("instructions") or [])
+    cfg = config(project)
+    wanted = set(cfg.get("instructions") or [])
+    off = set(cfg.get("disabled_instructions") or [])
     if profile and isinstance(profile.get("instructions"), list):
         wanted |= set(profile["instructions"])
         out = {k: v for k, v in out.items() if k in wanted or v["layer"] == "kit"}
-    return {k: v for k, v in out.items() if not v["optional"] or k in wanted}
+    return {k: v for k, v in out.items() if (not v["optional"] or k in wanted) and k not in off}
+
+
+def all_instructions(project: Path = ROOT):
+    """Every instruction any layer offers, with its state: active | optional (off) | disabled | not in profile."""
+    prof = active_profile(project)
+    active = instructions(project, prof)
+    cfg = config(project)
+    off = set(cfg.get("disabled_instructions") or [])
+    everything = {}
+    for layer, root in layer_roots(project):
+        if layer == "user":
+            continue
+        base = root / "instructions"
+        for md in (sorted(base.rglob("*.md")) if base.is_dir() else []):
+            fm = front_matter(md)
+            if fm.get("id"):
+                everything[fm["id"]] = {"path": md, "layer": layer, "description": fm.get("description", ""),
+                                        "applyTo": fm.get("applyTo", ""), "block": fm.get("block") is True, "optional": fm.get("optional") is True,
+                                        "section": str(fm.get("section", ""))}
+    for iid, v in everything.items():
+        v["state"] = "active" if iid in active else "disabled" if iid in off else "optional (off)" if v["optional"] else "not in profile"
+    return everything
 
 
 # ---- profiles -----------------------------------------------------------------------------------------------------

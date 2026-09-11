@@ -96,7 +96,8 @@ alternatives with the `use:` line to switch. A class that exists only in a layer
 `always`); `aix install` renders them as `.github/instructions/aix-*.instructions.md` (Copilot), `.cursor/rules/aix-*.mdc`
 (Cursor) and a `## Scoped instructions` section in AGENTS.md/GEMINI.md for every other runtime; generated files
 are git-ignored. **Profiles** (`profiles/<name>.yaml`: router, instructions, skills) are saved sets of these
-choices: `aix profile use NAME`. The organisation router (a profile's `router:` or `custom/AGENTS.md`) becomes the
+choices: `aix profile use NAME`. A single instruction is switched with `aix instructions enable|disable ID` (state in
+`.aix/config.yaml` `instructions:` and `disabled_instructions:`); an explicit enable or disable wins over the profile. The organisation router (a profile's `router:` or `custom/AGENTS.md`) becomes the
 `## Organisation` section of AGENTS.md, GEMINI.md and the Copilot pointer. See `aix help profile`.
 
 ## Instruction blocks (AGENTS.md is assembled)

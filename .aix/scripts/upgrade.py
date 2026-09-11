@@ -7,7 +7,7 @@ Ownership decides what happens to each path:
   project-own (never touched): docs/requirements, tests, security, conflicts, operations, road-map, .aix/skills/extern,
               runtime folders, code
   merged:     AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
-              .aix/config.yaml (kit text + project's disabled_skills line and style: block)
+              .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source lines and style: block)
   1.x layout  a root framework.yaml: kit-owned folders are moved under .aix/ first (migrate_layout)
 Runs from the KIT's scripts (not the project's), so it always carries the newest logic."""
 import filecmp, re, shutil, subprocess, sys
@@ -93,9 +93,10 @@ def merged_text(project: Path, name) -> str:
                 out = out.rstrip("\n") + "\n\n" + keep
         return out
     out = kit_text  # config.yaml: kit text, but the project's disabled_skills line and style: block win
-    m = re.search(r"^disabled_skills:.*$", proj_text, re.M)
-    if m:
-        out = re.sub(r"^disabled_skills:.*$", lambda _: m.group(0), out, count=1, flags=re.M) if re.search(r"^disabled_skills:", out, re.M) else out.rstrip("\n") + "\n" + m.group(0) + "\n"
+    for key in ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source"):
+        m = re.search(rf"^{key}:.*$", proj_text, re.M)
+        if m:
+            out = re.sub(rf"^{key}:.*$", lambda _: m.group(0), out, count=1, flags=re.M) if re.search(rf"^{key}:", out, re.M) else out.rstrip("\n") + "\n" + m.group(0) + "\n"
     s = re.search(r"^style:\s*\n((?:[ \t]+\S.*\n?)+)", proj_text, re.M)
     if s:
         out = re.sub(r"^style:\s*\n((?:[ \t]+\S.*\n?)+)", lambda _: s.group(0), out, count=1, flags=re.M) if re.search(r"^style:", out, re.M) else out.rstrip("\n") + "\n" + s.group(0)
@@ -165,7 +166,7 @@ def describe(project: Path, d: str, action: str, rel: Path, edited=()) -> str:
         kept = [h for h in KEEP_SECTIONS if section(dst.read_text(encoding="utf-8"), h)] if dst.exists() else []
         keep = ", keeping your " + " and ".join(f"'{h[3:]}'" for h in kept) if kept else ""
         if rel.name == "config.yaml":
-            keep = ", keeping your disabled_skills and style limits"
+            keep = ", keeping your disabled_skills, instructions, profile, use, source and style limits"
         return f"  merge   {shown}  (kit text{keep}; {line_delta(src, dst, merged_text(project, rel))})"
     return f"  update  {shown}  ({line_delta(src, dst)})"
 

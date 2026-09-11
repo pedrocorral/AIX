@@ -71,6 +71,13 @@ The docs                              (aix docs ...)
 The road-map                          (aix task ...)
   aix task new "Title" [--bucket next|backlog|ideas] | start|block|done TASK-0007 ["reason"] | list
 
+The instructions                      (aix instructions ...)
+  aix instructions [list]             every instruction any layer offers: state (active / optional off / disabled /
+                                      not in profile), layer, kind (block that builds AGENTS.md, scoped by globs, always)
+  aix instructions info ID | show ID  details | the file
+  aix instructions enable|disable ID  turn one on (optional kit standards such as aix/stacks/fastapi-backend) or off;
+                                      remembered in .aix/config.yaml; profiles are for switching whole sets
+
 Profiles and overrides                (aix profile ...; .aix/custom/, ~/.config/aix/)
   aix profile [list] | show NAME | use NAME | off
                                       a profile is a saved set of choices shipped by a layer (profiles/NAME.yaml):
@@ -707,6 +714,18 @@ Every finding names the VUL row and the CWE. Test code is listed, not gated (--s
 What this still is not: an authorisation or business-logic review (the security-audit-* skills), a runtime test,
 or a scan of the deployed environment."""
 
+TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID
+
+Instructions are the second kind of thing a layer ships, next to skills. Two kinds:
+  block     `block: true`, `section`, `order` — a section of AGENTS.md itself; `aix install` assembles the file from
+            them. The kit's six blocks (aix/agents/*) are the contract; a layer replaces one by id or adds a section.
+  scoped    `applyTo` globs (or `always: true`) — a standard rendered natively for Copilot (.github/instructions/)
+            and Cursor (.cursor/rules/) and listed in AGENTS.md for every other runtime.
+States: active (rendered on the next install), optional (off) (a kit standard such as aix/stacks/fastapi-backend
+that only applies when enabled here or by a profile), disabled (config disabled_instructions), not in profile
+(the active profile lists other ids). `enable` / `disable` edit .aix/config.yaml and re-run the install; a profile
+(`aix profile use NAME`) switches a whole set at once, and an explicit enable/disable wins over it."""
+
 TOPICS["profile"] = """aix profile [list] | show NAME | use NAME | off
 
 A PROFILE is a saved set of customisation choices, shipped by a layer as profiles/<name>.yaml (kit, organisation
@@ -773,7 +792,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -918,6 +937,57 @@ def run_code(args):
     graph.main(CODE_MODES[sub] + rest)
 
 
+def run_instructions(args):
+    """aix instructions [list] | info ID | show ID | enable ID | disable ID"""
+    import layers, re, shutil
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    allins = layers.all_instructions(ROOT)
+    if sub == "list":
+        width = shutil.get_terminal_size((100, 20)).columns
+        print(f"{'INSTRUCTION':36s} {'STATE':16s} {'LAYER':8s} {'KIND':22s} DESCRIPTION")
+        for iid, v in sorted(allins.items(), key=lambda kv: (kv[1]["block"], kv[0])):
+            kind = f"block: {v['section']}" if v["block"] else ("scoped: " + str(v["applyTo"])[:12] if v["applyTo"] else "always")
+            print(f"{iid:36s} {v['state']:16s} {v['layer']:8s} {kind[:22]:22s} {v['description'][:max(10, width - 90)]}")
+        print(f"\n{len(allins)} instructions. active = rendered on install; optional (off) = enable with `aix instructions enable ID` or a profile; "
+              "disabled = in config disabled_instructions. Blocks build AGENTS.md; scoped ones render per runtime.")
+        return
+    if not rest:
+        sys.exit("usage: aix instructions [list] | info ID | show ID | enable ID | disable ID")
+    iid = rest[0]
+    if iid not in allins:
+        sys.exit(f"unknown instruction '{iid}' (aix instructions)")
+    v = allins[iid]
+    if sub == "show":
+        print(v["path"].read_text(encoding="utf-8")); return
+    if sub == "info":
+        shown = v["path"].relative_to(ROOT) if v["path"].is_relative_to(ROOT) else v["path"]
+        print(f"{iid}\n  state:       {v['state']}\n  layer:       {v['layer']}\n  kind:        {'block (AGENTS.md section ' + repr(v['section']) + ')' if v['block'] else ('scoped to ' + str(v['applyTo']) if v['applyTo'] else 'always')}"
+              f"\n  optional:    {v['optional']}\n  path:        {shown}\n  description: {v['description']}")
+        return
+    if sub in ("enable", "disable"):
+        cfg = ROOT / ".aix" / "config.yaml"
+        text = cfg.read_text(encoding="utf-8")
+        def edit_list(key, add, remove):
+            nonlocal text
+            m = re.search(rf"^{key}:\s*\[(.*?)\]", text, re.M)
+            items = [x.strip() for x in m.group(1).split(",") if x.strip()] if m else []
+            items = [x for x in items if x != remove] + ([add] if add and add not in items else [])
+            line = f"{key}: [" + ", ".join(items) + "]"
+            text = re.sub(rf"^{key}:.*$", line, text, count=1, flags=re.M) if m else text.rstrip("\n") + "\n" + line + "   # managed by `aix instructions enable|disable`\n"
+        if sub == "enable":
+            edit_list("disabled_instructions", None, iid)
+            if v["optional"]:
+                edit_list("instructions", iid, None)
+        else:
+            edit_list("disabled_instructions", iid, None)
+            edit_list("instructions", None, iid)
+        cfg.write_text(text, encoding="utf-8")
+        print(f"{iid}: {sub}d; applying")
+        cmd_install([])
+        return
+    sys.exit("usage: aix instructions [list] | info ID | show ID | enable ID | disable ID")
+
+
 def run_profile(args):
     """aix profile [list] | show NAME | use NAME | off  — a profile is a saved set of choices from a layer."""
     import layers, re
@@ -995,6 +1065,8 @@ def main(argv):
         skills.main(args)
     elif cmd == "profile":
         run_profile(args)
+    elif cmd == "instructions":
+        run_instructions(args)
     elif cmd in ("version", "-V", "--version"):
         print(f"AIX {version()}")
     else:

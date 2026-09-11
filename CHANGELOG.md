@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.8.0 — 2026-09-11
+
+- `aix instructions [list] | info ID | show ID | enable ID | disable ID`: the instruction files are first-class next to skills. `list` shows every instruction any layer offers with its state (active, optional (off), disabled, not in profile), layer and kind (block that builds AGENTS.md, scoped by globs, always). `enable`/`disable` switch one file and re-run the install; state lives in `.aix/config.yaml` (`instructions:`, `disabled_instructions:`), survives `aix upgrade`, and wins over the active profile. Profiles stay the way to switch a whole set (router + instructions + skill implementations).
+- `aix help instructions`.
+
 ## 2.7.0 — 2026-09-11
 - Instruction blocks: AGENTS.md is assembled by `aix install` from instructions with `block: true`, `section` and `order`; the kit's contract lives in `.aix/instructions/agents/` (header, authority, rules, navigation, session, output) and a layer replaces a block by id or adds a section. Managed sections are preserved; `aix doctor` reports hand-written sections outside them. Rule order in AGENTS.md fixed (8 modularity, 9 the kit folder).
 - Kit stack standards as opt-in scoped instructions (`optional: true`): `aix/stacks/fastapi-backend`, `react-frontend`, `kedro-pipelines`, selected by the new kit profiles `fastapi-react` and `kedro` or by `instructions:` in config.
