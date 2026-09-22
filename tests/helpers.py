@@ -36,9 +36,11 @@ def env(home: Path) -> dict:
     return e
 
 
-def run(args, cwd: Path, home: Path, launcher: Path = LAUNCHER, check: bool = True, stdin: str = None):
+def run(args, cwd: Path, home: Path, launcher: Path = LAUNCHER, check: bool = True, stdin: str = None, extra_env: dict = None):
     """Run the launcher with args; return CompletedProcess (stdout/stderr as text). check=True fails the call on a non-zero exit."""
-    r = subprocess.run([str(launcher), *map(str, args)], cwd=str(cwd), env=env(home), capture_output=True, text=True, input=stdin)
+    e = env(home)
+    e.update(extra_env or {})
+    r = subprocess.run([str(launcher), *map(str, args)], cwd=str(cwd), env=e, capture_output=True, text=True, input=stdin)
     if check and r.returncode != 0:
         raise AssertionError(f"aix {' '.join(map(str, args))} failed ({r.returncode}) in {cwd}\n--- stdout\n{r.stdout}\n--- stderr\n{r.stderr}")
     return r

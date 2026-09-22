@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.15.0 — 2026-09-22
+
+- `aix self-install` (alias `aix install aix`): from a clone, makes `aix` callable from any terminal. Creates `~/.local/bin` and the `aix` link (a foreign `aix` there is kept as `aix.bak`, a stale link replaced, a wrapper where symlinks are impossible), appends one marked PATH line to every shell profile found (bash, zsh, fish, macOS login profile) unless the folder is already on PATH, verifies that the resolved `aix` is this clone and reports a shadowing one. Windows: `%LOCALAPPDATA%\aix\bin\aix.cmd` and the user PATH. `--dry-run`, `--no-profile`. Refuses to run from a project's copy.
+- `aix self-update`: `git pull --ff-only` of the clone with a reminder to `aix upgrade` projects.
+- `install.sh` / `install.ps1`: one-line installers that clone into `~/.local/share/aix/kit` (Windows `%LOCALAPPDATA%\aix\kit`) and run `self-install`.
+- `aix version` inside a project names both copies, the project's and the kit on PATH, with an upgrade hint when they differ.
+- `aix doctor` points at `self-install` when `aix` is not on PATH.
+
 ## 2.14.0 — 2026-09-22
 
 - Test suite: `tests/` (stdlib unittest, temp folders, the real launcher; `python -m unittest discover -s tests`) and a CI workflow on Linux, macOS and Windows. Fixed on the way: `aix skills enable` crashed (undefined name, 2.13.0); `aix install --into` without a terminal printed the code-folder table without the hint to run `aix code find`.

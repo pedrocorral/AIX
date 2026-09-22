@@ -54,6 +54,7 @@ AIX/
 │   ├── extern.py            # third-party skills: registry.json, tarball fetch into .aix/skills/extern/<name>, always-on sections in AGENTS.md + pointers
 │   ├── security.py          # `aix docs security`: register state, evidence check, release gate
 │   ├── upgrade.py           # `aix upgrade`: updates a project's kit files per payload.py (runs from the kit, not the project)
+│   ├── selfinstall.py       # `aix self-install` / `self-update`: ~/.local/bin link, shell profile PATH line, verification
 │   ├── payload.py           # leaf: THE list of what travels into a project (owned / merged / seeded); install, upgrade, manifest, doctor read it
 │   ├── catalog.py           # leaf: skill catalogue data (used by skills.py, extern.py, doctor.py)
 │   ├── project.py           # leaf: find_project (used by aix.py, upgrade.py)

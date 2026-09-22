@@ -11,6 +11,7 @@ Usage: aix <group> <command> [args]   (no command = this help; aix help <command
 aix acts on the nearest project at or above the current folder (the one holding .aix/config.yaml).
 
 The kit
+  aix self-install                    make `aix` callable from any terminal (link + PATH in your shell profile)
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
       --from SOURCE                   with --into: the origin is SOURCE (a path or git URL: an organisation's kit
                                       checkout, or a bare layer folder taken as .aix/org/); recorded as source:
@@ -247,9 +248,12 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
   The kit
   aix                       version and command list (same as `aix help`)
   aix about | version       this text | kit version from .aix/config.yaml
+  aix self-install          make `aix` callable from any terminal: ~/.local/bin/aix -> this clone, PATH line in your
+                            shell profiles (bash, zsh, fish; Windows: user PATH), verified. Idempotent, --dry-run.
+                            alias: aix install aix.   aix self-update = git pull of the clone.
   aix install               link all skills into the five runtime folders; write pointer files for Copilot, Cursor
-                            and Gemini CLI if missing; create road-map STATE.md if missing; on Linux/macOS symlink
-                            `aix` into ~/.local/bin when that folder exists. Idempotent.
+                            and Gemini CLI if missing; create road-map STATE.md if missing; refresh the ~/.local/bin
+                            link when that folder exists. Idempotent.
       --copy                copy skills instead of symlinking
       --into DIR            first copy the kit payload into an existing project, asking per existing item
                             ([r]eplace keeps <item>.bak, [s]kip, [m]erge adds missing files only, R/S/M for all,
@@ -342,7 +346,7 @@ def skill_count():
     return sum(1 for _ in (ROOT / ".aix" / "skills").rglob("SKILL.md"))
 
 
-ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version"}  # need no project
+ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update"}  # need no project
 
 
 def is_kit() -> bool:
@@ -352,8 +356,8 @@ def is_kit() -> bool:
 
 def reexec_in_project(argv):
     """Run the project's own copy of the CLI so every module resolves ROOT to the project, not to this checkout."""
-    if argv[:1] == ["upgrade"]:
-        return  # upgrade must run from THIS checkout's scripts, not the project's older copy
+    if argv[:1] in (["upgrade"], ["self-install"], ["self-update"]) or argv[:2] == ["install", "aix"]:
+        return  # these act on / from THIS checkout (the kit on PATH), never a project's older copy
     plain_install = argv[:1] == ["install"] and "--into" not in argv
     if plain_install and is_kit():
         expose_on_path()  # the aix on PATH is always the kit's launcher, never a project's copy; fix it first, from anywhere
@@ -594,7 +598,23 @@ Choosing between implementations of one class: `aix skills use NAME ID` writes  
 `aix skills use NAME default` removes it. `info` lists the ids on offer.""",
 
 "about": "aix about      prints the full description of the kit: purpose, workflow, folders, IDs, skills, every command.",
-"version": "aix version    prints the kit version from .aix/config.yaml.",
+"version": "aix version    the version of the copy that runs: the kit clone, or inside a project that project's copy plus the kit on PATH (with an upgrade hint when they differ).",
+"self-install": """aix self-install [--dry-run] [--no-profile]        alias: aix install aix
+aix self-update
+
+Run once from a clone of AIX (git clone <repo> ~/AIX && ~/AIX/.aix/bin/aix self-install), or by the one-line
+installers install.sh / install.ps1 at the repository root, which clone and call it. Refuses to run from a
+project's copy of the kit. Steps, each printed:
+  python   3.9+ present
+  link     ~/.local/bin created if missing; ~/.local/bin/aix -> this clone's launcher. A foreign `aix` there is kept
+           as aix.bak; a stale or other-clone link is replaced; a wrapper script where symlinks are impossible.
+           Windows: %LOCALAPPDATA%\\aix\\bin\\aix.cmd wrapping this clone's aix.cmd.
+  path     when ~/.local/bin is not on PATH: one marked line appended to every shell profile found (~/.bashrc,
+           ~/.zshrc, ~/.config/fish/config.fish, plus ~/.bash_profile on macOS, ~/.profile if present). Never twice.
+           Windows: the folder added to the user PATH (registry, through PowerShell).
+  verify   the aix the new PATH resolves is this clone; another aix earlier on PATH (or a shell alias) is reported.
+Then: open a new terminal (or export PATH as printed) and `aix install --into <project>`.
+aix self-update pulls the clone (git, fast-forward only) and reminds you to `aix upgrade` each project.""",
 "help": "aix help [COMMAND]    this list, or the detailed help for one command or group (e.g. aix help code dead; also: aix code dead --help).",
 }
 TOPICS["code style"] = """aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
@@ -816,7 +836,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: install, upgrade, doctor, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: self-install, install, upgrade, doctor, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -840,24 +860,39 @@ def version():
 
 
 def expose_on_path():
-    """Best effort: make `aix` callable from anywhere. Never edits shell profiles or the registry."""
-    if os.name == "nt":
-        print(f"PATH: add {ROOT} to your PATH to call `aix` from anywhere (aix.cmd lives there).")
+    """A plain `aix install` in the kit clone refreshes the link in ~/.local/bin when that folder exists; the full,
+    profile-editing setup is `aix self-install`."""
+    import selfinstall
+    folder = selfinstall.bin_dir()
+    if os.name == "nt" or not folder.is_dir():
+        print("PATH: run `aix self-install` once to call `aix` from any terminal.")
         return
-    bin_dir = Path.home() / ".local" / "bin"
-    if not bin_dir.is_dir():
-        print(f"PATH: {bin_dir} does not exist; call ./.aix/bin/aix from the repo or add {ROOT} to PATH.")
-        return
-    link = bin_dir / "aix"
-    if link.is_symlink() or link.exists():
-        link.unlink()
-    link.symlink_to(ROOT / ".aix" / "bin" / "aix")
-    on_path = str(bin_dir) in os.environ.get("PATH", "").split(os.pathsep)
-    print(f"PATH: linked {link} -> {ROOT / '.aix' / 'bin' / 'aix'}" + ("" if on_path else f" (add {bin_dir} to PATH)"))
+    actions = []
+    selfinstall.write_link(folder / "aix", False, actions)
+    print("PATH: " + actions[-1].strip() + ("" if selfinstall.on_path(folder) else "  (not on PATH yet: `aix self-install` fixes that)"))
+
+
+def version_line() -> str:
+    """The version of the copy that runs; inside a project also the kit on PATH, with a hint when they differ."""
+    mine = version()
+    if is_kit():
+        return f"AIX {mine}"
+    import shutil, re
+    found = shutil.which("aix")
+    kit_root = Path(found).resolve().parents[2] if found else None
+    if not kit_root or not (kit_root / ".aix" / "config.yaml").exists() or kit_root == ROOT:
+        return f"AIX {mine} (this project's copy)"
+    m = re.search(r"^version:\s*([^\s#]+)", (kit_root / ".aix" / "config.yaml").read_text(encoding="utf-8"), re.M)
+    theirs = m.group(1) if m else "?"
+    hint = "" if theirs == mine else "  -> run `aix upgrade` here (`--dry-run` shows the plan)"
+    return f"AIX {mine} (this project's copy); kit on PATH: {theirs} at {kit_root}{hint}"
 
 
 
 def cmd_install(args):
+    if args[:1] == ["aix"]:  # aix install aix = aix self-install
+        import selfinstall
+        return selfinstall.main(args[1:])
     import install_skills as inst
     known = {"--copy", "--into", "--from", "--from-org", "--from-custom", "--replace-all", "--skip-all", "--merge-all"}
     bad = [a for a in args if a.startswith("--") and a not in known]
@@ -1062,6 +1097,9 @@ def main(argv):
     cmd, args = argv[0], argv[1:]
     if cmd == "about":
         print(ABOUT)
+    elif cmd in ("self-install", "self-update"):
+        import selfinstall
+        selfinstall.main(args) if cmd == "self-install" else selfinstall.self_update(args)
     elif cmd == "install":
         cmd_install(args)
     elif cmd == "upgrade":
@@ -1083,7 +1121,7 @@ def main(argv):
     elif cmd == "instructions":
         run_instructions(args)
     elif cmd in ("version", "-V", "--version"):
-        print(f"AIX {version()}")
+        print(version_line())
     else:
         print(f"aix: unknown command '{cmd}'\n")
         usage(1)

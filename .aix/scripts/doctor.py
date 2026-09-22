@@ -24,7 +24,7 @@ def check_python():
 
 def check_path():
     if os.name != "nt" and not shutil.which("aix"):
-        problem("`aix` is not on PATH", "run `aix install` (links ~/.local/bin/aix) or add the kit folder to PATH")
+        problem("`aix` is not on PATH", "run `aix self-install` from the kit clone (link + shell profile), then open a new terminal")
 
 
 def check_pointers():

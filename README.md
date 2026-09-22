@@ -21,17 +21,29 @@ and code is its optimised implementation.
 
 ## Quick start
 
+One line puts `aix` on your PATH (clones the kit into `~/.local/share/aix/kit`, links `~/.local/bin/aix`, adds the
+folder to your shell profile, verifies):
+
 ```bash
-git clone <this-repo> my-app && cd my-app
-./.aix/bin/aix install        # links skills into .opencode/ .github/ .claude/ .agents/ .cursor/ ; writes pointer files (Copilot, Cursor, Gemini) + road-map state
-aix docs validate         # sanity-check IDs, links, indexes
+curl -fsSL https://raw.githubusercontent.com/pedrocorral/AIX/main/install.sh | sh
 ```
 
+Windows, PowerShell: `irm https://raw.githubusercontent.com/pedrocorral/AIX/main/install.ps1 | iex`. Already cloned?
+`./.aix/bin/aix self-install` does the same from your clone (`--dry-run` shows the plan). Then, in a new terminal:
+
+```bash
+aix install --into my-app     # copies the kit into the project, links skills into every agent runtime, asks which folders hold code
+cd my-app && aix doctor && aix docs validate
+```
+
+`aix self-update` pulls the clone; `aix upgrade` inside a project brings it to that version.
+
 `aix` acts on the nearest project at or above your current folder (the one holding `.aix/config.yaml`), running that project's own copy of the CLI. Outside any project only `help`, `about`, `version`, `install --into` and `skills registry` work. `aix` is the only tool you need. Linux/macOS run the `aix` bash launcher, Windows runs `aix.cmd`; both call
-`.aix/scripts/aix.py` (Python 3.9+, no dependencies). `aix install` also links `aix` into `~/.local/bin` when that folder exists, and that one `aix` then runs the `.aix/scripts/aix.py` of whatever project you are in.
+`.aix/scripts/aix.py` (Python 3.9+, no dependencies). That one `aix` on PATH runs the `.aix/scripts/aix.py` of whatever project you are in; `aix version` names both copies.
 
 | Command | Does |
 |---|---|
+| `aix self-install [--dry-run]` | Make `aix` callable from any terminal, from a clone: `~/.local/bin/aix` link (foreign file kept as `.bak`), PATH line in every shell profile found (bash, zsh, fish; Windows: user PATH), verification. Idempotent. Alias `aix install aix`; `aix self-update` pulls the clone |
 | `aix install [--into DIR] [--copy]` | Install skills into every agent runtime; `--into` first copies the kit into an existing project, asking per existing item: replace (old kept as `.bak`), skip, merge (add missing files only), all-variants, abort. `--replace-all` / `--skip-all` / `--merge-all` answer for you |
 | `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run. The same list `aix install` copies (`.aix/scripts/payload.py`) says what may change: owned paths are overwritten, AGENTS.md, GEMINI.md and .aix/config.yaml are merged, everything else (your docs, code, downloads, `.aix/custom/`) is never touched |
 | `aix code security [PATH...] [--gate] [--audit]` | Deterministic static security checks mapped to the VUL register and CWEs; findings to review, never proof; `--audit` writes the audit report the register needs as evidence |

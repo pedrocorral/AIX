@@ -38,6 +38,7 @@ skipped when git or a tag is missing).
 | `test_skills.py` | list, info, `use`/`default`, disable/enable, registry listing |
 | `test_code.py` | `aix code find` (list, yes, the checklist through a pseudo-terminal), every code tool, hidden folders |
 | `test_migration.py` | a 1.x layout generated from a fresh install migrates on upgrade |
+| `test_selfinstall.py` | link, profile lines per shell, idempotence, foreign file kept, stale link replaced, dry run, refusal from a project, `aix version` naming both copies |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 
 ## Not covered
