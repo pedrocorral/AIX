@@ -20,26 +20,33 @@ IGNORED_PARTS = {"__pycache__"}   # never payload, whatever folder they sit in
 IGNORED_SUFFIXES = {".pyc"}
 
 
-def items(kit: Path):
+AGENT_OF = {"CLAUDE.md": "claude", "GEMINI.md": "gemini"}   # pointer files that travel only when their agent is selected
+
+
+def items(kit: Path, agents: list = None):
     """[(path relative to the kit root, mode)] in install order. Skill categories are read from the kit, extern excepted:
-    its registry is kit text, the downloads next to it belong to the project."""
+    its registry is kit text, the downloads next to it belong to the project. With `agents`, pointer files of
+    unselected agents are left out."""
     skills = kit / ".aix" / "skills"
     categories = sorted(p.name for p in skills.iterdir() if p.is_dir() and p.name != "extern") if skills.is_dir() else []
-    return ([(".aix/config.yaml", MERGED), (".aix/bin", OWNED), (".aix/scripts", OWNED), (".aix/templates", OWNED),
+    out = ([(".aix/config.yaml", MERGED), (".aix/bin", OWNED), (".aix/scripts", OWNED), (".aix/templates", OWNED),
              (".aix/meta-docs", OWNED), (".aix/instructions", OWNED), (".aix/profiles", OWNED),
              (".aix/skills/INDEX.md", OWNED), (".aix/skills/extern/registry.json", OWNED)]
             + [(f".aix/skills/{c}", OWNED) for c in categories]
             + [("AGENTS.md", MERGED), ("CLAUDE.md", OWNED), ("GEMINI.md", MERGED), ("docs", SEEDED)]
             + [(f".aix/{l}", LAYER) for l in LAYERS])
+    if agents is not None:
+        out = [(rel, m) for rel, m in out if AGENT_OF.get(rel, None) in (None, *agents)]
+    return out
 
 
 def is_payload_file(path: Path) -> bool:
     return not (IGNORED_PARTS & set(path.parts)) and path.suffix not in IGNORED_SUFFIXES
 
 
-def files(root: Path, mode: str = OWNED):
+def files(root: Path, mode: str = OWNED, agents: list = None):
     """Every payload file of the given mode under `root` (a kit checkout or an installed project), as (relative path)."""
-    for rel, m in items(root):
+    for rel, m in items(root, agents):
         if m != mode:
             continue
         p = root / rel
@@ -51,10 +58,10 @@ def files(root: Path, mode: str = OWNED):
                     yield f.relative_to(root)
 
 
-def owned_paths(kit: Path):
-    return [rel for rel, m in items(kit) if m == OWNED]
+def owned_paths(kit: Path, agents: list = None):
+    return [rel for rel, m in items(kit, agents) if m == OWNED]
 
 
-def merged_paths(kit: Path):
-    return [rel for rel, m in items(kit) if m == MERGED]
+def merged_paths(kit: Path, agents: list = None):
+    return [rel for rel, m in items(kit, agents) if m == MERGED]
 # edit

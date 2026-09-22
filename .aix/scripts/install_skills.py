@@ -10,7 +10,8 @@ import argparse, os, shutil, sys
 from pathlib import Path
 
 KIT_ROOT = Path(__file__).resolve().parents[2]
-TARGETS = [".opencode/skills", ".claude/skills", ".github/skills", ".agents/skills", ".cursor/skills"]
+import agents  # which agents (Claude, Copilot, Cursor, Gemini, OpenCode, Codex) the project equips: folders and pointer files
+TARGETS = [a["skills"] for a in agents.AGENTS.values() if a["skills"]]  # every folder the kit knows; a project links the selected ones
 import payload  # THE list of what travels into a project (shared with upgrade, manifest, doctor)
 
 
@@ -52,8 +53,8 @@ def disabled_skills(project: Path):
 
 
 def prune_dangling(project: Path):
-    """Remove runtime links whose skill folder no longer exists (skill removed or renamed)."""
-    for t in TARGETS:
+    """Remove agent links whose skill folder no longer exists (skill removed or renamed)."""
+    for t in agents.skill_dirs(project):
         d = project / t
         if not d.is_dir():
             continue
@@ -103,15 +104,16 @@ def install_into(project: Path, copy: bool):
     except PermissionError as e:
         sys.exit(f"aix install: cannot write {e.filename}: {project} belongs to another user, whose skill links are already in place "
                  f"(they run `aix install` there). Your PATH link is done; your own projects need `aix install --into DIR`.")
-    print(f"installed {n} skills into {project}")
+    print(f"installed {n} skills into {project} for {', '.join(agents.selected(project))}")
 
 
 def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
     import layers
     profile = layers.active_profile(project)
     active, layer_disabled = layers.resolve(project, profile)
+    targets = agents.skill_dirs(project)
     for flat, layer in layer_disabled.items():  # removed by a DISABLED file in a higher layer
-        for t in TARGETS:
+        for t in targets:
             p = project / t / flat
             if p.is_symlink() or p.is_file(): p.unlink()
             elif p.is_dir(): shutil.rmtree(p)
@@ -120,17 +122,18 @@ def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
     for flat, info in sorted(active.items()):
         src = info["path"]
         if flat in off:
-            for t in TARGETS:
+            for t in targets:
                 p = project / t / flat
                 if p.is_symlink() or p.is_file(): p.unlink()
                 elif p.is_dir(): shutil.rmtree(p)
             print(f"  {flat:40s} -> disabled (.aix/config.yaml)")
             continue
-        for t in TARGETS:
+        mode = "-"
+        for t in targets:
             mode = link_or_copy(src, project / t / flat, copy)
         n += 1
         origin = "" if info["layer"] == "kit" and not info["chosen_by"].startswith("config") else f"  [{info['chosen_by']}]"
-        print(f"  {flat:40s} -> {', '.join(TARGETS)} ({mode}){origin}")
+        print(f"  {flat:40s} -> {', '.join(targets) or 'AGENTS.md only'} ({mode}){origin}")
     render_instructions(project, profile)
     layers.write_index(project)
     return n
@@ -179,6 +182,7 @@ def render_instructions(project: Path, profile):
     """Scoped instructions -> native files per runtime (git-ignored, regenerated) + a managed section in AGENTS.md/GEMINI.md."""
     import layers, re
     ins = {k: v for k, v in layers.instructions(project, profile).items() if not v["block"]}
+    chosen = agents.selected(project)
     gh, cur = project / ".github" / "instructions", project / ".cursor" / "rules"
     for d, pat in ((gh, "aix-*.instructions.md"), (cur, "aix-*.mdc")):
         for old in (d.glob(pat) if d.is_dir() else []):
@@ -189,10 +193,13 @@ def render_instructions(project: Path, profile):
         slug = slug[4:] if slug.startswith("aix-") else slug  # the file already carries the aix- prefix
         body = v["path"].read_text(encoding="utf-8")
         body = body[body.find("\n---", 3) + 4:].lstrip("\n") if body.startswith("---") else body
-        gh.mkdir(parents=True, exist_ok=True); cur.mkdir(parents=True, exist_ok=True)
         apply = ",".join(v["applyTo"]) if v["applyTo"] else "**"
-        (gh / f"aix-{slug}.instructions.md").write_text(f"---\ndescription: \"{v['description']}\"\napplyTo: \"{apply}\"\n---\n{body}", encoding="utf-8")
-        (cur / f"aix-{slug}.mdc").write_text(f"---\ndescription: {v['description']}\nglobs: {apply}\nalwaysApply: {'true' if v['always'] or not v['applyTo'] else 'false'}\n---\n{body}", encoding="utf-8")
+        if "copilot" in chosen:
+            gh.mkdir(parents=True, exist_ok=True)
+            (gh / f"aix-{slug}.instructions.md").write_text(f"---\ndescription: \"{v['description']}\"\napplyTo: \"{apply}\"\n---\n{body}", encoding="utf-8")
+        if "cursor" in chosen:
+            cur.mkdir(parents=True, exist_ok=True)
+            (cur / f"aix-{slug}.mdc").write_text(f"---\ndescription: {v['description']}\nglobs: {apply}\nalwaysApply: {'true' if v['always'] or not v['applyTo'] else 'false'}\n---\n{body}", encoding="utf-8")
         shown = v["path"].relative_to(project) if v["path"].is_relative_to(project) else v["path"]
         scope = "always" if v["always"] or not v["applyTo"] else "when touching " + ", ".join(v["applyTo"])
         lines.append(f"- `{iid}` ({scope}): read `{shown}` — {v['description']}")
@@ -206,7 +213,8 @@ def render_instructions(project: Path, profile):
         if f.exists():
             f.write_text(_replace_section(f.read_text(encoding="utf-8"), "## Organisation", org_section), encoding="utf-8")
     if lines:
-        print(f"  rendered {len(lines)} scoped instruction(s) -> .github/instructions/aix-*.instructions.md, .cursor/rules/aix-*.mdc, AGENTS.md")
+        where = [x for x, ok in (("AGENTS.md", True), (".github/instructions/aix-*.instructions.md", "copilot" in chosen), (".cursor/rules/aix-*.mdc", "cursor" in chosen)) if ok]
+        print(f"  rendered {len(lines)} scoped instruction(s) -> {', '.join(where)}")
 
 
 def _org_fragment(project: Path) -> str:
@@ -227,19 +235,21 @@ def _replace_section(text: str, header: str, section: str) -> str:
     return (text.rstrip("\n") + "\n\n" + section) if section else text
 
 
+POINTERS = {  # agent -> (file, text) for the agents that do not read AGENTS.md by themselves
+    "claude": ("CLAUDE.md", "Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.claude/skills/` (installed from `.aix/skills/` by `aix install`).\n"),
+    "copilot": (".github/copilot-instructions.md", "Read and follow `AGENTS.md` at the repository root before doing anything.\n"),
+    "cursor": (".cursor/rules/aix.mdc", "---\ndescription: AIX agent contract\nalwaysApply: true\n---\nRead and follow `AGENTS.md` at the repository root before doing anything. Skills are in `.cursor/skills/`.\n"),
+    "gemini": ("GEMINI.md", "Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.agents/skills/` (installed from `.aix/skills/` by `aix install`).\n"),
+}
+
+
 def _pointer_files(project: Path):
-    """Pointer files for runtimes that do not read AGENTS.md, STATE.md, and the kit-file manifest (projects only)."""
-    gh = project / ".github" / "copilot-instructions.md"
-    if not gh.exists():
-        gh.parent.mkdir(parents=True, exist_ok=True)
-        gh.write_text("Read and follow `AGENTS.md` at the repository root before doing anything.\n")
-    cur = project / ".cursor" / "rules" / "aix.mdc"
-    if not cur.exists():
-        cur.parent.mkdir(parents=True, exist_ok=True)
-        cur.write_text("---\ndescription: AIX agent contract\nalwaysApply: true\n---\nRead and follow `AGENTS.md` at the repository root before doing anything. Skills are in `.cursor/skills/`.\n")
-    gem = project / "GEMINI.md"  # Gemini CLI reads GEMINI.md and .agents/skills; Antigravity reads AGENTS.md and .agents/skills natively
-    if not gem.exists():
-        gem.write_text("Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.agents/skills/` (installed from `.aix/skills/` by `aix install`).\n")
+    """Pointer files for the selected agents that do not read AGENTS.md by themselves, STATE.md, and the kit-file manifest (projects only)."""
+    for agent, (rel, text) in POINTERS.items():
+        f = project / rel
+        if agent in agents.selected(project) and not f.exists():
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(text, encoding="utf-8")
     state = project / "docs" / "road-map" / "going-on" / "STATE.md"
     if not state.exists():
         shutil.copy(project / ".aix" / "templates" / "session-state.md", state)

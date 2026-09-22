@@ -16,6 +16,7 @@ The kit
       --from SOURCE                   with --into: the origin is SOURCE (a path or git URL: an organisation's kit
                                       checkout, or a bare layer folder taken as .aix/org/); recorded as source:
       --from-org SRC | --from-custom SRC   take one layer (.aix/org/, .aix/custom/) from SRC instead of the origin
+      --agents a,b                    equip only these agents (else: a checklist in a terminal, all without one)
       --into asks per existing item: [r]eplace [s]kip [m]erge [R/S/M] all [a]bort  (replace keeps <item>.bak)
       --replace-all | --skip-all | --merge-all   answer for every collision without asking (CI, no terminal)
   aix upgrade [PROJECT] [--dry-run] [--yes]
@@ -73,6 +74,9 @@ The road-map                          (aix task ...)
   aix task new "Title" [--bucket next|backlog|ideas] | start|block|done TASK-0007 ["reason"] | list
 
 The instructions                      (aix instructions ...)
+  aix agents [NAME...|all|--list]     which agents this project equips (claude, copilot, cursor, gemini, opencode,
+                                      codex): a checklist, detected ones preselected; writes agents: to config;
+                                      install links folders and pointer files only for those. No line = all
   aix instructions [list]             every instruction any layer offers: state (active / optional off / disabled /
                                       not in profile), layer, kind (block that builds AGENTS.md, scoped by globs, always)
   aix instructions info ID | show ID  details | the file
@@ -756,6 +760,23 @@ Every finding names the VUL row and the CWE. Test code is listed, not gated (--s
 What this still is not: an authorisation or business-logic review (the security-audit-* skills), a runtime test,
 or a scan of the deployed environment."""
 
+TOPICS["agents"] = """aix agents [NAME... | all] [--list]          aix install --into DIR --agents claude,copilot
+
+An agent is the tool that reads the files, whatever model it runs: claude (Claude Code, Claude desktop), copilot
+(GitHub Copilot in VS Code, the CLI, the cloud agent; alias vscode), cursor, gemini (Gemini CLI, Antigravity),
+opencode, codex (reads AGENTS.md only). Each has a skills folder and, for those that do not read AGENTS.md by
+themselves, a pointer file:
+  claude   .claude/skills/   CLAUDE.md            copilot  .github/skills/  .github/copilot-instructions.md, .github/instructions/
+  cursor   .cursor/skills/   .cursor/rules/       gemini   .agents/skills/  GEMINI.md
+  opencode .opencode/skills/                      codex    AGENTS.md (always present)
+`aix agents` with no names opens the checklist (space toggles, a all, n none, Enter writes, q cancels): agents
+detected on PATH or already equipped are preselected; nothing detected = all. Names on the command line set it
+without a screen; `all` removes the line. The choice is `agents:` in .aix/config.yaml, kept by aix upgrade.
+Install, upgrade and `aix skills` then link folders and write pointer files only for the selected agents; choosing
+fewer removes what AIX created for the others (links, its own pointer files, rendered aix-* files), never a file a
+person wrote. `aix doctor` reports the selection and leftovers. `aix install --into DIR` asks in a terminal unless
+--agents names them; without a terminal all agents are equipped."""
+
 TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID      (alias: aix rules ...)
 
 Instructions are the second kind of thing a layer ships, next to skills. Two kinds:
@@ -836,7 +857,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: self-install, install, upgrade, doctor, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: self-install, install, upgrade, doctor, agents, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -894,10 +915,10 @@ def cmd_install(args):
         import selfinstall
         return selfinstall.main(args[1:])
     import install_skills as inst
-    known = {"--copy", "--into", "--from", "--from-org", "--from-custom", "--replace-all", "--skip-all", "--merge-all"}
+    known = {"--copy", "--into", "--from", "--from-org", "--from-custom", "--agents", "--replace-all", "--skip-all", "--merge-all"}
     bad = [a for a in args if a.startswith("--") and a not in known]
     if bad:
-        sys.exit(f"aix install: unknown option {' '.join(bad)}. Options: --copy, --into DIR, --from SRC, --from-org SRC, --from-custom SRC, --replace-all, --skip-all, --merge-all (aix help install)")
+        sys.exit(f"aix install: unknown option {' '.join(bad)}. Options: --copy, --into DIR, --from SRC, --from-org SRC, --from-custom SRC, --agents a,b, --replace-all, --skip-all, --merge-all (aix help install)")
     copy, into = "--copy" in args, None
     if "--into" in args:
         i = args.index("--into")
@@ -914,6 +935,7 @@ def cmd_install(args):
             sys.exit(f"aix install {flag} SOURCE needs a source and --into DIR")
         return args[i + 1]
     src, layer_src = value_of("--from"), {"org": value_of("--from-org"), "custom": value_of("--from-custom")}
+    wanted_agents = value_of("--agents")
     if into:
         mode = "replace" if "--replace-all" in args else "skip" if "--skip-all" in args else "merge" if "--merge-all" in args else "ask"
         import source as srcmod
@@ -930,6 +952,9 @@ def cmd_install(args):
         if src:
             srcmod.record(into, src)
         srcmod.install_layers(into, srcmod.resolve_layers(origin, srcmod.layer_sources(into, layer_src)))
+        import agents
+        agents.run(into, wanted_agents.split(",") if wanted_agents else None, title="aix install")  # names, checklist, or all
+        agents.remove_deselected(into, agents.selected(into))
         inst.install_into(into, copy)
         import codefind
         codefind.run(into, title="aix install")  # checklist in a terminal; the table and a hint otherwise
@@ -985,6 +1010,19 @@ def run_code(args):
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args
     graph.main(CODE_MODES[sub] + rest)
+
+
+def run_agents(args):
+    """aix agents [NAME... | all] [--list]: which agents the project equips; checklist in a terminal."""
+    import agents, install_skills as inst
+    if any(a.startswith("--") and a != "--list" for a in args):
+        sys.exit("usage: aix agents [NAME... | all] [--list]   (names: " + ", ".join(agents.AGENTS) + ")")
+    names = [a for a in args if not a.startswith("--")]
+    changed = agents.run(ROOT, names, "--list" in args)
+    if changed or names:
+        for r in agents.remove_deselected(ROOT, agents.selected(ROOT)):
+            print(f"  removed {r}")
+        inst.install_into(ROOT, copy=False)
 
 
 def run_instructions(args):
@@ -1120,6 +1158,8 @@ def main(argv):
         run_profile(args)
     elif cmd == "instructions":
         run_instructions(args)
+    elif cmd == "agents":
+        run_agents(args)
     elif cmd in ("version", "-V", "--version"):
         print(version_line())
     else:

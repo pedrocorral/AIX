@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SKILLS = ROOT / ".aix" / "skills"
 MANIFEST = ROOT / ".aix" / "config.yaml"
 AGENTS = ROOT / "AGENTS.md"
-TARGETS = [".opencode/skills", ".claude/skills", ".github/skills", ".agents/skills", ".cursor/skills"]
+import agents
+TARGETS = [a["skills"] for a in agents.AGENTS.values() if a["skills"]]
 RUNTIME = {".opencode/skills": "opencode", ".claude/skills": "claude", ".github/skills": "copilot",
            ".agents/skills": "agents", ".cursor/skills": "cursor"}   # agents = agentskills.io dir: Antigravity, Gemini CLI, VS Code
 
@@ -92,7 +93,7 @@ def set_disabled(names):
 
 
 def installed_in(flat: str):
-    return [RUNTIME[t] for t in TARGETS if (ROOT / t / flat).exists()]
+    return [RUNTIME[t] for t in agents.skill_dirs(ROOT) if (ROOT / t / flat).exists()]
 
 
 def unlink_everywhere(flat):

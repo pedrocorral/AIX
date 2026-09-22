@@ -79,29 +79,31 @@ def describe(r):
     return langs, r["marker"], r["status"]
 
 
-def checklist(rows, title):
-    """Toggle rows; return the selected names, or None when cancelled. curses when available, prompts otherwise."""
+def checklist(rows, title, describe_row=None, footer="paths.code_roots in .aix/config.yaml"):
+    """Toggle rows; return the selected names, or None when cancelled. curses when available, prompts otherwise.
+    describe_row(row) -> three column strings; shared with `aix agents`."""
+    describe_row = describe_row or describe
     try:
         import curses
     except ImportError:
-        return prompt_list(rows)
+        return prompt_list(rows, describe_row)
     try:
-        return curses.wrapper(lambda scr: tui(scr, rows, title))
+        return curses.wrapper(lambda scr: tui(scr, rows, title, describe_row, footer))
     except Exception:
-        return prompt_list(rows)
+        return prompt_list(rows, describe_row)
 
 
-def prompt_list(rows):
+def prompt_list(rows, describe_row):
     out = []
     for r in rows:
-        langs, marker, status = describe(r)
-        ans = input(f"  {r['name']:24s} {langs:22s} {marker:15s} {status:22s} keep? [{'Y/n' if r['on'] else 'y/N'}] ").strip().lower()
+        a, b, status = describe_row(r)
+        ans = input(f"  {r['name']:24s} {a:22s} {b:15s} {status:22s} keep? [{'Y/n' if r['on'] else 'y/N'}] ").strip().lower()
         if ans in ("y", "yes") or (not ans and r["on"]):
             out.append(r["name"])
     return out
 
 
-def tui(scr, rows, title):
+def tui(scr, rows, title, describe_row, footer):
     import curses
     curses.curs_set(0)
     curses.use_default_colors()
@@ -117,14 +119,14 @@ def tui(scr, rows, title):
         if cur >= top + body: top = cur - body + 1
         for i, r in enumerate(rows[top:top + body]):
             idx = top + i
-            langs, marker, status = describe(r)
+            a, b, status = describe_row(r)
             box = "[x]" if r["on"] else "[ ]"
-            color = curses.color_pair(1) if status == "new" else curses.color_pair(3) if "not found" in status else curses.color_pair(2) if "no code" in status else 0
+            color = curses.color_pair(1) if status in ("new", "detected") else curses.color_pair(3) if "not found" in status or status == "not selected" else curses.color_pair(2) if "no code" in status else 0
             attr = curses.A_REVERSE if idx == cur else 0
-            line = f"  {box} {r['name']:<26.26s} {langs:<24.24s} {marker:<15.15s} {status}"
+            line = f"  {box} {r['name']:<26.26s} {a:<24.24s} {b:<15.15s} {status}"
             scr.addnstr(3 + i, 0, line.ljust(w - 1), w - 1, attr | color)
         on = sum(1 for r in rows if r["on"])
-        scr.addnstr(h - 1, 0, f"  {on} of {len(rows)} selected -> paths.code_roots in .aix/config.yaml", w - 1, curses.A_DIM)
+        scr.addnstr(h - 1, 0, f"  {on} of {len(rows)} selected -> {footer}", w - 1, curses.A_DIM)
         scr.refresh()
         k = scr.getch()
         if k in (curses.KEY_UP, ord("k")): cur = max(0, cur - 1)

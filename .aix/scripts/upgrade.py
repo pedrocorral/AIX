@@ -18,7 +18,7 @@ KIT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import payload
 MERGED_FILES = payload.merged_paths(KIT)
-PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom", "style")  # config.yaml lines the project owns
+PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom", "agents", "style")  # config.yaml lines the project owns
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
               "framework.yaml": ".aix/config.yaml"}
 OLD_TEXT = [("docs/meta-docs/", ".aix/meta-docs/"), ("`skills/INDEX.md`", "`.aix/skills/INDEX.md`"), ("`skills/`", "`.aix/skills/`"),
@@ -50,14 +50,17 @@ def diff_dir(src: Path, dst: Path):
 def plan(project: Path):
     """Everything the upgrade would do, as (label, action, path) rows."""
     rows = []
-    for d in payload.owned_paths(KIT):
+    sys.path.insert(0, str(KIT / ".aix" / "scripts"))
+    import agents as agmod
+    chosen = agmod.selected(project)
+    for d in payload.owned_paths(KIT, chosen):
         src, dst = KIT / d, project / d
         if src.is_dir():
             a, u, r = diff_dir(src, dst)
             rows += [(d, "add", x) for x in a] + [(d, "update", x) for x in u] + [(d, "remove", x) for x in r]
         elif src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
             rows.append((".", "update" if dst.exists() else "add", Path(d)))
-    for f in MERGED_FILES:
+    for f in payload.merged_paths(KIT, chosen):
         current = (project / f).read_text(encoding="utf-8") if (project / f).exists() else None
         if merged_text(project, f) != current:
             rows.append((".", "merge" if current is not None else "add", Path(f)))

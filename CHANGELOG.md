@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.16.0 — 2026-09-22
+
+- `aix agents [NAME... | all | --list]`: which agents a project equips, from a fixed list: claude (Claude Code, Claude desktop), copilot (VS Code, CLI, cloud agent), cursor, gemini (Gemini CLI, Antigravity), opencode, codex (AGENTS.md only). A checklist like `aix code find`, agents detected on PATH or already present preselected; the choice is `agents:` in `.aix/config.yaml`, no line = all (existing projects unchanged). Install, upgrade, `aix skills` and the instruction rendering write folders and pointer files only for the selected agents; choosing fewer removes what AIX created for the others, never a person's file. `aix install --into DIR --agents a,b`, or the checklist in a terminal, or all without one. `aix doctor` reports the selection and leftovers. Team feedback, 2026-09-22: the kit installed every agent's files.
+- `skill_targets` in `config.yaml` (read by nothing) replaced by the `agents:` line. `CLAUDE.md` is now written like the other pointer files, for the claude agent.
+
 ## 2.15.0 — 2026-09-22
 
 - `aix self-install` (alias `aix install aix`): from a clone, makes `aix` callable from any terminal. Creates `~/.local/bin` and the `aix` link (a foreign `aix` there is kept as `aix.bak`, a stale link replaced, a wrapper where symlinks are impossible), appends one marked PATH line to every shell profile found (bash, zsh, fish, macOS login profile) unless the folder is already on PATH, verifies that the resolved `aix` is this clone and reports a shadowing one. Windows: `%LOCALAPPDATA%\aix\bin\aix.cmd` and the user PATH. `--dry-run`, `--no-profile`. Refuses to run from a project's copy.

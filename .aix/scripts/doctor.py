@@ -28,22 +28,32 @@ def check_path():
 
 
 def check_pointers():
-    wanted = {ROOT / "CLAUDE.md": "AGENTS.md", ROOT / ".github" / "copilot-instructions.md": "AGENTS.md",
-              ROOT / ".cursor" / "rules" / "aix.mdc": "AGENTS.md", ROOT / "GEMINI.md": "AGENTS.md"}
-    for f, needle in wanted.items():
-        if not f.exists() or needle not in f.read_text(encoding="utf-8"):
-            problem(f"{f.relative_to(ROOT)} missing or not pointing at AGENTS.md", "run `aix install`")
+    import agents
+    chosen = agents.selected(ROOT)
+    print(f"agents: {', '.join(chosen)}" + ("" if agents.configured(ROOT) else " (all: no agents: line; `aix agents` chooses)"))
+    for rel in agents.pointer_files(ROOT):
+        f = ROOT / rel
+        if not f.exists() or "AGENTS.md" not in f.read_text(encoding="utf-8"):
+            problem(f"{rel} missing or not pointing at AGENTS.md", "run `aix install`")
+    for n, a in agents.AGENTS.items():
+        if n in chosen:
+            continue
+        left = [rel for rel in a["pointers"] if agents.is_aix_pointer(ROOT / rel)] + ([a["skills"]] if a["skills"] and (ROOT / a["skills"]).is_dir() else [])
+        if left:
+            problem(f"{n} is not selected but AIX files remain: {', '.join(left)}", "run `aix agents` (removes them) or select it")
 
 
 def check_links():
+    import agents
+    agents_dirs = agents.skill_dirs(ROOT)
     cat, off = sk.catalogue(), sk.disabled()
     for flat, info in cat.items():
         if flat in off:
             continue
-        missing = [t for t in inst.TARGETS if not (ROOT / t / flat / "SKILL.md").exists()]
+        missing = [t for t in agents_dirs if not (ROOT / t / flat / "SKILL.md").exists()]
         if missing:
             problem(f"skill {flat} not linked in {', '.join(missing)}", "run `aix install`")
-    for t in inst.TARGETS:
+    for t in agents_dirs:
         d = ROOT / t
         for p in d.iterdir() if d.is_dir() else []:
             if p.is_symlink() and not p.exists():
