@@ -11,8 +11,7 @@ from pathlib import Path
 
 KIT_ROOT = Path(__file__).resolve().parents[2]
 TARGETS = [".opencode/skills", ".claude/skills", ".github/skills", ".agents/skills", ".cursor/skills"]
-KIT_PAYLOAD = [  # AIX-DEVELOPMENT.md is intentionally NOT here (kit-development only)
-    ".aix", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "docs"]   # .aix = the kit (scripts, templates, meta-docs, skills, config); docs = the project's seed
+import payload  # THE list of what travels into a project (shared with upgrade, manifest, doctor)
 
 
 def flat_name(rel_parts):
@@ -64,19 +63,15 @@ def prune_dangling(project: Path):
 
 
 def kit_owned_files(project: Path):
-    """Files the kit owns inside a project: everything under .aix/ except config.yaml, skills/extern and the manifest."""
-    base = project / ".aix"
-    for f in base.rglob("*"):
-        rel = f.relative_to(base)
-        if f.is_file() and rel.parts[0] != "__pycache__" and "__pycache__" not in rel.parts and rel.as_posix() != "config.yaml" \
-                and not rel.as_posix().startswith("skills/extern/") and rel.as_posix() != "manifest.json":
-            yield f
+    """Files the kit owns inside a project: payload.py's `owned` items (never config.yaml, custom/, org/, extern downloads, index, manifest)."""
+    for rel in payload.files(project, payload.OWNED):
+        yield project / rel
 
 
 def write_manifest(project: Path):
     """.aix/manifest.json: sha256 of every kit-owned file, so doctor and upgrade can see local edits."""
     import hashlib, json
-    digest = {f.relative_to(project / ".aix").as_posix(): hashlib.sha256(f.read_bytes()).hexdigest() for f in kit_owned_files(project)}
+    digest = {f.relative_to(project).as_posix(): hashlib.sha256(f.read_bytes()).hexdigest() for f in kit_owned_files(project)}
     (project / ".aix" / "manifest.json").write_text(json.dumps({"files": digest}, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     return len(digest)
 
@@ -90,8 +85,9 @@ def modified_kit_files(project: Path):
     recorded = json.loads(m.read_text(encoding="utf-8")).get("files", {})
     out = []
     for f in kit_owned_files(project):
-        rel = f.relative_to(project / ".aix").as_posix()
-        if rel in recorded and hashlib.sha256(f.read_bytes()).hexdigest() != recorded[rel]:
+        rel = f.relative_to(project).as_posix()
+        key = rel if rel in recorded else rel[5:] if rel.startswith(".aix/") and rel[5:] in recorded else None  # manifests before 2.12.0 were .aix-relative
+        if key and hashlib.sha256(f.read_bytes()).hexdigest() != recorded[key]:
             out.append(rel)
     return sorted(out)
 
@@ -294,20 +290,28 @@ def replace_item(src: Path, dst: Path):
     elif bak.exists() or bak.is_symlink():
         bak.unlink()
     dst.rename(bak)
-    shutil.copytree(src, dst, ignore=PAYLOAD_IGNORE) if src.is_dir() else shutil.copy(src, dst)
+    copy_item(src, dst)
 
 
-PAYLOAD_IGNORE = shutil.ignore_patterns("custom", "org", "index.json", "__pycache__", "*.pyc")  # layers and per-machine files never travel as payload
+def copy_item(src: Path, dst: Path):
+    """Copy one payload item (file or folder) without the ignored parts (__pycache__, *.pyc)."""
+    if src.is_dir():
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*payload.IGNORED_PARTS, *("*" + s for s in payload.IGNORED_SUFFIXES)))
+    else:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(src, dst)
 
 
 def copy_kit_into(project: Path, on_collision: str = "ask"):
-    """Copy KIT_PAYLOAD into project. on_collision: ask | replace | skip | merge."""
+    """Copy payload.items() into project. on_collision: ask | replace | skip | merge."""
     project.mkdir(parents=True, exist_ok=True)
     remembered = {} if on_collision == "ask" else {"all": on_collision}
-    for item in KIT_PAYLOAD:
+    for item, _mode in payload.items(KIT_ROOT):
         src, dst = KIT_ROOT / item, project / item
+        if not src.exists():
+            continue
         if not dst.exists():
-            shutil.copytree(src, dst, ignore=PAYLOAD_IGNORE) if src.is_dir() else shutil.copy(src, dst)
+            copy_item(src, dst)
             print(f"  added: {item}")
             continue
         choice = ask_collision(item, src.is_dir(), remembered)

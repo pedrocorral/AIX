@@ -87,7 +87,7 @@ def check_kit_edits():
     if edited is None:
         return problem(".aix/manifest.json missing (cannot detect local edits of kit files)", "run `aix install`")
     for f in edited:
-        problem(f".aix/{f} was edited locally; the next `aix upgrade` overwrites it", "make the change in the kit repository (or a skill under .aix/skills/extern), then `aix upgrade`")
+        problem(f"{f} was edited locally; the next `aix upgrade` overwrites it", "make the change in the kit repository (or a skill under .aix/skills/extern), then `aix upgrade`")
 
 
 def check_layers():

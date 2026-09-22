@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.12.0 — 2026-09-22
+
+- One positive list of what the kit installs: `.aix/scripts/payload.py` (owned / merged / seeded). `aix install`, `aix upgrade`, the kit-file manifest and `aix doctor` read it; nothing is described by exclusion any more. Consequences: `.aix/skills/INDEX.md` is now upgraded (it was copied once and never refreshed); the manifest no longer hashes `.aix/org/`, `.aix/custom/` or `index.json`; a new kit folder or file cannot be forgotten by upgrade again (profiles in 2.8.3 and the registry in 2.11.0 were exactly that).
+- `aix install --from <relative path>` records the absolute path, so `aix upgrade` run from elsewhere finds it.
+- Fixed: an import cycle between extern.py and skills.py (2.11.0) — `aix code graph .aix/scripts --gate` passes again; `aix doctor` printed `.aix/.aix/...` for a locally edited kit file.
+
 ## 2.11.0 — 2026-09-11
 
 - Registry entries may carry `class`: `aix skills add NAME` then installs the download as an implementation of that kit class (front matter rewritten to the class name, `class:` and `id: "@owner/NAME"`), selects it in config `use:`, and the runtimes see it under the class folder instead of a second skill with overlapping triggers. `aix skills use CLASS default` returns to the kit's; `remove` drops the selection; `update` re-applies the rewrite. Documented in cli.md ("Registry skills and classes") and AIX-DEVELOPMENT §12.

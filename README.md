@@ -33,7 +33,7 @@ aix docs validate         # sanity-check IDs, links, indexes
 | Command | Does |
 |---|---|
 | `aix install [--into DIR] [--copy]` | Install skills into every agent runtime; `--into` first copies the kit into an existing project, asking per existing item: replace (old kept as `.bak`), skip, merge (add missing files only), all-variants, abort. `--replace-all` / `--skip-all` / `--merge-all` answer for you |
-| `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run: overwrites kit-owned paths (scripts, templates, meta-docs, built-in skills, launchers), merges AGENTS.md and .aix/config.yaml, never touches your docs, code or extern skills |
+| `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run. The same list `aix install` copies (`.aix/scripts/payload.py`) says what may change: owned paths are overwritten, AGENTS.md, GEMINI.md and .aix/config.yaml are merged, everything else (your docs, code, downloads, `.aix/custom/`) is never touched |
 | `aix code security [PATH...] [--gate] [--audit]` | Deterministic static security checks mapped to the VUL register and CWEs; findings to review, never proof; `--audit` writes the audit report the register needs as evidence |
 | `aix code stats [PATH...] [--metric ...]` | Terminal histogram of function sizes (or any style metric) scaled to the window, mean/sd/median/percentiles, share over the limit, and the largest functions, files and folders |
 | `aix code vulnerabilities [--taint] [--cve] [--history] [--audit]` | The deep security layer: Python taint paths from input to dangerous sinks, known CVEs for pinned dependencies (OSV, network), secrets in git history; evidence to review, `--audit` writes the report |

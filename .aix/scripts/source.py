@@ -49,6 +49,8 @@ def classify(folder: Path):
 def record(project: Path, source: str):
     cfg = project / ".aix" / "config.yaml"
     text = cfg.read_text(encoding="utf-8")
+    if Path(source).expanduser().exists():
+        source = str(Path(source).expanduser().resolve())  # a relative path would break `aix upgrade` run from elsewhere
     line = f"source: {source}   # organisation layer origin (aix install --from); refreshed by aix upgrade"
     text = re.sub(r"^source:.*$", line, text, count=1, flags=re.M) if re.search(r"^source:", text, re.M) else text.rstrip("\n") + "\n" + line + "\n"
     cfg.write_text(text, encoding="utf-8")

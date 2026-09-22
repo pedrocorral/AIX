@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """aix upgrade — bring a project's copy of the kit up to this kit checkout, without touching the project's own work.
 
-Ownership decides what happens to each path:
-  kit-owned   (overwritten, removed if gone from the kit): .aix/scripts, .aix/templates, .aix/meta-docs, .aix/bin, .aix/instructions, .aix/profiles,
-              .aix/skills/<every category except extern>, .aix/skills/extern/registry.json, CLAUDE.md
-  project-own (never touched): docs/requirements, tests, security, conflicts, operations, road-map, .aix/skills/extern,
-              runtime folders, code
-  merged:     AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
-              .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source lines and style: block)
+What may change is decided by payload.py, the same list `aix install` copies (nothing else is ever touched):
+  owned   overwritten, removed if gone from the kit (scripts, bin, templates, meta-docs, instructions, profiles,
+          skill categories, skills/INDEX.md, skills/extern/registry.json, CLAUDE.md)
+  merged  AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
+          .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source lines and style: block)
+  seeded  docs/ (never touched)
+  Unlisted, therefore never touched: docs, .aix/custom, .aix/org, .aix/skills/extern downloads, runtime folders, code.
   1.x layout  a root framework.yaml: kit-owned folders are moved under .aix/ first (migrate_layout)
 Runs from the KIT's scripts (not the project's), so it always carries the newest logic."""
 import filecmp, re, shutil, subprocess, sys
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[2]
-KIT_OWNED_DIRS = [".aix/scripts", ".aix/templates", ".aix/meta-docs", ".aix/bin", ".aix/instructions", ".aix/profiles"]
-KIT_OWNED_FILES = ["CLAUDE.md", ".aix/skills/extern/registry.json"]   # the registry is kit text; downloads next to it stay the project's
-MERGED_FILES = ["AGENTS.md", "GEMINI.md", ".aix/config.yaml"]  # GEMINI.md carries the always-on section like AGENTS.md
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import payload
+MERGED_FILES = payload.merged_paths(KIT)
+PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "style")  # config.yaml lines the project owns
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
               "framework.yaml": ".aix/config.yaml"}
 OLD_TEXT = [("docs/meta-docs/", ".aix/meta-docs/"), ("`skills/INDEX.md`", "`.aix/skills/INDEX.md`"), ("`skills/`", "`.aix/skills/`"),
@@ -30,21 +31,11 @@ def version_of(root: Path) -> str:
     return m.group(1) if m else "?"
 
 
-def skill_categories(root: Path):
-    d = root / ".aix" / "skills"
-    return [p.name for p in d.iterdir() if p.is_dir() and p.name != "extern"] if d.is_dir() else []
-
-
-def kit_owned_paths():
-    """Directories (kit-relative) that the kit owns outright inside a project."""
-    return KIT_OWNED_DIRS + [f".aix/skills/{c}" for c in skill_categories(KIT)]
-
-
 def diff_dir(src: Path, dst: Path):
     """Return (added, updated, removed) file lists comparing kit dir `src` with project dir `dst`."""
     added, updated, removed = [], [], []
-    src_files = {p.relative_to(src) for p in src.rglob("*") if p.is_file() and "__pycache__" not in p.parts}
-    dst_files = {p.relative_to(dst) for p in dst.rglob("*") if p.is_file() and "__pycache__" not in p.parts} if dst.exists() else set()
+    src_files = {p.relative_to(src) for p in src.rglob("*") if p.is_file() and payload.is_payload_file(p.relative_to(src))}
+    dst_files = {p.relative_to(dst) for p in dst.rglob("*") if p.is_file() and payload.is_payload_file(p.relative_to(dst))} if dst.exists() else set()
     for rel in sorted(src_files - dst_files):
         added.append(rel)
     for rel in sorted(src_files & dst_files):
@@ -58,13 +49,13 @@ def diff_dir(src: Path, dst: Path):
 def plan(project: Path):
     """Everything the upgrade would do, as (label, action, path) rows."""
     rows = []
-    for d in kit_owned_paths():
-        a, u, r = diff_dir(KIT / d, project / d)
-        rows += [(d, "add", x) for x in a] + [(d, "update", x) for x in u] + [(d, "remove", x) for x in r]
-    for f in KIT_OWNED_FILES:
-        src, dst = KIT / f, project / f
-        if src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
-            rows.append((".", "update" if dst.exists() else "add", Path(f)))
+    for d in payload.owned_paths(KIT):
+        src, dst = KIT / d, project / d
+        if src.is_dir():
+            a, u, r = diff_dir(src, dst)
+            rows += [(d, "add", x) for x in a] + [(d, "update", x) for x in u] + [(d, "remove", x) for x in r]
+        elif src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
+            rows.append((".", "update" if dst.exists() else "add", Path(d)))
     for f in MERGED_FILES:
         current = (project / f).read_text(encoding="utf-8") if (project / f).exists() else None
         if merged_text(project, f) != current:
@@ -94,13 +85,12 @@ def merged_text(project: Path, name) -> str:
         return out
     out = kit_text  # config.yaml: kit text, but the project's disabled_skills line and style: block win
     proj_text = proj_text.replace("aix/stacks/", "aix/frameworks/")  # 2.8.3 renamed the kit's framework standards
-    for key in ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source"):
-        m = re.search(rf"^{key}:.*$", proj_text, re.M)
+    for key in PROJECT_KEYS:  # a key and, for maps such as use: and style:, its indented body
+        pat = rf"^{key}:.*\n(?:[ \t]+\S.*\n?)*"
+        m = re.search(pat, proj_text, re.M)
         if m:
-            out = re.sub(rf"^{key}:.*$", lambda _: m.group(0), out, count=1, flags=re.M) if re.search(rf"^{key}:", out, re.M) else out.rstrip("\n") + "\n" + m.group(0) + "\n"
-    s = re.search(r"^style:\s*\n((?:[ \t]+\S.*\n?)+)", proj_text, re.M)
-    if s:
-        out = re.sub(r"^style:\s*\n((?:[ \t]+\S.*\n?)+)", lambda _: s.group(0), out, count=1, flags=re.M) if re.search(r"^style:", out, re.M) else out.rstrip("\n") + "\n" + s.group(0)
+            block = m.group(0) if m.group(0).endswith("\n") else m.group(0) + "\n"
+            out = re.sub(pat, lambda _: block, out, count=1, flags=re.M) if re.search(rf"^{key}:", out, re.M) else out.rstrip("\n") + "\n" + block
     return out
 
 
@@ -156,7 +146,7 @@ def describe(project: Path, d: str, action: str, rel: Path, edited=()) -> str:
     """One verbose line for the dry run: what happens to this file and how big the change is."""
     src, dst = KIT / d / rel, project / d / rel
     shown = f"{d}/{rel}" if d != "." else str(rel)
-    warn = "  !! LOCAL EDIT WILL BE LOST (move the change to the kit)" if shown.startswith(".aix/") and shown[5:] in edited else ""
+    warn = "  !! LOCAL EDIT WILL BE LOST (move the change to the kit)" if shown in edited else ""
     if warn and action == "update":
         return f"  update  {shown}  ({line_delta(src, dst)}){warn}"
     if action == "add":

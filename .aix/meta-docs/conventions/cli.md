@@ -113,10 +113,19 @@ reports a section that no block produced. Kit instructions marked `optional: tru
 `aix/frameworks/fastapi-backend`, `react-frontend`, `kedro-pipelines`) apply only when a profile or `instructions:`
 in config names them; the kit ships the profiles `fastapi-react` and `kedro` for that.
 
-## Ownership (what `aix upgrade` may overwrite)
-| Kit-owned (overwritten on upgrade) | Project-owned (never touched) | Merged |
-|---|---|---|
-| `.aix/scripts/`, `aix`, `aix.cmd`, `.aix/templates/`, `.aix/meta-docs/`, `.aix/skills/<built-in categories>/`, `CLAUDE.md` | `docs/requirements tests security conflicts operations road-map`, `.aix/skills/extern/`, runtime folders, your code | `AGENTS.md`, `GEMINI.md` (project keeps `## Always-on skills`, `## Project notes`), `.aix/config.yaml` (`disabled_skills`) |
+## Ownership (what `aix install` copies and `aix upgrade` may change)
+One list, `.aix/scripts/payload.py`, says what the kit puts into a project; `aix install`, `aix upgrade`, the kit-file
+manifest and `aix doctor` all read it. It names what travels, never what stays: anything unlisted (the kit's `tests/`,
+`examples/`, `AIX-DEVELOPMENT.md`, `CHANGELOG.md`, `.aix/custom/`, `.aix/org/`, `.aix/index.json`, `.aix/manifest.json`)
+never leaves the kit checkout and is never touched by an upgrade.
+
+| Mode | Paths | On install | On upgrade |
+|---|---|---|---|
+| owned | `.aix/bin scripts templates meta-docs instructions profiles`, `.aix/skills/<category>/`, `.aix/skills/INDEX.md`, `.aix/skills/extern/registry.json`, `CLAUDE.md` | copied; hashed in `.aix/manifest.json` | overwritten, removed if gone from the kit; a local edit is reported by `aix doctor` and marked in the plan first |
+| merged | `AGENTS.md`, `GEMINI.md`, `.aix/config.yaml` | copied | kit text plus the project's parts: `## Always-on skills`, `## Project notes`, the managed sections; `disabled_skills`, `instructions`, `disabled_instructions`, `profile`, `use`, `source`, `style:` |
+| seeded | `docs/` | copied when absent | never touched |
+
+Not in the list, therefore the project's: `.aix/skills/extern/<downloads>`, `.aix/custom/`, `.aix/org/` (refreshed from `source:` by upgrade, not from the kit), runtime folders, your code.
 Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.
 
 ## Rules for agents

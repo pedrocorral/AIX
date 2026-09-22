@@ -105,3 +105,21 @@ def unlink_everywhere(flat):
             shutil.rmtree(p)
 
 
+def set_use(flat, iid):
+    """Write (iid) or drop (iid=None) the `use:` entry of one class in .aix/config.yaml."""
+    import re
+    cfg = ROOT / ".aix" / "config.yaml"
+    text = cfg.read_text(encoding="utf-8")
+    m = re.search(r"^use:[^\n]*\n((?:[ \t]+\S[^\n]*\n?)*)", text, re.M)
+    entries = {}
+    if m:
+        for line in m.group(1).splitlines():
+            k, _, v = line.strip().partition(":")
+            if k and v.strip():
+                entries[k.strip()] = v.split("#")[0].strip().strip("'\"")
+    entries = {k: v for k, v in entries.items() if k.replace("/", "-") != flat}
+    if iid:
+        entries[flat] = iid
+    block = "" if not entries else "use:   # skill implementation per class, managed by `aix skills use`\n" + "".join(f"  {k}: \"{v}\"\n" for k, v in sorted(entries.items()))
+    text = text[:m.start()] + block + text[m.end():] if m else (text.rstrip("\n") + "\n" + block if block else text)
+    cfg.write_text(text, encoding="utf-8")

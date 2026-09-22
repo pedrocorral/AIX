@@ -53,7 +53,8 @@ AIX/
 │   ├── doctor.py            # `aix doctor`: installation health checks with fixes
 │   ├── extern.py            # third-party skills: registry.json, tarball fetch into .aix/skills/extern/<name>, always-on sections in AGENTS.md + pointers
 │   ├── security.py          # `aix docs security`: register state, evidence check, release gate
-│   ├── upgrade.py           # `aix upgrade`: ownership-based update of a project's kit files (runs from the kit, not the project)
+│   ├── upgrade.py           # `aix upgrade`: updates a project's kit files per payload.py (runs from the kit, not the project)
+│   ├── payload.py           # leaf: THE list of what travels into a project (owned / merged / seeded); install, upgrade, manifest, doctor read it
 │   ├── catalog.py           # leaf: skill catalogue data (used by skills.py, extern.py, doctor.py)
 │   ├── project.py           # leaf: find_project (used by aix.py, upgrade.py)
 │   ├── runtime.py           # leaf: detect target runtimes (Python/JS/Rust/Java) and where they are declared
@@ -179,7 +180,7 @@ Built 2026-09-04/05 in a chat session, then compared against two alternative des
 - Edit `.aix/skills/` only; never the installed copies. After editing skills or templates run `aix install` (idempotent) and `aix docs validate` (must be 0 errors; investigate warnings).
 - Skill `name:` must equal `<category>-<folder>`; keep descriptions ≤ ~30 words with trigger phrases; bodies: *When NOT / Inputs / Procedure / Outputs / Hand-off* + reading budget; no duplication of meta-docs (link instead).
 - Docs: front-matter per `.aix/meta-docs/conventions/document-format.md`; every new file gets an INDEX row; ≤300 lines; stable H2 names.
-- Never reference this file from `AGENTS.md`, INDEXes or skills. Keep `KIT_PAYLOAD` in `.aix/scripts/install_skills.py` free of it.
+- Never reference this file from `AGENTS.md`, INDEXes or skills. Keep it out of `.aix/scripts/payload.py`, the one list of what `aix install` copies and `aix upgrade` may change (owned / merged / seeded; anything unlisted never travels).
 - Bump `.aix/config.yaml` version and add a `CHANGELOG.md` entry per change set.
 - Instruction switch: `aix instructions enable aix/frameworks/kedro-pipelines` renders `.github/instructions/aix-frameworks-kedro-pipelines.instructions.md`; `aix instructions disable aix/agents/output` removes the `## Output` section of AGENTS.md; `aix doctor` stays healthy after both.
 - Organisation smoke test: `aix install --into /tmp/x --from examples/acme && cd /tmp/x && aix profile use web-app && aix doctor && aix docs validate`.
