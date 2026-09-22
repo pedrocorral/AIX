@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.13.0 — 2026-09-22
+
+- Layers `.aix/org/` and `.aix/custom/` share one rule (payload mode `layer`): copied at install when the origin has the folder, replaced at upgrade when it has it, left alone when it does not. The origin is the kit checkout that runs or `--from SRC`; `--from-org SRC` / `--from-custom SRC` (install and upgrade) take one layer from elsewhere, recorded as `source_org:` / `source_custom:`. An organisation now fills `.aix/org/` in its fork, same name as in projects (it was `.aix/custom/` in the fork, renamed on the way, which nobody could remember). Team feedback, 2026-09-22: edits to the fork's `org/` never reached projects.
+
+- `aix code find [--list | --yes]`: finds the folders that hold code (top-level folders with source files, the root itself when files sit there; files per language and project marker shown) and sets `paths.code_roots` in `.aix/config.yaml` through a checklist TUI (curses; plain prompts without it). Configured roots absent on disk are dropped. `aix install --into DIR` runs it at the end in a terminal, prints the list otherwise. `aix upgrade` keeps `code_roots`. Team feedback, 2026-09-22: a folder holding three projects scanned nothing.
+- The code tools (`aix code graph|complexity|dead|clones|style|stats|security|vulnerabilities`) take their default folders from `paths.code_roots` in `.aix/config.yaml` (they ignored it) and, when none of those folders exists, scan the whole project instead of reporting no source files. Hidden folders, `docs/`, dependency and build folders are skipped. Team feedback, 2026-09-22.
+
 ## 2.12.0 — 2026-09-22
 
 - One positive list of what the kit installs: `.aix/scripts/payload.py` (owned / merged / seeded). `aix install`, `aix upgrade`, the kit-file manifest and `aix doctor` read it; nothing is described by exclusion any more. Consequences: `.aix/skills/INDEX.md` is now upgraded (it was copied once and never refreshed); the manifest no longer hashes `.aix/org/`, `.aix/custom/` or `index.json`; a new kit folder or file cannot be forgotten by upgrade again (profiles in 2.8.3 and the registry in 2.11.0 were exactly that).

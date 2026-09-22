@@ -206,15 +206,17 @@ Every layer is optional. Precedence, later wins:
 | Layer | Where | Who owns it | Committed? |
 |---|---|---|---|
 | kit | `.aix/` | the kit (upstream, vendored) | yes, kit-owned (manifest) |
-| organisation | `.aix/custom/` **in the kit repository an organisation installs from**; arrives in projects as `.aix/org/` | the organisation | yes, in the org's kit repo; refreshed in projects by `aix upgrade` |
+| organisation | `.aix/org/` in the fork an organisation installs from, and `.aix/org/` in every project (same name everywhere; 2.13.0, was `custom/` in the fork) | the organisation | yes, in the org's kit repo; refreshed in projects by `aix upgrade` |
 | person | `~/.config/aix/` | the developer | never |
 | project | `.aix/custom/` in the project | the project | yes, with the project |
 
 Rules:
-- Upstream `pedrocorral/AIX` keeps `.aix/custom/` empty. An organisation = a copy of the kit with a filled `custom/`;
-  `aix upgrade` there refreshes `.aix/` and leaves `custom/` alone; `aix doctor` flags overrides whose upstream file
-  changed. Projects install with `aix install --into DIR --from <git url | path>`; the source is recorded in
-  `config.yaml` so `aix upgrade` follows the organisation from then on.
+- Upstream `pedrocorral/AIX` keeps `.aix/org/` and `.aix/custom/` empty. An organisation = a fork with a filled
+  `.aix/org/`. Both layers follow one rule (payload.py mode `layer`): copied at install when the origin has the folder,
+  replaced at upgrade when it has it, left alone when it does not. Origin = the kit checkout that runs, or `--from SRC`;
+  `--from-org SRC` / `--from-custom SRC` (install and upgrade) take one layer from elsewhere, recorded as
+  `source_org:` / `source_custom:`. A colleague editing the fork's `.aix/org/` therefore reaches every project at its
+  next `aix upgrade` run from that fork.
 - The person layer may only touch uncommitted places: the runtime link folders (git-ignored), the user-level
   instruction files the runtimes already read (`~/.claude/CLAUDE.md`, `~/.gemini/GEMINI.md`, ...), and the limits of
   a hand-run session. It applies inside the kit checkout too (harmless by construction). Reproducible checks

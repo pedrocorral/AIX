@@ -5,9 +5,10 @@ What may change is decided by payload.py, the same list `aix install` copies (no
   owned   overwritten, removed if gone from the kit (scripts, bin, templates, meta-docs, instructions, profiles,
           skill categories, skills/INDEX.md, skills/extern/registry.json, CLAUDE.md)
   merged  AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
-          .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source lines and style: block)
+          .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source, paths.code_roots lines and style: block)
   seeded  docs/ (never touched)
-  Unlisted, therefore never touched: docs, .aix/custom, .aix/org, .aix/skills/extern downloads, runtime folders, code.
+  layer   .aix/org/, .aix/custom/: replaced when the origin (or --from-org / --from-custom SRC) has the folder, else left
+  Unlisted, therefore never touched: .aix/skills/extern downloads, runtime folders, code.
   1.x layout  a root framework.yaml: kit-owned folders are moved under .aix/ first (migrate_layout)
 Runs from the KIT's scripts (not the project's), so it always carries the newest logic."""
 import filecmp, re, shutil, subprocess, sys
@@ -17,7 +18,7 @@ KIT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import payload
 MERGED_FILES = payload.merged_paths(KIT)
-PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "style")  # config.yaml lines the project owns
+PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom", "style")  # config.yaml lines the project owns
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
               "framework.yaml": ".aix/config.yaml"}
 OLD_TEXT = [("docs/meta-docs/", ".aix/meta-docs/"), ("`skills/INDEX.md`", "`.aix/skills/INDEX.md`"), ("`skills/`", "`.aix/skills/`"),
@@ -91,6 +92,9 @@ def merged_text(project: Path, name) -> str:
         if m:
             block = m.group(0) if m.group(0).endswith("\n") else m.group(0) + "\n"
             out = re.sub(pat, lambda _: block, out, count=1, flags=re.M) if re.search(rf"^{key}:", out, re.M) else out.rstrip("\n") + "\n" + block
+    m = re.search(r"^[ \t]+code_roots:.*$", proj_text, re.M)  # nested under paths:, set by `aix code find`
+    if m:
+        out = re.sub(r"^[ \t]+code_roots:.*$", lambda _: m.group(0), out, count=1, flags=re.M)
     return out
 
 
@@ -201,22 +205,33 @@ def migrate_layout(project: Path, dry: bool):
 
 
 def main(args):
+    global KIT
     yes, dry = "--yes" in args, "--dry-run" in args
     args = [a for a in args if a not in ("--yes", "--dry-run")]
+    layer_src = {}
+    for layer in ("org", "custom"):
+        flag = f"--from-{layer}"
+        if flag in args:
+            i = args.index(flag)
+            if i + 1 >= len(args) or args[i + 1].startswith("-"):
+                sys.exit(f"aix upgrade {flag} SOURCE needs a source")
+            layer_src[layer] = args[i + 1]; del args[i:i + 2]
     from project import find_project
     project = Path(args[0]).resolve() if args else find_project(Path.cwd())
     if project is None or not ((project / ".aix" / "config.yaml").exists() or (project / "framework.yaml").exists()):
         sys.exit("aix upgrade: no project found (nearest .aix/config.yaml, or a 1.x framework.yaml); pass the project path")
     import source as srcmod
     src = srcmod.configured(project)
+    origin = KIT
     if src:
-        kind, payload_root, org_layer = srcmod.classify(srcmod.fetch(src, refresh=not dry))
-        global KIT
+        kind, payload_root, bare = srcmod.classify(srcmod.fetch(src, refresh=not dry))
         if kind == "kit":
-            KIT = payload_root
-        print(f"  source: {src} ({kind}{', organisation layer refreshed' if org_layer and not dry else ''})")
-        if org_layer and not dry:
-            srcmod.install_org(project, org_layer)
+            KIT = origin = payload_root
+        else:
+            layer_src.setdefault("org", None)
+            layer_src["org"] = layer_src["org"] or src
+        print(f"  origin: {src} ({kind})")
+    srcmod.install_layers(project, srcmod.resolve_layers(origin, srcmod.layer_sources(project, layer_src), refresh=not dry), dry=dry)
     if old_layout(project):
         if not dry and not yes and not confirm("  Migrate this project's kit files into .aix/ (2.0 layout)? [y/N] "):
             sys.exit("aborted")

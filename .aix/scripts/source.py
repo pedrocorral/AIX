@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Leaf: resolve where a project's kit comes from (`aix install --from`, `source:` in config.yaml).
 
-A source is a path or a git URL. It is either a KIT CHECKOUT (has `.aix/`): its `.aix/` is the payload and its
-`.aix/custom/` is the organisation layer; or a bare LAYER FOLDER (has `skills/`, `instructions/`, `profiles/` or
-`templates/` at its top): the payload comes from the running kit and the folder is the organisation layer.
+A source is a path or a git URL. `--from SRC` names the ORIGIN: a kit checkout (has `.aix/`) whose `.aix/` is the
+payload and whose `.aix/org/` and `.aix/custom/` are the layers; or a bare LAYER FOLDER (has `skills/`,
+`instructions/`, `profiles/` or `templates/` at its top), taken as the org layer with the payload from the running kit.
+`--from-org SRC` / `--from-custom SRC` point one layer elsewhere (a kit checkout's `.aix/<layer>/` or a bare folder).
+Both layers follow one rule: copied on install when the source has the folder, replaced on upgrade when it has it,
+left alone when it does not. Sources are recorded in config.yaml (`source:`, `source_org:`, `source_custom:`).
 Git URLs are cloned shallow into ~/.cache/aix/sources/<slug> and refreshed with `git pull` on upgrade."""
 import os, re, subprocess
 from pathlib import Path
@@ -36,36 +39,91 @@ def fetch(source: str, refresh: bool = False) -> Path:
     return dest
 
 
+def is_kit(folder: Path) -> bool:
+    return (folder / ".aix" / "config.yaml").exists()
+
+
+def is_layer(folder: Path) -> bool:
+    return any((folder / d).is_dir() for d in LAYER_DIRS) or (folder / "AGENTS.md").exists()
+
+
 def classify(folder: Path):
     """('kit', payload_root, org_layer_or_None) | ('layer', None, folder)"""
-    if (folder / ".aix" / "config.yaml").exists():
-        custom = folder / ".aix" / "custom"
-        return "kit", folder, (custom if custom.is_dir() and any(custom.iterdir()) else None)
-    if any((folder / d).is_dir() for d in LAYER_DIRS) or (folder / "AGENTS.md").exists():
+    if is_kit(folder):
+        return "kit", folder, filled(folder / ".aix" / "org")
+    if is_layer(folder):
         return "layer", None, folder
     raise SystemExit(f"aix: {folder} is neither a kit checkout (.aix/) nor a customisation layer (skills/, instructions/, profiles/, templates/)")
 
 
-def record(project: Path, source: str):
+def filled(folder: Path):
+    """The folder when it holds at least one file, else None."""
+    return folder if folder.is_dir() and any(p.is_file() for p in folder.rglob("*")) else None
+
+
+def layer_folder(src_folder: Path, layer: str):
+    """Where a source keeps the given layer: <kit>/.aix/<layer>/ for a kit checkout, the folder itself when bare."""
+    return filled(src_folder / ".aix" / layer) if is_kit(src_folder) else filled(src_folder)
+
+
+def resolve_layers(origin_kit: Path, sources: dict, refresh: bool = False):
+    """{layer: (source label or None, folder or None)} for org and custom: an explicit source per layer wins, else the
+    origin's own .aix/<layer>/. A bare --from layer folder counts as the org source."""
+    out = {}
+    for layer in ("org", "custom"):
+        src = sources.get(layer)
+        if src:
+            out[layer] = (src, layer_folder(fetch(src, refresh), layer))
+        else:
+            out[layer] = (None, filled(origin_kit / ".aix" / layer))
+    return out
+
+
+def install_layers(project: Path, resolved: dict, dry: bool = False):
+    """Apply resolve_layers(): replace each layer the source has; say what happened."""
+    for layer, (src, folder) in resolved.items():
+        if folder is None:
+            continue
+        if not dry:
+            install_layer(project, layer, folder)
+        print(f"  layer {layer}: {'from ' + src if src else 'from the origin'} -> .aix/{layer}/" + (" (dry run)" if dry else ""))
+
+
+def record(project: Path, source: str, key: str = "source"):
+    """Write `source:` (the origin, --from), `source_org:` or `source_custom:` (--from-org / --from-custom) into config.yaml."""
     cfg = project / ".aix" / "config.yaml"
     text = cfg.read_text(encoding="utf-8")
     if Path(source).expanduser().exists():
         source = str(Path(source).expanduser().resolve())  # a relative path would break `aix upgrade` run from elsewhere
-    line = f"source: {source}   # organisation layer origin (aix install --from); refreshed by aix upgrade"
-    text = re.sub(r"^source:.*$", line, text, count=1, flags=re.M) if re.search(r"^source:", text, re.M) else text.rstrip("\n") + "\n" + line + "\n"
+    what = {"source": "origin of the kit and its layers (aix install --from)", "source_org": "where .aix/org/ comes from (--from-org)",
+            "source_custom": "where .aix/custom/ comes from (--from-custom)"}[key]
+    line = f"{key}: {source}   # {what}; followed by aix upgrade"
+    text = re.sub(rf"^{key}:.*$", line, text, count=1, flags=re.M) if re.search(rf"^{key}:", text, re.M) else text.rstrip("\n") + "\n" + line + "\n"
     cfg.write_text(text, encoding="utf-8")
 
 
-def configured(project: Path):
-    m = re.search(r"^source:\s*(\S+)", (project / ".aix" / "config.yaml").read_text(encoding="utf-8"), re.M) if (project / ".aix" / "config.yaml").exists() else None
+def configured(project: Path, key: str = "source"):
+    cfg = project / ".aix" / "config.yaml"
+    m = re.search(rf"^{key}:\s*(\S+)", cfg.read_text(encoding="utf-8"), re.M) if cfg.exists() else None
     return m.group(1) if m else None
 
 
-def install_org(project: Path, layer: Path):
-    """Replace the project's .aix/org/ with the organisation layer (kit-owned from the project's point of view)."""
+def layer_sources(project: Path, overrides: dict = None):
+    """{layer: source} from --from-org / --from-custom (recorded) or config.yaml source_org / source_custom."""
+    out = {}
+    for layer in ("org", "custom"):
+        src = (overrides or {}).get(layer)
+        if src:
+            record(project, src, f"source_{layer}")
+        out[layer] = src or configured(project, f"source_{layer}")
+    return out
+
+
+def install_layer(project: Path, layer: str, folder: Path):
+    """Replace the project's .aix/<layer>/ with the source's folder."""
     import shutil
-    dst = project / ".aix" / "org"
+    dst = project / ".aix" / layer
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(layer, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+    shutil.copytree(folder, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
     return dst

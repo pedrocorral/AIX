@@ -17,10 +17,11 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 | Command | Does | When an agent uses it |
 |---|---|---|
 | `aix install [--copy]` | Link every enabled skill into `.opencode/ .claude/ .github/ .agents/ .cursor/` skills dirs; write pointer files and `STATE.md` if missing; prune dangling links | After adding, removing or editing skills |
-| `aix install --into DIR --from SOURCE` | Install from an organisation: SOURCE is a path or git URL to the organisation's kit checkout (its `.aix/` is the payload, its `.aix/custom/` becomes `.aix/org/`) or to a bare layer folder (`skills/`, `instructions/`, `profiles/`, `templates/`). Recorded as `source:`; `aix upgrade` refreshes `.aix/org/` from it | Every project of an organisation |
+| `aix install --into DIR --from SOURCE` | Install from an origin: a path or git URL to an organisation's kit checkout (its `.aix/` is the payload, its `.aix/org/` and `.aix/custom/` the layers) or a bare layer folder (org layer only); `--from-org SRC` / `--from-custom SRC` take one layer from elsewhere; all recorded in config and followed by `aix upgrade` | Joining an organisation |
 | `aix install --into DIR` | Copy the kit into an existing project, asking per existing item ([r]eplace keeps `.bak`, [s]kip, [m]erge adds missing files only, R/S/M for all, [a]bort); `--replace-all` / `--skip-all` / `--merge-all` when no terminal | Bootstrapping a project |
 | `aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]` | Deterministic static checks mapped to VUL rows and CWEs (injection, shell/eval, deserialisation, secrets, TLS, debug, weak hashes/randomness, JWT/cookies, XSS/CSRF/CORS, logs, prompt injection, Dockerfile, dependencies). Findings to review, never proof; inline `aix: accepted VUL-…` records accepted risk; `--audit` writes `docs/security/audits/AUDIT-<date>-code.md`, the evidence the register needs | Before the security-audit-* skills; closing any task with attack surface; CI |
 | `aix code stats [PATH...] [--metric lines\|cognitive\|cyclomatic\|nesting\|params] [--report]` | Distribution of function sizes as a terminal histogram with fixed comparable bins, mean/sd/median/p90/p95/max, share over the limit, the largest functions and the files/folders pushing most over the limit | Design reviews; before and after a refactor; comparing projects |
+| `aix code find [--list \| --yes]` | Folders that hold code -> `paths.code_roots` in `.aix/config.yaml`, the default scope of every `aix code` command; checklist TUI; run by `aix install` too | A project whose code is not under backend/frontend/src |
 | `aix code vulnerabilities [PATH...] [--taint] [--cve] [--history] [--commits N] [--strict] [--gate] [--audit] [--report] [--selftest]` | Deep checks: Python taint paths (input sources → sinks, one call deep, per file, sanitisers respected), known CVEs for pinned dependencies via OSV (network), secrets in git history. Findings name VUL row and CWE; `--audit` writes `docs/security/audits/AUDIT-<date>-vulnerabilities.md` | After `aix code security`; before the security-audit-* skills; release |
 | `aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]` | Readability per function against `.aix/config.yaml` limits (cognitive 15, cyclomatic 10, nesting 4, params 5, lines 60): ranked table for a folder/file, full card with line-numbered findings for `file:func` / `file::Class.method`; names, docstrings, magic numbers as advice. Evidence in `conventions/readability.md` | Reviewing or writing any function; CI |
 | `aix docs validate` | Doc integrity: front-matter, INDEX completeness, IDs exist, links resolve, TS → FR, VUL statuses, field dictionary, **status drift** (`implemented`/`automated`/`mitigated` claimed without the matching code marker). Exit 1 on errors | Closing any task; pre-commit / CI |
@@ -116,7 +117,7 @@ in config names them; the kit ships the profiles `fastapi-react` and `kedro` for
 ## Ownership (what `aix install` copies and `aix upgrade` may change)
 One list, `.aix/scripts/payload.py`, says what the kit puts into a project; `aix install`, `aix upgrade`, the kit-file
 manifest and `aix doctor` all read it. It names what travels, never what stays: anything unlisted (the kit's `tests/`,
-`examples/`, `AIX-DEVELOPMENT.md`, `CHANGELOG.md`, `.aix/custom/`, `.aix/org/`, `.aix/index.json`, `.aix/manifest.json`)
+`examples/`, `AIX-DEVELOPMENT.md`, `CHANGELOG.md`, `.aix/index.json`, `.aix/manifest.json`)
 never leaves the kit checkout and is never touched by an upgrade.
 
 | Mode | Paths | On install | On upgrade |
@@ -124,8 +125,9 @@ never leaves the kit checkout and is never touched by an upgrade.
 | owned | `.aix/bin scripts templates meta-docs instructions profiles`, `.aix/skills/<category>/`, `.aix/skills/INDEX.md`, `.aix/skills/extern/registry.json`, `CLAUDE.md` | copied; hashed in `.aix/manifest.json` | overwritten, removed if gone from the kit; a local edit is reported by `aix doctor` and marked in the plan first |
 | merged | `AGENTS.md`, `GEMINI.md`, `.aix/config.yaml` | copied | kit text plus the project's parts: `## Always-on skills`, `## Project notes`, the managed sections; `disabled_skills`, `instructions`, `disabled_instructions`, `profile`, `use`, `source`, `style:` |
 | seeded | `docs/` | copied when absent | never touched |
+| layer | `.aix/org/`, `.aix/custom/` | copied when the origin has the folder | replaced when the origin (or `--from-org SRC` / `--from-custom SRC`, recorded as `source_org:` / `source_custom:`) has it, left alone when it does not |
 
-Not in the list, therefore the project's: `.aix/skills/extern/<downloads>`, `.aix/custom/`, `.aix/org/` (refreshed from `source:` by upgrade, not from the kit), runtime folders, your code.
+Not in the list, therefore the project's: `.aix/skills/extern/<downloads>`, runtime folders, your code.
 Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.
 
 ## Rules for agents

@@ -18,5 +18,6 @@ cd my-app && aix profile use web-app        # or data-pipelines
   `Compliance (ACME)` section to AGENTS.md.
 - Documentation templates under `templates/project-docs/`.
 
-A real organisation forks the kit repository and fills `.aix/custom/` with the same shape; upstream releases arrive
-by a normal git merge (upstream's `custom/` is empty), and projects install with `--from` the fork's URL.
+A real organisation forks the kit repository and fills `.aix/org/` with the same shape; upstream releases arrive
+by a normal git merge (upstream's `org/` is empty), and projects install with `--from` the fork's URL. The fork's
+`.aix/custom/`, if any, travels the same way.

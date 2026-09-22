@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import ROOT, CODE_ROOTS, SKIP, rel, source_files, iter_functions
+from graph import ROOT, CODE_ROOTS, default_roots, SKIP, rel, source_files, iter_functions
 from codesecurity import RULES, SKIP_FILE, MARKER_LINES, is_test, register_rows
 
 REQUEST_ATTRS = {"args", "form", "json", "values", "data", "files", "GET", "POST", "query_params", "path_params",
@@ -475,7 +475,7 @@ def main(args):
     if "--commits" in args:
         i = args.index("--commits"); commits = int(args[i + 1]); del args[i:i + 2]
     strict, gate, audit, report = "--strict" in args, "--gate" in args, "--audit" in args, "--report" in args
-    paths = [a for a in args if not a.startswith("--")] or [r for r in CODE_ROOTS if (ROOT / r).exists()] or ["."]
+    paths = [a for a in args if not a.startswith("--")] or default_roots()
     sections, unreachable = [], False
     if "--taint" in modes:
         sections.append(("taint paths (Python)", taint(paths), "input sources followed to sinks, one call deep, per file"))

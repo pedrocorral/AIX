@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import ROOT, CODE_ROOTS, SKIP, rel
+from graph import ROOT, CODE_ROOTS, default_roots, SKIP, rel
 
 TEXT_EXT = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".rs", ".java", ".kt", ".yml", ".yaml", ".json", ".toml", ".env",
             ".ini", ".cfg", ".conf", ".txt", ".html", ".jinja", ".jinja2", ".j2", ".sh", ".properties", ".xml", ".tf"}
@@ -397,7 +397,7 @@ def main(args):
     if "--selftest" in args:
         return selftest()
     strict, gate, audit, report = "--strict" in args, "--gate" in args, "--audit" in args, "--report" in args
-    paths = [a for a in args if not a.startswith("--")] or [r for r in CODE_ROOTS if (ROOT / r).exists()] or ["."]
+    paths = [a for a in args if not a.startswith("--")] or default_roots()
     findings = scan(paths)
     text, n_live = render(findings, paths, strict)
     print(text)

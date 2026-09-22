@@ -23,8 +23,31 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CODE_ROOTS = ["backend", "frontend", "shared", "infra", "src", "app", "tests", "lib"]
-SKIP = {"node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".git", "target", ".next", ".aix"}
+SKIP = {"node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".git", "target", ".next", ".aix", "docs"}
+
+
+def code_roots():
+    """Where the code tools look by default: the `paths.code_roots` of .aix/config.yaml that exist in this project;
+    when none does (code at the root, or in a package named after the project) the whole project, hidden and
+    SKIP folders excepted."""
+    roots = ["backend", "frontend", "shared", "infra", "src", "app", "tests", "lib"]
+    cfg = ROOT / ".aix" / "config.yaml"
+    if cfg.exists():
+        m = re.search(r"^\s+code_roots:\s*\[(.*?)\]", cfg.read_text(encoding="utf-8"), re.M)
+        if m:
+            roots = [x.strip() for x in m.group(1).split(",") if x.strip()]
+    found = [r for r in roots if (ROOT / r).exists()]
+    return found or ["."]
+
+
+CODE_ROOTS = code_roots()
+
+
+def default_roots():
+    """CODE_ROOTS for a tool run without paths, saying so once when it falls back to the whole project."""
+    if CODE_ROOTS == ["."]:
+        print("code_roots: none of the configured folders exists here; scanning the whole project (`aix code find` sets them)", file=sys.stderr)
+    return CODE_ROOTS
 EXT = {".py": "python", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs": "js", ".rs": "rust", ".java": "java"}
 HUB_FAN = 3
 
@@ -39,7 +62,7 @@ def source_files(roots):
         files = [base] if base.is_file() else base.rglob("*")
         for f in files:  # SKIP applies below the given base only: an explicit `.aix/scripts` target is measured
             inner = f.relative_to(base).parts if base.is_dir() else ()
-            if f.is_file() and f.suffix in EXT and not any(s in inner for s in SKIP) and f.stat().st_size > 0:
+            if f.is_file() and f.suffix in EXT and not any(s in SKIP or s.startswith(".") for s in inner[:-1]) and f.stat().st_size > 0:
                 yield f  # empty files (bare __init__.py) are not nodes
 
 
@@ -802,7 +825,7 @@ def main(args):
     for flag in ("--max-reducible", "--max-excess"):  # --max-excess kept as an alias
         if flag in args:
             i = args.index(flag); max_reducible = float(args[i + 1]); del args[i:i + 2]
-    paths = [a for a in args if not a.startswith("--")] or CODE_ROOTS
+    paths = [a for a in args if not a.startswith("--")] or default_roots()
     nodes, edges = function_graph(paths) if functions else module_graph(paths)
     if not nodes:
         sys.exit(f"no source files under {', '.join(paths)} (looked for {', '.join(EXT)})")

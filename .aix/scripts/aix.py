@@ -12,9 +12,9 @@ aix acts on the nearest project at or above the current folder (the one holding 
 
 The kit
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
-      --from SOURCE                   with --into: take the kit and/or the organisation layer from SOURCE (a path or
-                                      git URL: an organisation's kit checkout, or a bare layer folder); recorded as
-                                      source: in config.yaml so aix upgrade follows it
+      --from SOURCE                   with --into: the origin is SOURCE (a path or git URL: an organisation's kit
+                                      checkout, or a bare layer folder taken as .aix/org/); recorded as source:
+      --from-org SRC | --from-custom SRC   take one layer (.aix/org/, .aix/custom/) from SRC instead of the origin
       --into asks per existing item: [r]eplace [s]kip [m]erge [R/S/M] all [a]bort  (replace keeps <item>.bak)
       --replace-all | --skip-all | --merge-all   answer for every collision without asking (CI, no terminal)
   aix upgrade [PROJECT] [--dry-run] [--yes]
@@ -283,6 +283,7 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
                             (with the chain), known CVEs for pinned dependencies via the OSV database, secrets in
                             git history. Evidence to review, never proof; --audit writes the report the register
                             needs. Not an authorisation/logic review: that stays with the security-audit-* skills.
+  aix code find             which folders hold code -> paths.code_roots (checklist; also run by aix install)
   aix code stats            the shape of the code base: histogram of function sizes (or cognitive, cyclomatic,
                             nesting, parameters) scaled to the terminal, mean/sd/median/p90/p95/max, share over
                             the limit, and the largest functions, files and folders pulling the tail.
@@ -388,17 +389,19 @@ into ~/.local/bin when that folder exists. Idempotent: run it after adding, remo
                  [r]eplace (yours kept as <item>.bak)  [s]kip  [m]erge (folders: add missing files only)
                  [R]/[S]/[M] same answer for the rest  [a]bort
   --replace-all | --skip-all | --merge-all   answer every collision without a terminal (CI)
-  Without --from, a checkout whose own .aix/custom/ is filled (an organisation's fork) installs as that
-                 organisation: its custom/ becomes the project's .aix/org/ and its git URL is recorded as source:.
+  Layers: .aix/org/ (the organisation's) and .aix/custom/ (local overrides) follow one rule: copied when the origin
+                 has the folder, replaced by aix upgrade when it has it, left alone when it does not. The origin is
+                 this checkout, or the kit checkout named by --from. So a fork of the kit with a filled .aix/org/
+                 installs its organisation into every project, and an edit there reaches projects at the next upgrade.
   --from SOURCE  (with --into) a path or git URL. A kit checkout (has .aix/): its .aix/ is the payload and its
-                 .aix/custom/ becomes the project's organisation layer (.aix/org/). A bare layer folder (skills/,
-                 instructions/, profiles/, templates/): payload from this kit, folder becomes .aix/org/. Git URLs are
-                 cloned into ~/.cache/aix/sources/. `source:` is recorded in config.yaml; `aix upgrade` refreshes
-                 .aix/org/ from it (git pull for URLs). An organisation = a fork of the kit with a filled .aix/custom/,
-                 kept current with upstream by a normal git merge (its custom/ never collides with upstream's, empty).
+                 .aix/org/ and .aix/custom/ the layers. A bare layer folder (skills/, instructions/, profiles/,
+                 templates/): payload from this kit, the folder is the org layer. Git URLs are cloned into
+                 ~/.cache/aix/sources/ (git pull on upgrade). Recorded as `source:` in config.yaml; aix upgrade follows it.
+  --from-org SRC, --from-custom SRC   one layer from another place (a kit checkout's .aix/<layer>/, a bare folder, a
+                 URL); recorded as source_org: / source_custom: and followed by aix upgrade, which also accepts them.
 Related: aix upgrade (update an already installed project), aix doctor (check the result).""",
 
-"upgrade": """aix upgrade [PROJECT] [--dry-run] [--yes]   (experimental)
+"upgrade": """aix upgrade [PROJECT] [--dry-run] [--yes] [--from-org SRC] [--from-custom SRC]   (experimental)
 
 Brings a project created with `aix install --into` up to the kit version of the `aix` you run. Run the KIT's aix
 (the one on PATH) from inside the project; the project's own copy refuses, because the newest logic must come
@@ -462,7 +465,8 @@ What it builds
   --functions         nodes = functions/methods (Python only, stdlib parser); edges = calls resolved by name in the
                       module, through imported names, and self.method(). Calls through typed objects cannot be
                       resolved statically: the function graph is a lower bound.
-  PATH...             restrict to these folders (default: backend frontend shared infra src app tests lib)
+  PATH...             restrict to these folders (default: the `code_roots` of .aix/config.yaml that exist, else the
+                      whole project without hidden, docs, dependency and build folders)
 
 Normalisations (all reported)
   facades collapsed   an __init__.py / index.ts / mod.rs that only re-exports its own folder is a name, not a
@@ -671,6 +675,17 @@ Options
   --selftest  known-vulnerable snippets must be found, safe variants must not
 Related: aix docs security (register state), skills security-audit-* (reasoning on the hits), security-threat-model."""
 
+TOPICS["code find"] = """aix code find [--list | --yes]
+
+Finds the folders that hold code and sets `paths.code_roots` in .aix/config.yaml, the default scope of every
+`aix code` command. Candidates: each top-level folder with source files below it (hidden, docs/, .aix/, dependency
+and build folders skipped) and the project root itself when files sit directly in it; per candidate: files per
+language and the project marker (pyproject.toml, package.json, Cargo.toml, pom.xml, ...). A checklist (curses; plain
+prompts where curses is missing) keeps or drops each: space toggles, a all, n none, Enter writes, q cancels. Roots
+configured but absent on disk are dropped. --list prints and changes nothing; --yes accepts every suggestion (CI).
+`aix install --into DIR` runs the same checklist at the end when a terminal is attached, otherwise prints the list.
+While code_roots names nothing that exists, the code tools scan the whole project and say so."""
+
 TOPICS["code stats"] = """aix code stats [PATH...] [--metric lines|cognitive|cyclomatic|nesting|params] [--report] [--selftest]
 
 THE SHAPE OF THE CODE BASE in one screen: where function sizes sit, how spread they are, and who is pulling the
@@ -778,6 +793,8 @@ Three tools on one engine (.aix/scripts/graph.py). All read the same dependency 
   aix code security   static security checks mapped to VUL rows and CWEs; --audit writes the audit evidence
   aix code vulnerabilities  deep checks: Python taint paths, known CVEs (OSV), secrets in git history
   aix code stats      histogram of function sizes (or any style metric) with mean/sd/percentiles and offenders
+  aix code find       which folders hold code: a checklist that sets paths.code_roots in .aix/config.yaml, the
+                      default scope of every command above (also run at the end of aix install)
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
 proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security | code vulnerabilities | code stats."""
 TOPICS["docs"] = """aix docs validate | coverage | security
@@ -839,22 +856,13 @@ def expose_on_path():
     print(f"PATH: linked {link} -> {ROOT / '.aix' / 'bin' / 'aix'}" + ("" if on_path else f" (add {bin_dir} to PATH)"))
 
 
-def checkout_source() -> str:
-    """How a project should refer back to this checkout: its git remote URL when it has one, else its path."""
-    import subprocess
-    try:
-        url = subprocess.run(["git", "-c", f"safe.directory={ROOT}", "remote", "get-url", "origin"], cwd=ROOT, capture_output=True, text=True, timeout=10).stdout.strip()
-    except Exception:
-        url = ""
-    return url or str(ROOT)
-
 
 def cmd_install(args):
     import install_skills as inst
-    known = {"--copy", "--into", "--from", "--replace-all", "--skip-all", "--merge-all"}
+    known = {"--copy", "--into", "--from", "--from-org", "--from-custom", "--replace-all", "--skip-all", "--merge-all"}
     bad = [a for a in args if a.startswith("--") and a not in known]
     if bad:
-        sys.exit(f"aix install: unknown option {' '.join(bad)}. Options: --copy, --into DIR, --replace-all, --skip-all, --merge-all (aix help install)")
+        sys.exit(f"aix install: unknown option {' '.join(bad)}. Options: --copy, --into DIR, --from SRC, --from-org SRC, --from-custom SRC, --replace-all, --skip-all, --merge-all (aix help install)")
     copy, into = "--copy" in args, None
     if "--into" in args:
         i = args.index("--into")
@@ -863,36 +871,37 @@ def cmd_install(args):
         if args[i + 1].startswith("-"):
             sys.exit("aix install --into needs a directory")
         into = Path(args[i + 1]).resolve()
-    src = None
-    if "--from" in args:
-        i = args.index("--from")
-        if i + 1 >= len(args) or not into:
-            sys.exit("aix install --from SOURCE needs --into DIR")
-        src = args[i + 1]
+    def value_of(flag):
+        if flag not in args:
+            return None
+        i = args.index(flag)
+        if i + 1 >= len(args) or args[i + 1].startswith("-") or not into:
+            sys.exit(f"aix install {flag} SOURCE needs a source and --into DIR")
+        return args[i + 1]
+    src, layer_src = value_of("--from"), {"org": value_of("--from-org"), "custom": value_of("--from-custom")}
     if into:
         mode = "replace" if "--replace-all" in args else "skip" if "--skip-all" in args else "merge" if "--merge-all" in args else "ask"
-        org_layer = None
-        own_custom = ROOT / ".aix" / "custom"
-        self_source = not src and own_custom.is_dir() and any(p for p in own_custom.rglob("*") if p.is_file())
-        if self_source:
-            src = checkout_source()  # recorded for later upgrades; the files come from this checkout right now
-            print(f"  this checkout has a filled .aix/custom/: installing as an organisation (source recorded as {src})")
+        import source as srcmod
+        origin = ROOT  # the origin: this checkout, or the kit checkout named by --from (a bare --from folder is the org source)
         if src:
-            import source as srcmod
-            kind, payload_root, org_layer = ("kit", ROOT, own_custom) if self_source else srcmod.classify(srcmod.fetch(src))
+            kind, payload_root, bare = srcmod.classify(srcmod.fetch(src))
             if kind == "kit":
-                inst.KIT_ROOT = payload_root  # the organisation's vendored kit is the payload
-                print(f"  source: kit checkout at {payload_root}" + (" with an organisation layer" if org_layer else ""))
+                inst.KIT_ROOT = origin = payload_root
+                print(f"  origin: kit checkout at {payload_root}")
             else:
-                print(f"  source: organisation layer at {org_layer} (kit payload from this checkout)")
+                layer_src["org"] = layer_src["org"] or src
+                print(f"  origin: this checkout; org layer from {src}")
         inst.copy_kit_into(into, mode)
         if src:
-            import source as srcmod
-            if org_layer:
-                srcmod.install_org(into, org_layer)
-                print(f"  organisation layer -> {into / '.aix' / 'org'}")
             srcmod.record(into, src)
+        srcmod.install_layers(into, srcmod.resolve_layers(origin, srcmod.layer_sources(into, layer_src)))
         inst.install_into(into, copy)
+        if sys.stdin.isatty() and not os.environ.get("CI"):
+            import codefind
+            codefind.run(into, title="aix install")
+        else:
+            import codefind
+            codefind.run(into, list_only=True)
     else:
         inst.install_into(inst.KIT_ROOT, copy)  # PATH link is handled in reexec_in_project, by the kit only
 
@@ -923,6 +932,9 @@ CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--c
 
 
 def run_code(args):
+    if args and args[0] == "find":
+        import codefind
+        return codefind.main(args[1:])
     if args and args[0] == "style":
         import style
         return style.main(args[1:])
@@ -937,7 +949,7 @@ def run_code(args):
         return vulnerabilities.main(args[1:])
     import graph
     if args and args[0] not in CODE_MODES and not args[0].startswith("-") and not (ROOT / args[0]).exists():
-        sys.exit(f"aix code: unknown command '{args[0]}'. Commands: graph, complexity, dead, clones, style, security, vulnerabilities, stats "
+        sys.exit(f"aix code: unknown command '{args[0]}'. Commands: find, graph, complexity, dead, clones, style, security, vulnerabilities, stats "
                  f"(a path may follow the command, e.g. aix code graph backend)")
     sub = args[0] if args and args[0] in CODE_MODES else "graph"
     rest = args[1:] if args and args[0] in CODE_MODES else args

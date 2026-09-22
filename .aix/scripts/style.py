@@ -11,7 +11,7 @@ import ast, re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import ROOT, CODE_ROOTS, EXT, FUNC_HEAD, KEYWORDS, TOKEN, brace_block, iter_functions, rel, source_files
+from graph import ROOT, CODE_ROOTS, default_roots, EXT, FUNC_HEAD, KEYWORDS, TOKEN, brace_block, iter_functions, rel, source_files
 
 DEFAULTS = dict(max_lines=60, max_cognitive=15, max_cyclomatic=10, max_nesting=4, max_params=5, max_file_lines=400)
 PLAIN_NUMBERS = {0, 1, 2, -1, 10, 100, 1000, 0.5, 1.0, 0.0, 2.0} | {200, 201, 202, 204, 301, 302, 304, 400, 401, 403, 404, 405, 409, 410, 422, 429, 500, 502, 503, 504}
@@ -554,7 +554,7 @@ def main(args):
     if "--selftest" in args:
         return selftest()
     gate, report, show_all = "--gate" in args, "--report" in args, "--all" in args
-    specs = [a for a in args if not a.startswith("--")] or CODE_ROOTS
+    specs = [a for a in args if not a.startswith("--")] or default_roots()
     th = thresholds()
     import runtime
     rt = runtime.detect(ROOT)

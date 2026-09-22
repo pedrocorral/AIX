@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import CODE_ROOTS, ROOT, rel, source_files
+from graph import CODE_ROOTS, ROOT, default_roots, rel, source_files
 from style import functions_in, limit, thresholds
 
 BINS = {
@@ -155,7 +155,7 @@ def main(args):
     if metric not in BINS:
         sys.exit(USAGE)
     report = "--report" in args
-    paths = [a for a in args if not a.startswith("--")] or [r for r in CODE_ROOTS if (ROOT / r).exists()]
+    paths = [a for a in args if not a.startswith("--")] or default_roots()
     fxs = []
     for p in paths:
         base = (ROOT / p) if not Path(p).is_absolute() else Path(p)

@@ -36,6 +36,7 @@ aix docs validate         # sanity-check IDs, links, indexes
 | `aix upgrade [PROJECT] [--dry-run] [--yes]` | Update a project to the kit version of the `aix` you run. The same list `aix install` copies (`.aix/scripts/payload.py`) says what may change: owned paths are overwritten, AGENTS.md, GEMINI.md and .aix/config.yaml are merged, everything else (your docs, code, downloads, `.aix/custom/`) is never touched |
 | `aix code security [PATH...] [--gate] [--audit]` | Deterministic static security checks mapped to the VUL register and CWEs; findings to review, never proof; `--audit` writes the audit report the register needs as evidence |
 | `aix code stats [PATH...] [--metric ...]` | Terminal histogram of function sizes (or any style metric) scaled to the window, mean/sd/median/percentiles, share over the limit, and the largest functions, files and folders |
+| `aix code find` | Which folders hold code: a checklist that sets `code_roots` in `.aix/config.yaml`, the default scope of the code tools; also run at the end of `aix install` |
 | `aix code vulnerabilities [--taint] [--cve] [--history] [--audit]` | The deep security layer: Python taint paths from input to dangerous sinks, known CVEs for pinned dependencies (OSV, network), secrets in git history; evidence to review, `--audit` writes the report |
 | `aix code style [TARGET...] [--gate]` | Readability per function: lines, cognitive and cyclomatic complexity, nesting, parameters, names, docstring, magic numbers, against limits in `.aix/config.yaml`; a single function (`file:func`) gets a card with line-numbered advice |
 | `aix docs validate` | Check IDs, links, indexes, front-matter (exit 1 on errors) |
@@ -81,11 +82,13 @@ Projects on the 1.x layout (kit folders at the root, `framework.yaml`) are migra
 
 ## Organisations, profiles, personal overrides
 
-An organisation forks the kit and fills `.aix/custom/` with the same shape as `.aix/`: skill implementations
+An organisation forks the kit and fills `.aix/org/` with the same shape as `.aix/`: skill implementations
 (`class:` + `id: "@org/…"`), scoped instructions (`applyTo` globs, rendered natively for Copilot and Cursor and
 listed in AGENTS.md for the rest), profiles (saved sets of choices) and templates. Projects install with
 `aix install --into my-app --from <fork url>` and follow it with `aix upgrade`; the kit's own updates reach the fork
-by a normal git merge. `examples/acme/` is a complete fictional organisation to copy from.
+by a normal git merge. `.aix/org/` and `.aix/custom/` follow one rule: copied when the origin has the folder,
+replaced on upgrade when it has it, left alone when it does not; `--from-org SRC` / `--from-custom SRC` take one of
+them from elsewhere. `examples/acme/` is a complete fictional organisation to copy from.
 Instructions follow the same model: AGENTS.md is assembled from blocks that a layer can replace or extend, and
 scoped standards (`applyTo` globs) render natively per runtime. The kit ships FastAPI, React and Kedro standards as
 opt-in, as are language conventions for Python, TypeScript, Java and Rust (`aix/languages/*`): `aix instructions enable aix/frameworks/fastapi-backend` for one, or the profiles `aix profile use fastapi-react | kedro` for the set.

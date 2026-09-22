@@ -8,10 +8,14 @@ Three modes:
           so `aix doctor` can report a local edit before an upgrade loses it
   merged  copied on install; on upgrade rebuilt from the kit text plus the project's own parts (managed sections of
           AGENTS.md / GEMINI.md, the project's keys in .aix/config.yaml)
-  seeded  copied on install when absent; never touched by upgrade (the project's documentation)"""
+  seeded  copied on install when absent; never touched by upgrade (the project's documentation)
+  layer   .aix/org/ and .aix/custom/: copied on install when the origin has the folder, replaced on upgrade when the
+          origin has it, left alone when it does not. The origin is the kit checkout that runs, unless `--from-org SRC`
+          / `--from-custom SRC` (recorded as source_org / source_custom in config.yaml) point one of them elsewhere."""
 from pathlib import Path
 
-OWNED, MERGED, SEEDED = "owned", "merged", "seeded"
+OWNED, MERGED, SEEDED, LAYER = "owned", "merged", "seeded", "layer"
+LAYERS = ("org", "custom")
 IGNORED_PARTS = {"__pycache__"}   # never payload, whatever folder they sit in
 IGNORED_SUFFIXES = {".pyc"}
 
@@ -25,7 +29,8 @@ def items(kit: Path):
              (".aix/meta-docs", OWNED), (".aix/instructions", OWNED), (".aix/profiles", OWNED),
              (".aix/skills/INDEX.md", OWNED), (".aix/skills/extern/registry.json", OWNED)]
             + [(f".aix/skills/{c}", OWNED) for c in categories]
-            + [("AGENTS.md", MERGED), ("CLAUDE.md", OWNED), ("GEMINI.md", MERGED), ("docs", SEEDED)])
+            + [("AGENTS.md", MERGED), ("CLAUDE.md", OWNED), ("GEMINI.md", MERGED), ("docs", SEEDED)]
+            + [(f".aix/{l}", LAYER) for l in LAYERS])
 
 
 def is_payload_file(path: Path) -> bool:
