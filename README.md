@@ -80,6 +80,10 @@ my-app/
 
 Projects on the 1.x layout (kit folders at the root, `framework.yaml`) are migrated in place by `aix upgrade`.
 
+## Tests
+
+`python -m unittest discover -s tests` runs the kit's own suite in temporary folders (install, upgrade from the previous release, layers, instructions, skills, code tools, migration); `tests/README.md` explains it. `tests/` is not in the payload, so projects never receive it.
+
 ## Organisations, profiles, personal overrides
 
 An organisation forks the kit and fills `.aix/org/` with the same shape as `.aix/`: skill implementations

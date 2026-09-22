@@ -153,7 +153,7 @@ def run(project: Path, yes: bool = False, list_only: bool = False, title: str = 
     if not rows:
         print(f"aix code find: no source files ({', '.join(sorted(EXT))}) under {project}")
         return False
-    if list_only or (not yes and not sys.stdin.isatty()):
+    if list_only or (not yes and not (sys.stdin.isatty() and not os.environ.get("CI"))):
         report(project, rows)
         if not list_only:
             print("  (no terminal to ask: run `aix code find` interactively, or `aix code find --yes` to accept the suggestions)")

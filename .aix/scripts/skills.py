@@ -102,7 +102,7 @@ def cmd_enable(flat):
     if flat not in cat:
         sys.exit(f"unknown skill '{flat}'")
     set_disabled(disabled() - {flat})
-    for t in TARGETS:
+    for t in inst.TARGETS:
         inst.link_or_copy(cat[flat]["path"], ROOT / t / flat, copy=False)
     print(f"enabled {flat} (linked into all runtimes)")
 

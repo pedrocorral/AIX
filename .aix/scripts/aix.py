@@ -896,12 +896,8 @@ def cmd_install(args):
             srcmod.record(into, src)
         srcmod.install_layers(into, srcmod.resolve_layers(origin, srcmod.layer_sources(into, layer_src)))
         inst.install_into(into, copy)
-        if sys.stdin.isatty() and not os.environ.get("CI"):
-            import codefind
-            codefind.run(into, title="aix install")
-        else:
-            import codefind
-            codefind.run(into, list_only=True)
+        import codefind
+        codefind.run(into, title="aix install")  # checklist in a terminal; the table and a hint otherwise
     else:
         inst.install_into(inst.KIT_ROOT, copy)  # PATH link is handled in reexec_in_project, by the kit only
 

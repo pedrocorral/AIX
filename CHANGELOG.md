@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.14.0 — 2026-09-22
+
+- Test suite: `tests/` (stdlib unittest, temp folders, the real launcher; `python -m unittest discover -s tests`) and a CI workflow on Linux, macOS and Windows. Fixed on the way: `aix skills enable` crashed (undefined name, 2.13.0); `aix install --into` without a terminal printed the code-folder table without the hint to run `aix code find`.
+
 ## 2.13.0 — 2026-09-22
 
 - Layers `.aix/org/` and `.aix/custom/` share one rule (payload mode `layer`): copied at install when the origin has the folder, replaced at upgrade when it has it, left alone when it does not. The origin is the kit checkout that runs or `--from SRC`; `--from-org SRC` / `--from-custom SRC` (install and upgrade) take one layer from elsewhere, recorded as `source_org:` / `source_custom:`. An organisation now fills `.aix/org/` in its fork, same name as in projects (it was `.aix/custom/` in the fork, renamed on the way, which nobody could remember). Team feedback, 2026-09-22: edits to the fork's `org/` never reached projects.
