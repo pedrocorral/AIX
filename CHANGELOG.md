@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.17.0 — 2026-09-22
+
+- `.gitignore`: `aix install`, `aix upgrade` and `aix agents` show the AIX lines a project lacks (`.aix/`, the selected agents' skills folders, rendered `aix-*` files, the code-tool reports) and add them on a y/N (`aix upgrade --yes` answers yes); without a terminal the lines are printed and nothing is touched. The whole `.aix/` is ignored (decision 2026-09-22): teammates and CI get the kit from `aix install`, `.aix/custom/` and `.aix/org/` are not committed either.
+- Where AIX writes and a person's file or folder already exists (`CLAUDE.md`, `GEMINI.md`, `.github/skills/`, `.cursor/rules/aix.mdc`, ...), it is kept as `<name>-bak` before AIX writes; never the whole `.github/` folder.
+
 ## 2.16.0 — 2026-09-22
 
 - `aix agents [NAME... | all | --list]`: which agents a project equips, from a fixed list: claude (Claude Code, Claude desktop), copilot (VS Code, CLI, cloud agent), cursor, gemini (Gemini CLI, Antigravity), opencode, codex (AGENTS.md only). A checklist like `aix code find`, agents detected on PATH or already present preselected; the choice is `agents:` in `.aix/config.yaml`, no line = all (existing projects unchanged). Install, upgrade, `aix skills` and the instruction rendering write folders and pointer files only for the selected agents; choosing fewer removes what AIX created for the others, never a person's file. `aix install --into DIR --agents a,b`, or the checklist in a terminal, or all without one. `aix doctor` reports the selection and leftovers. Team feedback, 2026-09-22: the kit installed every agent's files.

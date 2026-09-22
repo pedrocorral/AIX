@@ -55,6 +55,7 @@ AIX/
 │   ├── security.py          # `aix docs security`: register state, evidence check, release gate
 │   ├── upgrade.py           # `aix upgrade`: updates a project's kit files per payload.py (runs from the kit, not the project)
 │   ├── selfinstall.py       # `aix self-install` / `self-update`: ~/.local/bin link, shell profile PATH line, verification
+│   ├── gitignore.py         # leaf: the .gitignore lines a project needs (.aix/, agent folders, rendered files, reports) and the y/N that adds them
 │   ├── agents.py            # leaf: the agents (claude, copilot, cursor, gemini, opencode, codex), their folders and pointer files, the project's selection
 │   ├── payload.py           # leaf: THE list of what travels into a project (owned / merged / seeded); install, upgrade, manifest, doctor read it
 │   ├── catalog.py           # leaf: skill catalogue data (used by skills.py, extern.py, doctor.py)
@@ -275,6 +276,13 @@ the bare-name behaviour. The mapping in the entry is a judgement, like an organi
 checks that name equals the class flat name. Test: `aix skills add grill-me && aix skills info coach-grill-me` shows
 layer kit, id `@mattpocock/grill-me`, chosen by config; `aix skills use coach-grill-me default` returns to the kit's;
 `aix skills remove grill-me` leaves no `use:` line and a healthy doctor.
+
+### 12.y `.gitignore` and the whole `.aix/` (2026-09-22, under discussion)
+Projects ignore the whole `.aix/` (user's decision; `gitignore.wanted()`), so the kit copy, `.aix/custom/` and
+`.aix/org/` are per machine and CI must `aix install` first. The kit repository itself commits `.aix/` and ignores
+only `.aix/index.json`. If the team prefers committing the kit copy, change `wanted()` to `.aix/index.json` and
+`.aix/manifest.json` and drop the `.aix/` line from projects' `.gitignore`; nothing else depends on it.
+Details and consequences: `.aix/meta-docs/conventions/cli.md`, ".gitignore and backups".
 
 ## 13. Numbers to remember
 

@@ -36,7 +36,7 @@ aix install --into my-app     # copies the kit into the project, links skills in
 cd my-app && aix doctor && aix docs validate
 ```
 
-`aix self-update` pulls the clone; `aix upgrade` inside a project brings it to that version.
+`aix self-update` pulls the clone; `aix upgrade` inside a project brings it to that version. Install, upgrade and `aix agents` offer to add the generated paths (`.aix/`, agent link folders, rendered files, reports) to `.gitignore`, and keep any file of yours they would overwrite as `<name>-bak`. Note: the whole `.aix/` is ignored for now, so teammates and CI run `aix install --into .` first; see the CLI conventions for the trade-off.
 
 `aix` acts on the nearest project at or above your current folder (the one holding `.aix/config.yaml`), running that project's own copy of the CLI. Outside any project only `help`, `about`, `version`, `install --into` and `skills registry` work. `aix` is the only tool you need. Linux/macOS run the `aix` bash launcher, Windows runs `aix.cmd`; both call
 `.aix/scripts/aix.py` (Python 3.9+, no dependencies). That one `aix` on PATH runs the `.aix/scripts/aix.py` of whatever project you are in; `aix version` names both copies.

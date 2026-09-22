@@ -248,7 +248,11 @@ def main(args):
     rows = plan(project)
     print(f"upgrade {project}\n  kit {version_of(KIT)} (this checkout: {KIT})  ->  project {version_of(project)}")
     if not rows:
-        print("  already up to date"); return
+        print("  already up to date")
+        if not dry:
+            import gitignore
+            gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")
+        return
     counts = {a: sum(1 for _, x, _ in rows if x == a) for a in ("add", "update", "remove", "merge")}
     print("  plan: " + ", ".join(f"{n} {a}" for a, n in counts.items() if n) + (" (dry run, nothing written)" if dry else ""))
     import install_skills as inst
@@ -270,6 +274,8 @@ def main(args):
         sys.exit("aborted")
     apply(project, rows)
     inst.write_manifest(project)
+    import gitignore
+    gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")  # after the files, so the agents line is final
     print(f"  applied {len(rows)} changes; relinking skills in the project")
     subprocess.call([sys.executable, str(project / ".aix" / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
     print("  done. Run `aix doctor` and `aix docs validate` in the project.")

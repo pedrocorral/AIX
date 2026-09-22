@@ -132,6 +132,22 @@ never leaves the kit checkout and is never touched by an upgrade.
 Not in the list, therefore the project's: `.aix/skills/extern/<downloads>`, runtime folders, your code.
 Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.
 
+## .gitignore and backups
+`aix install`, `aix upgrade` and `aix agents` compare `.gitignore` with what AIX generates per machine, `.aix/`, the
+selected agents' skills folders, `.github/instructions/aix-*`, `.cursor/rules/aix-*`, the reports under `docs/tests/`,
+print the missing lines and add them on a y/N (`upgrade --yes` answers yes; no terminal: printed, untouched). Lines
+are appended once under a marker comment, never edited. Where AIX writes and a person's file or folder already sits,
+it is renamed `<name>-bak` first (`.github/skills-bak`, `CLAUDE.md-bak`), never a parent folder such as `.github/`.
+
+**Known limitation (decision of 2026-09-22, under discussion):** the whole `.aix/` is ignored, not only its
+per-machine files. Consequences: the kit copy is not versioned with the project, so every teammate and every CI job
+must run `aix install --into .` (with the same origin) before `aix docs validate` or the code gates work;
+`.aix/custom/` (the project's own overrides) and `.aix/org/` (the organisation layer) are not committed either, so
+they exist only where someone installed them; `aix doctor` cannot tell a teammate that their copy differs from the
+project's, because the project has none. The alternative, ignoring only `.aix/index.json` and `.aix/manifest.json`
+and committing the rest, is what the kit's own repository does. Switching later is one edit to
+`.aix/scripts/gitignore.py` (`wanted()`) and a `git add .aix`.
+
 ## Rules for agents
 - Never edit files under `.opencode/ .claude/ .github/skills .agents/ .cursor/skills`: they are generated links, present only for the agents the project selected (`aix agents`).
 - Never edit `.aix/` except `config.yaml` and `skills/extern/`: it is the kit. A bug in a kit script is fixed in the kit repository and arrives with `aix upgrade`; `.aix/manifest.json` records the shipped checksums, `aix doctor` reports local edits, and `aix upgrade` marks them in its plan before overwriting.

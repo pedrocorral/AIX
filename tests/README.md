@@ -39,6 +39,7 @@ skipped when git or a tag is missing).
 | `test_code.py` | `aix code find` (list, yes, the checklist through a pseudo-terminal), every code tool, hidden folders |
 | `test_migration.py` | a 1.x layout generated from a fresh install migrates on upgrade |
 | `test_agents.py` | `aix agents`: list, names, aliases, only the selected folders and pointers, deselection removes AIX files and keeps a person's, `--agents` at install, upgrade keeps the line, the checklist through a pseudo-terminal |
+| `test_gitignore.py` | missing lines printed without a terminal, added on `upgrade --yes` and on a y answer, once; a person's `CLAUDE.md` and `.github/skills` kept as `-bak` |
 | `test_selfinstall.py` | link, profile lines per shell, idempotence, foreign file kept, stale link replaced, dry run, refusal from a project, `aix version` naming both copies |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 

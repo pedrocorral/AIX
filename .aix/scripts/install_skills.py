@@ -98,6 +98,8 @@ def install_into(project: Path, copy: bool):
     if not skills_dir.exists():
         sys.exit(f"no .aix/skills folder in {project}")
     try:
+        for rel, bak in agents.backup_foreign(project):
+            print(f"  {rel} was not AIX's: kept as {bak}")
         prune_dangling(project)
         n = _install_links(project, skills_dir, copy, disabled_skills(project))
         _pointer_files(project)

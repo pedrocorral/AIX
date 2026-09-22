@@ -775,7 +775,10 @@ without a screen; `all` removes the line. The choice is `agents:` in .aix/config
 Install, upgrade and `aix skills` then link folders and write pointer files only for the selected agents; choosing
 fewer removes what AIX created for the others (links, its own pointer files, rendered aix-* files), never a file a
 person wrote. `aix doctor` reports the selection and leftovers. `aix install --into DIR` asks in a terminal unless
---agents names them; without a terminal all agents are equipped."""
+--agents names them; without a terminal all agents are equipped.
+Where AIX writes and a person's file or folder already sits (CLAUDE.md, GEMINI.md, .github/skills, ...), it is kept
+as `<name>-bak` first. After the selection, the .gitignore lines AIX needs (.aix/, the selected agents' skills
+folders, rendered aix-* files, reports) are shown and added on a y/N (`aix install`, `aix upgrade --yes` too)."""
 
 TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID      (alias: aix rules ...)
 
@@ -956,10 +959,14 @@ def cmd_install(args):
         agents.run(into, wanted_agents.split(",") if wanted_agents else None, title="aix install")  # names, checklist, or all
         agents.remove_deselected(into, agents.selected(into))
         inst.install_into(into, copy)
+        import gitignore
+        gitignore.ask_and_apply(into, label="aix install")
         import codefind
         codefind.run(into, title="aix install")  # checklist in a terminal; the table and a hint otherwise
     else:
         inst.install_into(inst.KIT_ROOT, copy)  # PATH link is handled in reexec_in_project, by the kit only
+        import gitignore
+        gitignore.ask_and_apply(inst.KIT_ROOT, label="aix install")
 
 
 def cmd_task(args):
@@ -1023,6 +1030,8 @@ def run_agents(args):
         for r in agents.remove_deselected(ROOT, agents.selected(ROOT)):
             print(f"  removed {r}")
         inst.install_into(ROOT, copy=False)
+        import gitignore
+        gitignore.ask_and_apply(ROOT, label="aix agents")
 
 
 def run_instructions(args):

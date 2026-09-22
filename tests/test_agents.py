@@ -141,11 +141,14 @@ class AgentsAtInstallAndUpgrade(unittest.TestCase):
         for key in (b"a", b" ", b"\r"):
             os.write(fd, key); read(0.5)
         read(2.0)
+        self.assertIn(b"add them to .gitignore? [y/N]", out, "the .gitignore question follows the selection")
+        os.write(fd, b"n\n"); read(1.5)
         os.waitpid(pid, 0)
         plain = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", out).decode(errors="replace")
         self.assertIn("which agents does this project equip", plain)
         self.assertRegex(config(project), r"(?m)^agents: \[copilot, cursor, gemini, opencode, codex\]")
         self.assertFalse((project / "CLAUDE.md").exists())
+        self.assertFalse((project / ".gitignore").exists(), "answered n")
 
 
 if __name__ == "__main__":

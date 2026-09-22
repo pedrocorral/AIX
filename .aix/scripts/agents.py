@@ -180,3 +180,40 @@ def run(project: Path, names=None, list_only=False, title="aix agents") -> bool:
     print(f"agents: {now}" + (" (unchanged)" if set(before) == set(now) else ""))
     return set(before) != set(now)
 
+
+def _foreign_skills_dir(d: Path, project: Path) -> bool:
+    """A skills folder someone else made: has entries that are neither links into .aix/ nor AIX-indexed skills."""
+    known = _indexed(project)
+    for p in d.iterdir():
+        if p.is_symlink():
+            try:
+                if ".aix" in p.resolve().parts:
+                    continue
+            except OSError:
+                continue
+        if p.name in known or p.name.endswith("-bak"):
+            continue
+        return True
+    return False
+
+
+def backup_foreign(project: Path, names=None) -> list:
+    """Move aside what a person wrote where AIX writes for the selected agents: `<path>-bak`. Returns the moves."""
+    moved = []
+    for n in (names or selected(project)):
+        a = AGENTS[n]
+        targets = ([a["skills"]] if a["skills"] else []) + a["pointers"]
+        for rel in targets:
+            p = project / rel
+            if not p.exists() or p.is_symlink():
+                continue
+            foreign = _foreign_skills_dir(p, project) if p.is_dir() else not is_aix_pointer(p)
+            if not foreign:
+                continue
+            bak = p.with_name(p.name + "-bak")
+            i = 2
+            while bak.exists():
+                bak = p.with_name(f"{p.name}-bak{i}"); i += 1
+            p.rename(bak)
+            moved.append((rel, str(bak.relative_to(project))))
+    return moved
