@@ -8,7 +8,8 @@ Three modes:
           so `aix doctor` can report a local edit before an upgrade loses it
   merged  copied on install; on upgrade rebuilt from the kit text plus the project's own parts (managed sections of
           AGENTS.md / GEMINI.md, the project's keys in .aix/config.yaml)
-  seeded  copied on install when absent; never touched by upgrade (the project's documentation)
+  seeded  copied on install when absent, from a template inside .aix/ (`.aix/templates/docs` -> `docs/`) overlaid by the
+          layers' `templates/docs/`; never touched by upgrade (the project's documentation)
   layer   .aix/org/ and .aix/custom/: copied on install when the origin has the folder, replaced on upgrade when the
           origin has it, left alone when it does not. The origin is the kit checkout that runs, unless `--from-org SRC`
           / `--from-custom SRC` (recorded as source_org / source_custom in config.yaml) point one of them elsewhere."""
@@ -21,6 +22,14 @@ IGNORED_SUFFIXES = {".pyc"}
 
 
 AGENT_OF = {"CLAUDE.md": "claude", "GEMINI.md": "gemini"}   # pointer files that travel only when their agent is selected
+SEED_SOURCE = {"docs": ".aix/templates/docs", "CLAUDE.md": ".aix/templates/pointers/CLAUDE.md", "GEMINI.md": ".aix/templates/pointers/GEMINI.md"}
+# seeded items and pointer files come from inside .aix/ so a layer (org/, custom/) can overlay them; the pointer files are
+# written by install (templates/pointers/, a layer's copy winning) and merged on upgrade, never copied from the kit root
+
+
+def source_of(rel: str) -> str:
+    """Where a payload item is read from in the kit: itself, except seeded items whose template lives under .aix/."""
+    return SEED_SOURCE.get(rel, rel)
 
 
 def items(kit: Path, agents: list = None):
@@ -33,7 +42,7 @@ def items(kit: Path, agents: list = None):
              (".aix/meta-docs", OWNED), (".aix/instructions", OWNED), (".aix/profiles", OWNED),
              (".aix/skills/INDEX.md", OWNED), (".aix/skills/extern/registry.json", OWNED)]
             + [(f".aix/skills/{c}", OWNED) for c in categories]
-            + [("AGENTS.md", MERGED), ("CLAUDE.md", OWNED), ("GEMINI.md", MERGED), ("docs", SEEDED)]
+            + [("AGENTS.md", MERGED), ("CLAUDE.md", MERGED), ("GEMINI.md", MERGED), ("docs", SEEDED)]
             + [(f".aix/{l}", LAYER) for l in LAYERS])
     if agents is not None:
         out = [(rel, m) for rel, m in out if AGENT_OF.get(rel, None) in (None, *agents)]
@@ -52,7 +61,7 @@ def files(root: Path, mode: str = OWNED, agents: list = None):
         p = root / rel
         if p.is_file():
             yield Path(rel)
-        elif p.is_dir():
+        elif p.is_dir() and m != SEEDED:
             for f in sorted(p.rglob("*")):
                 if f.is_file() and is_payload_file(f.relative_to(root)):
                     yield f.relative_to(root)

@@ -78,9 +78,14 @@ def section(text: str, header: str) -> str:
 
 def merged_text(project: Path, name) -> str:
     name = str(name)
-    kit_text = (KIT / name).read_text(encoding="utf-8")
+    if name in ("CLAUDE.md", "GEMINI.md"):  # pointer files: the template inside .aix/, a layer's copy winning
+        import install_skills as inst
+        agent = payload.AGENT_OF[name]
+        kit_text = inst.pointer_text(project, name, inst.POINTERS[agent][1])
+    else:
+        kit_text = (KIT / name).read_text(encoding="utf-8")
     proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
-    if name in ("AGENTS.md", "GEMINI.md"):
+    if name in ("AGENTS.md", "GEMINI.md", "CLAUDE.md"):
         out = kit_text
         for h in KEEP_SECTIONS:
             keep = section(proj_text, h)

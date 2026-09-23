@@ -12,6 +12,7 @@ aix acts on the nearest project at or above the current folder (the one holding 
 
 The kit
   aix self-install                    make `aix` callable from any terminal (link + PATH in your shell profile)
+  aix self-test [NAME...]             run the kit's own tests (from the clone)
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
       --from SOURCE                   with --into: the origin is SOURCE (a path or git URL: an organisation's kit
                                       checkout, or a bare layer folder taken as .aix/org/); recorded as source:
@@ -255,6 +256,8 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
   aix self-install          make `aix` callable from any terminal: ~/.local/bin/aix -> this clone, PATH line in your
                             shell profiles (bash, zsh, fish; Windows: user PATH), verified. Idempotent, --dry-run.
                             alias: aix install aix.   aix self-update = git pull of the clone.
+  aix self-test [NAME...]   the kit's own test suite from the clone (tests/); NAME = one file (agents, layers, ...);
+                            --network adds the registry downloads; -q hides the per-test lines
   aix install               link all skills into the five runtime folders; write pointer files for Copilot, Cursor
                             and Gemini CLI if missing; create road-map STATE.md if missing; refresh the ~/.local/bin
                             link when that folder exists. Idempotent.
@@ -350,7 +353,7 @@ def skill_count():
     return sum(1 for _ in (ROOT / ".aix" / "skills").rglob("SKILL.md"))
 
 
-ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update"}  # need no project
+ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update", "self-test"}  # need no project
 
 
 def is_kit() -> bool:
@@ -360,7 +363,7 @@ def is_kit() -> bool:
 
 def reexec_in_project(argv):
     """Run the project's own copy of the CLI so every module resolves ROOT to the project, not to this checkout."""
-    if argv[:1] in (["upgrade"], ["self-install"], ["self-update"]) or argv[:2] == ["install", "aix"]:
+    if argv[:1] in (["upgrade"], ["self-install"], ["self-update"], ["self-test"]) or argv[:2] == ["install", "aix"]:
         return  # these act on / from THIS checkout (the kit on PATH), never a project's older copy
     plain_install = argv[:1] == ["install"] and "--into" not in argv
     if plain_install and is_kit():
@@ -605,6 +608,7 @@ Choosing between implementations of one class: `aix skills use NAME ID` writes  
 "version": "aix version    the version of the copy that runs: the kit clone, or inside a project that project's copy plus the kit on PATH (with an upgrade hint when they differ).",
 "self-install": """aix self-install [--dry-run] [--no-profile]        alias: aix install aix
 aix self-update
+aix self-test [NAME...] [--network] [-q]
 
 Run once from a clone of AIX (git clone <repo> ~/AIX && ~/AIX/.aix/bin/aix self-install), or by the one-line
 installers install.sh / install.ps1 at the repository root, which clone and call it. Refuses to run from a
@@ -618,7 +622,9 @@ project's copy of the kit. Steps, each printed:
            Windows: the folder added to the user PATH (registry, through PowerShell).
   verify   the aix the new PATH resolves is this clone; another aix earlier on PATH (or a shell alias) is reported.
 Then: open a new terminal (or export PATH as printed) and `aix install --into <project>`.
-aix self-update pulls the clone (git, fast-forward only) and reminds you to `aix upgrade` each project.""",
+aix self-update pulls the clone (git, fast-forward only) and reminds you to `aix upgrade` each project.
+aix self-test runs the kit's own suite (tests/, stdlib unittest, temporary folders only): all files, or the named
+ones (agents = tests/test_agents.py); --network adds the two registry downloads; -q hides the per-test lines.""",
 "help": "aix help [COMMAND]    this list, or the detailed help for one command or group (e.g. aix help code dead; also: aix code dead --help).",
 }
 TOPICS["code style"] = """aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
@@ -853,7 +859,7 @@ Details: aix help docs validate | docs coverage | docs security."""
 TOPICS["code complexity"] = TOPICS["code graph"]
 TOPICS["code dead"] = TOPICS["code graph"]
 TOPICS["code clones"] = TOPICS["code graph"]
-for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("validate", "docs validate"), ("coverage", "docs coverage"), ("security", "docs security"), ("rules", "instructions")):
+for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("validate", "docs validate"), ("coverage", "docs coverage"), ("security", "docs security"), ("rules", "instructions"), ("self-update", "self-install"), ("self-test", "self-install")):
     TOPICS[_old] = TOPICS[_new]
 
 
@@ -955,6 +961,7 @@ def cmd_install(args):
         if src:
             srcmod.record(into, src)
         srcmod.install_layers(into, srcmod.resolve_layers(origin, srcmod.layer_sources(into, layer_src)))
+        inst.seed_project(into)  # docs/ from .aix/templates/docs overlaid by the layers' templates/docs
         import agents
         agents.run(into, wanted_agents.split(",") if wanted_agents else None, title="aix install")  # names, checklist, or all
         agents.remove_deselected(into, agents.selected(into))
@@ -1144,9 +1151,9 @@ def main(argv):
     cmd, args = argv[0], argv[1:]
     if cmd == "about":
         print(ABOUT)
-    elif cmd in ("self-install", "self-update"):
+    elif cmd in ("self-install", "self-update", "self-test"):
         import selfinstall
-        selfinstall.main(args) if cmd == "self-install" else selfinstall.self_update(args)
+        {"self-install": selfinstall.main, "self-update": selfinstall.self_update, "self-test": selfinstall.self_test}[cmd](args)
     elif cmd == "install":
         cmd_install(args)
     elif cmd == "upgrade":

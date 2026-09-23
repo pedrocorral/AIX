@@ -1,14 +1,9 @@
-# requirements/ — GROUND TRUTH for this application
-Read this when: implementing, testing, reviewing or discussing behaviour. Skip when: never (at least the domain you touch).
-
-Conflicts between these docs and code are resolved by the user via `meta-docs/workflow/conflict-resolution.md`. Agents never edit an `approved` requirement without an ADR.
+# requirements/ — what the kit must do, and why it is the way it is
+Read this when: changing a command, a layout rule, a layer rule. Skip when: writing a skill's text.
 
 | Path | What | Read when |
 |---|---|---|
-| `product/` | Vision, personas, glossary (defines `<DOMAIN>` codes), scope | Onboarding; naming anything |
-| `functional/` | `FR-<DOMAIN>-NNN` grouped by domain folder (mirrors `backend/app/<domain>/`) | Before any feature work |
-| `non-functional/` | `NFR-<CAT>-NNN`: performance, security, accessibility, observability, data, ops, UX | Design; release |
-| `data-model/` | `DM-<Entity>` aggregates, fields, invariants, retention | Persistence & API work |
-| `api/` | `API-<DOMAIN>-NNN` contracts (source for OpenAPI in `shared/`) | Any endpoint / client work |
-| `decisions/` | `ADR-NNNN` architecture decisions incl. stack choice and conflict rulings | Design; whenever "why?" |
-| `how-to-write-requirements.md` | Quality bar for requirement text | Writing/reviewing FRs |
+| `decisions/` | `ADR-*`: the settled decisions (payload list, layers, agents, .gitignore, docs split) | "Why is it like this?" |
+| `product/` | Vision and glossary of the kit | Onboarding |
+| `functional/`, `non-functional/`, `api/`, `data-model/` | Reserved: the CLI's requirements as `FR-*`/`NFR-*` (today they live in `../../.aix/meta-docs/conventions/cli.md` and the help text) | When a requirement is written down |
+| `how-to-write-requirements.md` | The kit's own rules for requirement documents | Writing one |

@@ -7,8 +7,9 @@ from pathlib import Path
 from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parents[2]
-CODE_ROOTS = ["backend", "frontend", "shared", "infra", "src", "app", "tests"]
-SKIP = {"node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".git"}
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from graph import CODE_ROOTS, SKIP  # the configured code roots (paths.code_roots, `aix code find`), one list for every tool
 MARK = re.compile(r"@(implements|tests|mitigates)\s+([A-Z]+-[A-Z0-9]+(?:-\d{3,4})?(?:\s*,\s*[A-Z]+-[A-Z0-9]+(?:-\d{3,4})?)*)")
 
 

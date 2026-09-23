@@ -194,20 +194,39 @@ def main(args):
     sys.exit(0 if ok else 1)
 
 
+# ---- self-update: three small units and the command -------------------------------------------------------------------
+
+def is_git_clone(kit: Path) -> bool:
+    return (kit / ".git").exists()
+
+
+def git_pull(kit: Path):
+    """Fast-forward the clone from its origin. Returns (ok, message); never raises."""
+    if not shutil.which("git"):
+        return False, "git is not installed"
+    r = subprocess.run(["git", "-C", str(kit), "pull", "--ff-only", "-q"], capture_output=True, text=True)
+    return r.returncode == 0, (r.stderr.strip() or r.stdout.strip())
+
+
+def update_message(kit: Path, before: str, after: str) -> str:
+    """What to tell the user after a pull: the versions, and the reminder to upgrade projects when they changed."""
+    line = f"kit clone {kit}: {before} -> {after}"
+    if before == after:
+        return line + " (already current)"
+    return line + "\nrun `aix upgrade` inside each project to bring it to this version (`aix upgrade --dry-run` shows the plan)"
+
+
 def self_update(args):
     """aix self-update: git pull --ff-only in the kit clone, then remind about aix upgrade."""
     if not is_kit_clone():
         sys.exit("aix self-update: not a kit clone; run it from the clone on PATH (aix self-install sets it up)")
-    if not (KIT / ".git").exists():
+    if not is_git_clone(KIT):
         sys.exit(f"aix self-update: {KIT} is not a git checkout; update it the way it was obtained")
-    from_v = version_of(KIT)
-    r = subprocess.run(["git", "-C", str(KIT), "pull", "--ff-only", "-q"], capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit(f"aix self-update: git pull failed: {r.stderr.strip()}")
-    to_v = version_of(KIT)
-    print(f"kit clone {KIT}: {from_v} -> {to_v}" + ("" if from_v != to_v else " (already current)"))
-    if from_v != to_v:
-        print("run `aix upgrade` inside each project to bring it to this version (`aix upgrade --dry-run` shows the plan)")
+    before = version_of(KIT)
+    ok, message = git_pull(KIT)
+    if not ok:
+        sys.exit(f"aix self-update: git pull failed: {message}")
+    print(update_message(KIT, before, version_of(KIT)))
 
 
 def version_of(root: Path) -> str:
@@ -218,3 +237,21 @@ def version_of(root: Path) -> str:
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
+def self_test(args):
+    """aix self-test [NAME...] [--network] [-q]: the kit's own suite (tests/), from the clone. NAME = a file without
+    the test_ prefix (agents, layers, ...); --network adds the registry downloads; -q hides the per-test lines."""
+    if not is_kit_clone() or not (KIT / "tests").is_dir():
+        sys.exit("aix self-test: run it from a clone of AIX (the one `aix self-install` set up); projects carry no tests")
+    names = [a for a in args if not a.startswith("-")]
+    env = dict(os.environ)
+    if "--network" in args:
+        env["AIX_TEST_NETWORK"] = "1"
+    verbose = [] if "-q" in args else ["-v"]
+    patterns = [f"test_{n.removeprefix('test_').removesuffix('.py')}.py" for n in names] or ["test_*.py"]
+    failed = 0
+    for pat in patterns:
+        r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", str(KIT / "tests"), "-p", pat, *verbose], cwd=str(KIT), env=env)
+        failed += r.returncode != 0
+    sys.exit(1 if failed else 0)

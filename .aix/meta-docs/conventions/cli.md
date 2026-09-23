@@ -126,8 +126,8 @@ never leaves the kit checkout and is never touched by an upgrade.
 |---|---|---|---|
 | owned | `.aix/bin scripts templates meta-docs instructions profiles`, `.aix/skills/<category>/`, `.aix/skills/INDEX.md`, `.aix/skills/extern/registry.json`, `CLAUDE.md` | copied; hashed in `.aix/manifest.json` | overwritten, removed if gone from the kit; a local edit is reported by `aix doctor` and marked in the plan first |
 | merged | `AGENTS.md`, `GEMINI.md`, `.aix/config.yaml` | copied | kit text plus the project's parts: `## Always-on skills`, `## Project notes`, the managed sections; `disabled_skills`, `instructions`, `disabled_instructions`, `profile`, `use`, `source`, `style:` |
-| seeded | `docs/` | copied when absent | never touched |
-| layer | `.aix/org/`, `.aix/custom/` | copied when the origin has the folder | replaced when the origin (or `--from-org SRC` / `--from-custom SRC`, recorded as `source_org:` / `source_custom:`) has it, left alone when it does not |
+| seeded | `docs/` from `.aix/templates/docs/`, overlaid file by file by `org/templates/docs/` then `custom/templates/docs/`; pointer texts from `templates/pointers/` the same way | copied when absent | never touched |
+| layer | `.aix/org/`, `.aix/custom/` (skills, instructions, profiles, `templates/docs/`, `templates/pointers/`) | copied when the origin has the folder | replaced when the origin (or `--from-org SRC` / `--from-custom SRC`, recorded as `source_org:` / `source_custom:`) has it, left alone when it does not |
 
 Not in the list, therefore the project's: `.aix/skills/extern/<downloads>`, runtime folders, your code.
 Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.

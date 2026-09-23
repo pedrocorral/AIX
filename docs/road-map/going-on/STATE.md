@@ -1,18 +1,19 @@
 ---
-updated: 2026-09-07T20:33
+updated: 2026-09-23T10:00
 active_task: none
 agent_runtime: claude-code
 ---
 # Session state — read this first when resuming
 
 ## Where we are (3 lines max)
-- Kit work: TASK-0002 (Antigravity + Gemini CLI support via `GEMINI.md` pointer) completed 2026-09-05; changes uncommitted in the working tree.
-- Kit 2.17.0 (2026-09-22): .gitignore step (whole .aix/, under discussion) and -bak backups. 2.16.0: `aix agents` (which agents a project equips). 2.15.0: `aix self-install`, `self-update`, install.sh/install.ps1, `aix version` names both copies. 2.14.0: test suite (tests/, CI on three platforms). 2.13.0: `aix code find`, layers org/custom share one rule, --from-org/--from-custom. 2.12.0: payload.py, one positive install/upgrade list. 2.11.0: registry `class`, mattpocock/skills in the registry. 2.10.x: `aix/languages/*` standards. 2.9.0: `aix skills use`.: `aix/frameworks/*` ids (was stacks).: `aix instructions` (list, info, show, enable, disable), alias `aix rules`. 2.7.0: instruction blocks, kit FastAPI/React/Kedro standards + profiles. 2.6.x: --from. 2.6.0: `aix install --from` (organisation layer), examples/acme. 2.5.0: 28 new default skills (71 total, ten categories). 2.4.0: classes/implementations with `use:`, scoped instructions rendered per runtime, profiles. 2.3.0: skill overrides by layer (project `.aix/custom`, person `~/.config/aix`), index with hashes. 2.2.x: install fixes. 2.2.0: kit-file manifest, doctor/upgrade detect local edits, AGENTS.md rule 9. 2.1.0: `aix code vulnerabilities` (taint, CVE, history). 2.0.0: `.aix/` layout, in-place migration by `aix upgrade`. 1.10.0: `aix code stats` (TASK-0004). 1.9.0: `aix code security` (TASK-0003). 1.8.0: refactor skills. 1.7.3: AIX in capitals. 1.7.2: style limits respect tests, decorators, React, HTTP codes. 1.7.1: runtime detection + modernise tier in `aix code style`. 1.7.0: `aix code style` + readability.md. 1.6.0: command groups `aix code ...` / `aix docs ...`, old names aliased. 1.5.4: `aix code clones`. 1.5.3: `aix code dead`. 1.5.2: README modularity section, graph options in help. 1.5.1: `aix code graph` measurement fixed (stability, contracted cycles, upward deps, NCCD, Q, selftest). 1.5.0 on 2026-09-06: `aix code graph`/`complexity` (modularity metric), per-command help, kit scripts made acyclic. 1.4.0 earlier the same day: CLI, upgrade, security gate, modularity, Gemini/Antigravity.
+- Kit 2.18.0 (2026-09-23): `aix self-test`, the docs split (this folder is the kit's own; projects seeded from `.aix/templates/docs`), pointer templates, 84 tests.
+- Decisions of 2026-09-22/23 recorded as ADR-0001..0005 in `requirements/decisions/`; ADR-0004 (ignore whole `.aix/`) is under discussion with the team.
+- Release history lives in `../../../CHANGELOG.md`; contributor entry point `../../../AIX-DEVELOPMENT.md`.
 ## Files to load for the active task (nothing else)
 -
 ## Last verified facts (tests green? migrations applied? env?)
-- 2026-09-05: `aix install`, `aix docs validate` (0/0), `aix doctor` (healthy), `aix docs coverage`, `--into` scratch install all green.
+- 2026-09-23: `aix self-test` 78 green on Linux/Python 3.13; Windows and macOS await the first CI run.
 ## Immediate next action
-- Review and commit TASK-0002; decide where kit-development tasks live (they ship in the `--into` payload with `docs/`).
+- Team decision on ADR-0004; then the pending list in `pending/backlog/INDEX.md`.
 ## Blockers / questions for the user
-- (none)
+- ADR-0004: keep ignoring the whole `.aix/`, or only `index.json` and `manifest.json`?

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.18.0 — 2026-09-23
+
+- `aix self-test [NAME...] [--network] [-q]`: the kit's own suite from the clone, one word; `aix self-test agents` runs one file.
+- Tests for `aix self-update` (local origin), `aix self-test`, `install.sh` end to end (local repository) and doctor's leftover warning; 74 tests.
+- `aix code find` labels TypeScript files as `js/ts`.
+- The kit's `docs/` is now the kit's own ground truth (ADR-0001..0005 for this month's decisions, its tasks, `STATE.md`, `tests/suite.md`, a register of its own attack surface), validated by `aix docs validate` on the checkout. Projects are seeded from `.aix/templates/docs/` (the EXAMPLE domain, no kit history) and pointer files from `.aix/templates/pointers/`; `org/` and `custom/` overlay both by placing the same paths under their `templates/` (custom over org over kit). Everything a project receives now comes from inside `.aix/`. A project installed without `docs/` gets the seed at the next `aix install`.
+
 ## 2.17.0 — 2026-09-22
 
 - `.gitignore`: `aix install`, `aix upgrade` and `aix agents` show the AIX lines a project lacks (`.aix/`, the selected agents' skills folders, rendered `aix-*` files, the code-tool reports) and add them on a y/N (`aix upgrade --yes` answers yes); without a terminal the lines are printed and nothing is touched. The whole `.aix/` is ignored (decision 2026-09-22): teammates and CI get the kit from `aix install`, `.aix/custom/` and `.aix/org/` are not committed either.

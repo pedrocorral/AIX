@@ -1,6 +1,6 @@
-# road-map/pending/next/
-Ordered by priority (top first).
+# road-map/pending/next/ — prioritised, ready to start
+Ordered by priority (top = next).
 
-| Task | Title | Requirements |
-|---|---|---|
-| TASK-0001 | Bootstrap: vision, glossary, ADR-0001, project layout | — |
+| Task | Title |
+|---|---|
+| (none) | pick from `../backlog/INDEX.md` |

@@ -98,6 +98,8 @@ def install_into(project: Path, copy: bool):
     if not skills_dir.exists():
         sys.exit(f"no .aix/skills folder in {project}")
     try:
+        if not (project / "AIX-DEVELOPMENT.md").exists():
+            seed_project(project)  # a project without docs/ (e.g. installed before the seed existed) gets it now
         for rel, bak in agents.backup_foreign(project):
             print(f"  {rel} was not AIX's: kept as {bak}")
         prune_dangling(project)
@@ -246,12 +248,13 @@ POINTERS = {  # agent -> (file, text) for the agents that do not read AGENTS.md 
 
 
 def _pointer_files(project: Path):
-    """Pointer files for the selected agents that do not read AGENTS.md by themselves, STATE.md, and the kit-file manifest (projects only)."""
+    """Pointer files for the selected agents that do not read AGENTS.md by themselves (text from templates/pointers/, a
+    layer's copy winning), STATE.md, and the kit-file manifest (projects only)."""
     for agent, (rel, text) in POINTERS.items():
         f = project / rel
         if agent in agents.selected(project) and not f.exists():
             f.parent.mkdir(parents=True, exist_ok=True)
-            f.write_text(text, encoding="utf-8")
+            f.write_text(pointer_text(project, Path(rel).name, text), encoding="utf-8")
     state = project / "docs" / "road-map" / "going-on" / "STATE.md"
     if not state.exists():
         shutil.copy(project / ".aix" / "templates" / "session-state.md", state)
@@ -305,6 +308,49 @@ def replace_item(src: Path, dst: Path):
     copy_item(src, dst)
 
 
+def seed_sources(project: Path, name: str) -> list:
+    """The template folders for a seeded item, lowest layer first: the kit's .aix/templates/<name>, then org/, then custom/."""
+    import layers
+    out = []
+    for layer, root in layers.layer_roots(project):
+        if layer == "user":
+            continue
+        d = root / "templates" / name
+        if d.is_dir():
+            out.append((layer, d))
+    return out
+
+
+def seed_project(project: Path) -> list:
+    """Lay down the seeded payload items that are absent (docs/): kit template overlaid by the layers, file by file."""
+    done = []
+    for item, mode in payload.items(KIT_ROOT):
+        if mode != payload.SEEDED or (project / item).exists():
+            continue
+        sources = seed_sources(project, Path(payload.source_of(item)).name)
+        if not sources:
+            continue
+        for layer, d in sources:
+            for f in sorted(d.rglob("*")):
+                if f.is_file() and payload.is_payload_file(f.relative_to(d)):
+                    dst = project / item / f.relative_to(d)
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(f, dst)
+        done.append((item, [l for l, _ in sources]))
+        print(f"  seeded: {item} ({' < '.join(l for l, _ in sources)})")
+    return done
+
+
+def pointer_text(project: Path, name: str, fallback: str) -> str:
+    """The pointer file's text: the highest layer's templates/pointers/<name>, else the kit's, else the built-in."""
+    text = fallback
+    for _layer, d in seed_sources(project, "pointers"):
+        f = d / name
+        if f.is_file():
+            text = f.read_text(encoding="utf-8")
+    return text
+
+
 def copy_item(src: Path, dst: Path):
     """Copy one payload item (file or folder) without the ignored parts (__pycache__, *.pyc)."""
     if src.is_dir():
@@ -318,10 +364,10 @@ def copy_kit_into(project: Path, on_collision: str = "ask"):
     """Copy payload.items() into project. on_collision: ask | replace | skip | merge."""
     project.mkdir(parents=True, exist_ok=True)
     remembered = {} if on_collision == "ask" else {"all": on_collision}
-    for item, _mode in payload.items(KIT_ROOT):
-        src, dst = KIT_ROOT / item, project / item
-        if not src.exists():
-            continue
+    for item, mode in payload.items(KIT_ROOT):
+        src, dst = KIT_ROOT / payload.source_of(item), project / item
+        if not src.exists() or mode == payload.SEEDED or item in payload.AGENT_OF:
+            continue  # seeded items (docs/) and pointer files are laid down once the layers are in place (seed_project, _pointer_files)
         if not dst.exists():
             copy_item(src, dst)
             print(f"  added: {item}")

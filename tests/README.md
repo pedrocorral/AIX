@@ -6,8 +6,11 @@ is not in it), so no project ever receives them.
 ## Run
 
 ```bash
-python -m unittest discover -s tests -v
+aix self-test
 ```
+
+From the clone `aix self-install` set up. `aix self-test agents` runs one file, `--network` adds the registry
+downloads, `-q` hides the per-test lines. The long form is `python -m unittest discover -s tests -v`.
 
 No dependency beyond Python 3.10+. Add `AIX_TEST_NETWORK=1` to run the registry download tests (one file: `python -m unittest discover -s tests -p test_registry.py`). Windows runs the
 same command with `aix.cmd`; the curses checklist test is skipped there.
@@ -41,6 +44,8 @@ skipped when git or a tag is missing).
 | `test_agents.py` | `aix agents`: list, names, aliases, only the selected folders and pointers, deselection removes AIX files and keeps a person's, `--agents` at install, upgrade keeps the line, the checklist through a pseudo-terminal |
 | `test_gitignore.py` | missing lines printed without a terminal, added on `upgrade --yes` and on a y answer, once; a person's `CLAUDE.md` and `.github/skills` kept as `-bak` |
 | `test_selfinstall.py` | link, profile lines per shell, idempotence, foreign file kept, stale link replaced, dry run, refusal from a project, `aix version` naming both copies |
+| `test_docs_split.py` | projects seeded from `.aix/templates/docs`, the kit's own `docs/` never travels, upgrade leaves docs alone, org/custom overlay the seed and the pointer texts |
+| `test_selfcommands.py` | `aix self-update`: its units (`is_git_clone`, `version_of`, `git_pull` ok and failing, `update_message`) and the command against a local origin, `aix self-test` on one file and refused from a project, `install.sh` end to end with a local repository, doctor's leftover warning |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 
 ## Not covered

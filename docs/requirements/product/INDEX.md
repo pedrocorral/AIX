@@ -1,8 +1,7 @@
-# product/ — what we are building and the words we use
-Read this when: onboarding or naming something. Skip when: deep in a known domain.
+# product/ — vision and vocabulary of the kit
+Read this when: onboarding. Skip when: you know what a layer and an agent are.
 
 | Path | What | Read when |
 |---|---|---|
-| `vision.md` | Problem, users, value, scope boundaries | Onboarding |
-| `glossary.md` | Domain terms and `<DOMAIN>` codes used in IDs and folders | Creating any ID/folder |
-| `personas.md` | Who uses the system and what they need | Writing FRs and UX NFRs |
+| `vision.md` | What AIX is for | Onboarding |
+| `glossary.md` | The words the kit uses: agent, layer, payload, class, instruction, profile | Any doubt about a word |

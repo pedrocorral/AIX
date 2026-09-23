@@ -75,7 +75,8 @@ def rows_for(project: Path):
 
 
 def describe(r):
-    langs = " · ".join(f"{n} {l}" for l, n in sorted(r["langs"].items(), key=lambda kv: -kv[1])) or "-"
+    shown = {"js": "js/ts"}  # the tools parse .js/.jsx/.ts/.tsx as one language
+    langs = " · ".join(f"{n} {shown.get(l, l)}" for l, n in sorted(r["langs"].items(), key=lambda kv: -kv[1])) or "-"
     return langs, r["marker"], r["status"]
 
 

@@ -1,4 +1,4 @@
-"""Shared helpers for the AIX test suite. Every test works in a temporary folder: a temporary HOME (so ~/.local/bin,
+"""Shared helpers for the AIX test suite. @tests TS-KIT-001 (docs/tests/suite.md). Every test works in a temporary folder: a temporary HOME (so ~/.local/bin,
 ~/.cache/aix and the person layer are never touched), CI=1 and AIX_NO_USER=1 (no prompts, no TUI, no person layer),
 and the real launcher run as a subprocess. Nothing here writes outside that folder except the tests of the checkout
 itself (test_kit.py), which run `aix install` on the checkout the way a developer does."""

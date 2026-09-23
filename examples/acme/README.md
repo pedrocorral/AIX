@@ -16,7 +16,7 @@ cd my-app && aix profile use web-app        # or data-pipelines
   shared packages, plain language, the web-app profile) with `applyTo` globs; two profiles select them.
 - Two instruction blocks: one replaces the kit's `aix/agents/output` block (ACME commit format), one adds a
   `Compliance (ACME)` section to AGENTS.md.
-- Documentation templates under `templates/project-docs/`.
+- Documentation templates under `templates/project-docs/`. A layer may also ship `templates/docs/` (overlaid on the documentation seed every project receives) and `templates/pointers/` (the pointer texts).
 
 A real organisation forks the kit repository and fills `.aix/org/` with the same shape; upstream releases arrive
 by a normal git merge (upstream's `org/` is empty), and projects install with `--from` the fork's URL. The fork's
