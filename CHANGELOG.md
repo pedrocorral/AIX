@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.18.1 — 2026-09-23
+
+- `aix doctor` and `aix docs validate` report layer files that override nothing: a skill class or instruction id one edit away from a kit name (`coach/grill_me` vs `coach/grill-me`, `aix/agents/ouput`) is an error with "did you mean"; a genuinely new class or instruction is a note (doctor) or a warning (validate). Names match character by character, so a typo used to add a second skill next to the kit's, silently.
+
 ## 2.18.0 — 2026-09-23
 
 - `aix self-test [NAME...] [--network] [-q]`: the kit's own suite from the clone, one word; `aix self-test agents` runs one file.

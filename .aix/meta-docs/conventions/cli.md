@@ -82,7 +82,7 @@ upstream docs. `.aix/skills/extern/` is committed with the project; `aix skills 
 
 ## Overriding a skill (layers)
 A skill class is the folder name the runtimes link (`core-session-handoff`); its implementation is whichever layer
-wins. Layers, later wins: kit `.aix/skills/` < organisation `.aix/org/skills/` (later slice) < person
+wins. A layer file whose class or id matches no kit name adds a new one (legitimate) and is reported: `aix doctor` prints a note, `aix docs validate` a warning; when the name is one edit away from a kit name it is an error with "did you mean", because a typo would otherwise add a second skill next to the kit's. Layers, later wins: kit `.aix/skills/` < organisation `.aix/org/skills/` (later slice) < person
 `~/.config/aix/skills/` (terminal sessions only; never CI) < project `.aix/custom/skills/` (committed). A folder at
 the same class path replaces; a new path adds a class; an empty `DISABLED` file removes one. The class
 `description` must stay the same across implementations (it is what triggers the skill). `aix install` links the

@@ -157,7 +157,23 @@ def check_vul_register():
                 errors.append(f"vulnerability-register: {cells[0]} has invalid status '{cells[3]}'")
 
 
+def check_orphans():
+    """A layer file that overrides nothing: a near-miss of a kit name is an error (a typo), a genuine addition a warning."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import layers
+    new = {}
+    for kind, name, layer, path, near in layers.orphans(ROOT):
+        shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        if near:
+            errors.append(f"{shown}: {kind} {name} ({layer} layer) overrides nothing; did you mean {near}? (names must match character by character)")
+        else:
+            new.setdefault((kind, layer), []).append(name)
+    for (kind, layer), names in sorted(new.items()):
+        warnings.append(f"{len(names)} new {kind}{'s' if len(names) > 1 else ''} from the {layer} layer override nothing in the kit: {', '.join(names)}")
+
+
 if __name__ == "__main__":
+    check_orphans()
     check_instructions()
     check_status_drift()
     check_vul_evidence()

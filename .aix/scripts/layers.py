@@ -284,3 +284,46 @@ if __name__ == "__main__":
         print(f"{cls:40s} DISABLED by {l}")
     for k, v in instructions().items():
         print(f"instruction {k:36s} {v['layer']:8s} always={v['always']} applyTo={','.join(v['applyTo'])}")
+
+
+# ---- orphans: layer files that override nothing ---------------------------------------------------------------------
+
+def orphans(project: Path = ROOT, cutoff: float = 0.85) -> list:
+    """Skills and instructions in org/ or custom/ (or the user layer) that match nothing in the kit: a genuine addition,
+    or a typo one character away from a kit name. [(kind, name, layer, path, suggestion|None)]; `suggestion` is the
+    closest kit name when it is close enough (difflib ratio >= cutoff) — almost always a typo."""
+    out = []
+    found, _ = implementations(project)
+    kit_classes = sorted(c for c, impls in found.items() if any(i["layer"] == "kit" for i in impls))
+    for cls, impls in sorted(found.items()):
+        if any(i["layer"] == "kit" for i in impls):
+            continue
+        near = near_miss(cls, kit_classes, "-", cutoff)
+        for i in impls:
+            out.append(("skill", cls, i["layer"], i["path"], near))
+    kit_ids, layer_ids = set(), []
+    for layer, root in layer_roots(project):
+        base = root / "instructions"
+        for md in (sorted(base.rglob("*.md")) if base.is_dir() else []):
+            iid = front_matter(md).get("id")
+            if not iid:
+                continue
+            (kit_ids.add(iid) if layer == "kit" else layer_ids.append((iid, layer, md)))
+    for iid, layer, md in layer_ids:
+        if iid in kit_ids:
+            continue
+        out.append(("instruction", iid, layer, md, near_miss(iid, sorted(kit_ids), "/", cutoff)))
+    return out
+
+
+def near_miss(name: str, known: list, sep: str, cutoff: float = 0.85):
+    """The known name `name` is probably a typo of: same first segment (category, owner), remainder within the
+    difflib cutoff and at least 4 characters long. `implement-tdd` is not a typo of `implement-ui`; `coach-grill_me`
+    is one of `coach-grill-me`; `acme/x` is never a typo of `aix/y`."""
+    import difflib
+    head, _, rest = name.partition(sep)
+    if not rest or len(rest) < 4:
+        return None
+    candidates = {k.partition(sep)[2]: k for k in known if k.partition(sep)[0] == head and k.partition(sep)[2]}
+    hit = difflib.get_close_matches(rest, list(candidates), n=1, cutoff=cutoff)
+    return candidates[hit[0]] if hit else None

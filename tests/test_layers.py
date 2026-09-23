@@ -86,3 +86,38 @@ class BareLayerSources(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OrphansInLayers(unittest.TestCase):
+    """A layer file that overrides nothing: a near-miss of a kit name is a typo (error), a genuine addition a note."""
+    def setUp(self):
+        self.home = temp_home(self)
+        self.fork = make_fork(self.home, org=ACME)
+        org = self.fork / ".aix" / "org"
+        typo = org / "skills" / "coach" / "grill_me"
+        typo.mkdir(parents=True)
+        (typo / "SKILL.md").write_text("---\nname: coach-grill_me\ndescription: A relentless interview to sharpen a plan or design, with a typo in the class name.\n---\n# typo\n", encoding="utf-8")
+        (org / "instructions" / "ouput.md").write_text("---\nid: aix/agents/ouput\ndescription: An output block with a typo in its id, meant to replace the kit's.\nblock: true\norder: 50\nsection: \"Output\"\n---\n# text\n", encoding="utf-8")
+        self.project = self.home / "app"
+        install(self.home, self.project, kit=self.fork)
+
+    def test_near_misses_are_errors_with_a_suggestion(self):
+        v = project_cmd(self.project, self.home, "docs", "validate", check=False)
+        self.assertNotEqual(v.returncode, 0)
+        self.assertIn("skill coach-grill_me (org layer) overrides nothing; did you mean coach-grill-me?", v.stdout)
+        self.assertIn("instruction aix/agents/ouput (org layer) overrides nothing; did you mean aix/agents/output?", v.stdout)
+        d = project_cmd(self.project, self.home, "doctor", check=False)
+        self.assertIn("did you mean coach-grill-me", d.stdout)
+        self.assertIn("did you mean aix/agents/output", d.stdout)
+
+    def test_genuine_additions_are_only_noted(self):
+        shutil.rmtree(self.fork / ".aix" / "org" / "skills" / "coach" / "grill_me")
+        (self.fork / ".aix" / "org" / "instructions" / "ouput.md").unlink()
+        upgrade(self.project, self.home, kit=self.fork)
+        v = project_cmd(self.project, self.home, "docs", "validate")
+        self.assertIn("0 errors", v.stdout)
+        self.assertIn("new skill from the org layer override nothing in the kit: implement-tdd", v.stdout, "ACME's genuinely new class is a warning, not an error")
+        self.assertIn("new instructions from the org layer", v.stdout)
+        d = project_cmd(self.project, self.home, "doctor").stdout
+        self.assertIn("note: 1 new skill from the org layer (override nothing in the kit): implement-tdd", d)
+        self.assertIn("installation healthy", d)

@@ -118,6 +118,15 @@ def check_layers():
         print(f"instructions: {len(blocks)} AGENTS.md blocks ({', '.join(blocks)})")
         if scoped:
             print(f"instructions: {len(scoped)} scoped ({', '.join(scoped)})")
+    new = {}
+    for kind, name, layer, path, near in layers.orphans(ROOT):
+        shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+        if near:
+            problem(f"{kind} {name} ({layer} layer, {shown}) overrides nothing; did you mean {near}?", f"rename it to {near} (a class or id must match character by character to replace the kit's)")
+        else:
+            new.setdefault((kind, layer), []).append(name)
+    for (kind, layer), names in sorted(new.items()):
+        print(f"note: {len(names)} new {kind}{'s' if len(names) > 1 else ''} from the {layer} layer (override nothing in the kit): {', '.join(names)}")
     over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit" or r.get("chosen_by", "").startswith("config")]
     if over or idx["disabled"]:
         print("layers: " + (", ".join(over) if over else "no overrides") + (";  disabled by layers: " + ", ".join(idx["disabled"]) if idx["disabled"] else "")
