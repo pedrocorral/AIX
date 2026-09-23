@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.19.2 — 2026-09-23
+
+- The GitHub Actions workflow `aix-tests.yml` (added in 2.14.0 without asking) is removed: nothing runs on GitHub on a push; the suite runs with `aix self-test`.
+- Test suite: the launcher folder is put on the PATH of every test, so `aix doctor` passes on machines without `aix` installed (every CI runner: the first run failed all six jobs on that).
+
 ## 2.19.1 — 2026-09-23
 
 - Tagline: AIX is a spec-driven development kit (SDDK) for coding agents, stated once in the README, `aix about`, the guide's first chapter and the vision; everywhere else it is the kit.

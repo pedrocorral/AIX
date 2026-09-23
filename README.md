@@ -101,7 +101,7 @@ In the kit repository itself, `docs/` is the kit's own ground truth (its ADRs, t
 
 ## Tests
 
-`aix self-test` (from the clone; the long form is `python -m unittest discover -s tests`) runs the kit's own suite in temporary folders (install, upgrade from the previous release, layers, instructions, skills, code tools, migration); `tests/README.md` explains it. `tests/` is not in the payload, so projects never receive it.
+`aix self-test` (from the clone; the long form is `python -m unittest discover -s tests`) runs the kit's own suite in temporary folders (install, upgrade from the previous release, layers, instructions, skills, code tools, migration); `tests/README.md` explains it. `tests/` is not in the payload, so projects never receive it. Nothing runs on GitHub: the suite runs when you run it.
 
 ## Organisations, profiles, personal overrides
 

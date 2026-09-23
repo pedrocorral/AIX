@@ -24,4 +24,4 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_registry.py` | registry downloads (network) |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on
-wiring; the person layer; macOS and Windows (CI matrix); the agents actually reading the files.
+wiring; the person layer; macOS and Windows (never run); the agents actually reading the files.

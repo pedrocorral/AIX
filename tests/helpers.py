@@ -30,6 +30,7 @@ def temp_home(test) -> Path:
 
 def env(home: Path) -> dict:
     e = dict(os.environ)
+    e["PATH"] = os.pathsep.join([str(KIT / ".aix" / "bin"), e.get("PATH", "")])  # `aix` on PATH, as after self-install; CI runners have none
     e.update({"HOME": str(home), "USERPROFILE": str(home), "CI": "1", "AIX_NO_USER": "1", "AIX_CACHE": str(home / "cache"),
               "TERM": "xterm", "PYTHONDONTWRITEBYTECODE": "1",
               "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"})

@@ -13,7 +13,7 @@ From the clone `aix self-install` set up. `aix self-test agents` runs one file, 
 downloads, `-q` hides the per-test lines. The long form is `python -m unittest discover -s tests -v`.
 
 No dependency beyond Python 3.10+. Add `AIX_TEST_NETWORK=1` to run the registry download tests (one file: `python -m unittest discover -s tests -p test_registry.py`). Windows runs the
-same command with `aix.cmd`; the curses checklist test is skipped there.
+same command with `aix.cmd`; the curses checklist test is skipped there. The suite runs only when someone runs it; there is no CI workflow.
 
 ## How a test works
 
