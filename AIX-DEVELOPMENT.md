@@ -1,4 +1,4 @@
-# AIX-DEVELOPMENT.md — everything about the kit itself
+# AIX-DEVELOPMENT.md — everything about the kit itself (AIX, a spec-driven development kit, SDDK)
 
 > The kit is itself an AIX project: its decisions are `docs/requirements/decisions/ADR-*`, its state `docs/road-map/going-on/STATE.md`, its test map `docs/tests/suite.md`, all validated by `aix docs validate` on the checkout. This file is the contributor entry point; projects receive `.aix/templates/docs/`, never `docs/`.
 

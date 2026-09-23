@@ -11,9 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import agents
 
-MARK = "# AIX: generated per machine by `aix install` (kit copy, agent links, rendered files, reports)"
-REPORTS = ["docs/tests/coverage-matrix.md", "docs/tests/dependency-graph.md", "docs/tests/code-style.md",
-           "docs/tests/code-security.md", "docs/tests/code-stats.md", "docs/tests/code-vulnerabilities.md"]
+MARK = "# AIX: generated per machine by `aix install` (kit copy, agent links, rendered files)"
+REPORTS = []   # nothing under docs/ is ever proposed (decision 2026-09-23): the generated reports there are the project's to commit or not
 
 
 def wanted(project: Path) -> list:

@@ -27,9 +27,10 @@ class GitignoreLines(unittest.TestCase):
         r = upgrade(self.project, self.home)
         self.assertIn("added", r.stdout)
         text = gitignore(self.project)
-        for line in (".aix/", ".claude/skills/", ".cursor/skills/", ".cursor/rules/aix-*", "docs/tests/coverage-matrix.md"):
+        for line in (".aix/", ".claude/skills/", ".cursor/skills/", ".cursor/rules/aix-*"):
             self.assertIn(line + "\n", text, line)
         self.assertNotIn(".github/skills/", text, "copilot is not selected")
+        self.assertNotIn("docs/", text, "nothing under docs/ is ever proposed")
         self.assertNotIn(".agents/skills/", text)
         r = upgrade(self.project, self.home)
         self.assertNotIn("lacks", r.stdout, "second run: nothing missing")
@@ -43,7 +44,8 @@ class GitignoreLines(unittest.TestCase):
         text = gitignore(self.project)
         self.assertTrue(text.startswith("node_modules/\n.aix\n.claude/skills/\n"), "a person's lines are untouched")
         self.assertEqual(text.count(".claude/skills/"), 1, ".aix and .claude/skills were already there (trailing slash or not)")
-        self.assertIn("docs/tests/code-style.md\n", text)
+        self.assertEqual(text, "node_modules/\n.aix\n.claude/skills/\n", "everything needed was already there: the file is untouched")
+        self.assertNotIn("lacks", r.stdout)
 
     @unittest.skipIf(os.name == "nt", "pseudo-terminal: Linux/macOS only")
     def test_agents_asks_and_a_y_answer_writes(self):

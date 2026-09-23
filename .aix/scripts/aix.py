@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AIX is a spec-driven development kit for AI coding agents: documentation is the ground truth,
+"""AIX is a spec-driven development kit (SDDK) for AI coding agents: documentation is the ground truth,
 code is its implementation, and every change leaves a traceable trail. `aix install` puts everything
 an agent needs to build any application into your project: {n} skills for specifying, designing,
 implementing, testing, auditing and reviewing; design patterns and architecture guides (MVC,
@@ -120,8 +120,8 @@ from project import find_project
 
 
 ABOUT = """\
-AIX — Spec-Driven Development Kit for Agentic AI
-=================================================
+AIX — a spec-driven development kit (SDDK) for coding agents
+============================================================
 
 1. PURPOSE
 ----------

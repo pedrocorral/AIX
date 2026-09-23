@@ -1,6 +1,6 @@
-# AIX — Spec-Driven Development Kit for Agentic AI
+# AIX — a spec-driven development kit (SDDK) for coding agents
 
-A language-agnostic, clone-and-go framework for building applications with AI coding agents
+AIX is a spec-driven development kit (SDDK): a language-agnostic, clone-and-go kit for building applications with AI coding agents
 (opencode, VS Code / Copilot, Claude Code, Cursor, Antigravity, Gemini CLI, …) where **documentation is the ground truth**
 and code is its optimised implementation.
 

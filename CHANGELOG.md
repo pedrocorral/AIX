@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.19.1 — 2026-09-23
+
+- Tagline: AIX is a spec-driven development kit (SDDK) for coding agents, stated once in the README, `aix about`, the guide's first chapter and the vision; everywhere else it is the kit.
+
+- The `.gitignore` step never proposes a line under `docs/`: the generated reports there (`coverage-matrix.md`, `dependency-graph.md`, `code-*.md`) are the project's to commit or not.
+
 ## 2.19.0 — 2026-09-23
 
 - `aix guide [CHAPTER] [--all]`: the user guide, eleven chapters in plain language (start, concepts, install, agents, skills, instructions, organisation, docs, code, maintain, reference) under `.aix/meta-docs/guide/`, so it travels with every project and a layer can replace a chapter. Paged in a terminal.

@@ -134,7 +134,7 @@ Project-specific agent instructions therefore go in a `## Project notes` section
 
 ## .gitignore and backups
 `aix install`, `aix upgrade` and `aix agents` compare `.gitignore` with what AIX generates per machine, `.aix/`, the
-selected agents' skills folders, `.github/instructions/aix-*`, `.cursor/rules/aix-*`, the reports under `docs/tests/`,
+selected agents' skills folders, `.github/instructions/aix-*`, `.cursor/rules/aix-*` (never anything under `docs/`),
 print the missing lines and add them on a y/N (`upgrade --yes` answers yes; no terminal: printed, untouched). Lines
 are appended once under a marker comment, never edited. Where AIX writes and a person's file or folder already sits,
 it is renamed `<name>-bak` first (`.github/skills-bak`, `CLAUDE.md-bak`), never a parent folder such as `.github/`.

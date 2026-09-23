@@ -66,7 +66,8 @@ skills, your code.
 ## `.gitignore`
 AIX generates per-machine files. `aix install`, `aix upgrade` and `aix agents` show the lines your `.gitignore`
 lacks and add them when you say yes: `.aix/`, the selected agents' skills folders, the rendered `aix-*` instruction
-files, the reports the code tools write. Lines are appended once under a marker; your lines are never edited.
+files. Nothing under `docs/` is ever proposed: the reports the tools write there are yours to commit or not. Lines are
+appended once under a marker; your lines are never edited.
 
 Note: the whole `.aix/` is ignored, by decision. Every teammate and every CI job therefore runs
 `aix install --into .` before the tools work, and `.aix/custom/` and `.aix/org/` are not committed either. The

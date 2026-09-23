@@ -5,8 +5,8 @@ title: Start here
 # 1. Start here
 
 ## What AIX is
-AIX is a kit for building software with coding agents such as Claude Code, GitHub Copilot, Cursor, Gemini CLI,
-OpenCode and Codex. It puts into your project the things those agents read: documentation that is the ground truth,
+AIX is a spec-driven development kit (SDDK) for building software with coding agents such as Claude Code,
+GitHub Copilot, Cursor, Gemini CLI, OpenCode and Codex. In this guide it is simply the kit. It puts into your project the things those agents read: documentation that is the ground truth,
 skills (procedures the agent follows on demand), instructions (rules the agent obeys without being asked), and a
 command line tool, `aix`, that installs all of it, keeps it up to date and measures your code.
 
