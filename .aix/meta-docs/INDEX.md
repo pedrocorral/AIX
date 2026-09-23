@@ -4,6 +4,7 @@ Language-agnostic guidance. Stack specifics live in `stacks/`. Each sub-folder h
 
 | Folder | What | Read when |
 |---|---|---|
+| `guide/` | The user guide, chapter by chapter: start, concepts, install, agents, skills, instructions, organisations, docs, code tools, maintenance, command reference (`aix guide`) | Learning how to do something with AIX |
 | `workflow/` | The spec-driven loop, conflict resolution, session protocol, definition of done | Starting any task; on code/spec disagreement |
 | `conventions/` | IDs & traceability, document format, token economy (how to find things cheaply), git, the `aix` CLI | Writing any doc; when unsure where something is |
 | `architecture/` | Modularity (the governing principle), MVC, frontend/backend separation, layering, project layout, API design, config & secrets, errors & logging | Designing a new app or feature; deciding where code goes |

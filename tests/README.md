@@ -33,7 +33,7 @@ skipped when git or a tag is missing).
 |---|---|
 | `helpers.py` | `run`, `install`, `upgrade`, `project_cmd`, `assert_healthy`, `make_fork`, `previous_kit`, `fixture` |
 | `fixtures/` | small template folders: a flat project, a three-project folder, a bare custom layer ([README](fixtures/README.md)) |
-| `test_kit.py` | the checkout: install, doctor, validate, graph gate on the scripts, selftests, help |
+| `test_kit.py` | the checkout: install, doctor, validate, graph gate on the scripts, selftests, help, the guide |
 | `test_install.py` | a fresh install: exactly the payload, manifest, links and pointers, idempotent, `--copy`, collisions |
 | `test_upgrade.py` | from the previous release: files added, profile/instructions/`code_roots`/notes kept, local edit flagged |
 | `test_layers.py` | `.aix/org/` and `.aix/custom/`: fork install, a fork edit reaching the project, `--from`, `--from-org`, `--from-custom` |

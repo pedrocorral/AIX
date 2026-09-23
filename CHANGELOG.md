@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.19.0 — 2026-09-23
+
+- `aix guide [CHAPTER] [--all]`: the user guide, eleven chapters in plain language (start, concepts, install, agents, skills, instructions, organisation, docs, code, maintain, reference) under `.aix/meta-docs/guide/`, so it travels with every project and a layer can replace a chapter. Paged in a terminal.
+
 ## 2.18.1 — 2026-09-23
 
 - `aix doctor` and `aix docs validate` report layer files that override nothing: a skill class or instruction id one edit away from a kit name (`coach/grill_me` vs `coach/grill-me`, `aix/agents/ouput`) is an error with "did you mean"; a genuinely new class or instruction is a note (doctor) or a warning (validate). Names match character by character, so a typo used to add a second skill next to the kit's, silently.

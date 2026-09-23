@@ -11,6 +11,7 @@ Usage: aix <group> <command> [args]   (no command = this help; aix help <command
 aix acts on the nearest project at or above the current folder (the one holding .aix/config.yaml).
 
 The kit
+  aix guide [CHAPTER]                 the user guide: start, concepts, install, agents, skills, instructions, ...
   aix self-install                    make `aix` callable from any terminal (link + PATH in your shell profile)
   aix self-test [NAME...]             run the kit's own tests (from the clone)
   aix install [--into DIR] [--copy]   link skills into agent runtimes; --into copies the kit into DIR first
@@ -109,7 +110,7 @@ The skills                            (aix skills ...)
 Old forms still work: aix graph|complexity|validate|coverage|security = aix code graph | aix docs ...
 
 Launchers: `aix` (bash, Linux/macOS) and `aix.cmd` (Windows) simply call this file with python3."""
-import os, subprocess, sys
+import os, re, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -258,6 +259,8 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
                             alias: aix install aix.   aix self-update = git pull of the clone.
   aix self-test [NAME...]   the kit's own test suite from the clone (tests/); NAME = one file (agents, layers, ...);
                             --network adds the registry downloads; -q hides the per-test lines
+  aix guide [CHAPTER|--all] the user guide, eleven chapters in plain language (.aix/meta-docs/guide/); no argument
+                            lists them; a key or number opens one (aix guide skills, aix guide 5)
   aix install               link all skills into the five runtime folders; write pointer files for Copilot, Cursor
                             and Gemini CLI if missing; create road-map STATE.md if missing; refresh the ~/.local/bin
                             link when that folder exists. Idempotent.
@@ -353,7 +356,7 @@ def skill_count():
     return sum(1 for _ in (ROOT / ".aix" / "skills").rglob("SKILL.md"))
 
 
-ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update", "self-test"}  # need no project
+ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update", "self-test", "guide"}  # need no project
 
 
 def is_kit() -> bool:
@@ -786,6 +789,14 @@ Where AIX writes and a person's file or folder already sits (CLAUDE.md, GEMINI.m
 as `<name>-bak` first. After the selection, the .gitignore lines AIX needs (.aix/, the selected agents' skills
 folders, rendered aix-* files, reports) are shown and added on a y/N (`aix install`, `aix upgrade --yes` too)."""
 
+TOPICS["guide"] = """aix guide [CHAPTER...] [--all]
+
+The user guide: 1 start, 2 concepts, 3 install, 4 agents, 5 skills, 6 instructions, 7 organisation, 8 docs,
+9 code, 10 maintain, 11 reference. `aix guide` lists them; `aix guide skills` or `aix guide 5` prints one; `--all`
+prints everything. Long output goes through your pager ($PAGER, else less) in a terminal. The chapters live in
+.aix/meta-docs/guide/ and travel with every project; an organisation or a project can replace a chapter by placing
+the same file under its layer's meta-docs/guide/."""
+
 TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID      (alias: aix rules ...)
 
 Instructions are the second kind of thing a layer ships, next to skills. Two kinds:
@@ -866,7 +877,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: self-install, install, upgrade, doctor, agents, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: guide, self-install, install, upgrade, doctor, agents, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -1026,6 +1037,64 @@ def run_code(args):
     graph.main(CODE_MODES[sub] + rest)
 
 
+def guide_chapters():
+    """[(key, title, path)] of the guide, the kit's .aix/meta-docs/guide/NN-key.md overlaid by a layer's copy of the same file."""
+    import layers
+    files = {}
+    for layer, root in layers.layer_roots(ROOT):
+        base = (root / "meta-docs" / "guide") if layer != "kit" else (ROOT / ".aix" / "meta-docs" / "guide")
+        for f in (sorted(base.glob("[0-9][0-9]-*.md")) if base.is_dir() else []):
+            files[f.name] = f
+    out = []
+    for name in sorted(files):
+        text = files[name].read_text(encoding="utf-8")
+        m = re.search(r"^title:\s*(.+)$", text, re.M)
+        out.append((name[3:-3], m.group(1).strip() if m else name, files[name]))
+    return out
+
+
+def run_guide(args):
+    """aix guide [CHAPTER] [--all]: the user guide. No argument: the table of contents; a chapter key or number: that chapter."""
+    import re as _re
+    chapters = guide_chapters()
+    if not chapters:
+        sys.exit("aix guide: no guide found under .aix/meta-docs/guide/")
+    want = [a for a in args if not a.startswith("-")]
+    if "--all" in args:
+        want = [k for k, _, _ in chapters]
+    if not want:
+        print("The AIX guide — `aix guide <chapter>` opens one, `aix guide --all` prints everything\n")
+        for i, (key, title, _) in enumerate(chapters, 1):
+            print(f"  {i:2d}  {key:14s} {title}")
+        print("\nOther help: `aix help <command>` for one command, `aix doctor` for what is wrong here.")
+        return
+    keys = {k: (k, t, p) for k, t, p in chapters}
+    keys.update({str(i): c for i, c in enumerate(chapters, 1)})
+    texts = []
+    for w in want:
+        c = keys.get(w.lower().lstrip("0")) or keys.get(w.lower())
+        if not c:
+            sys.exit(f"aix guide: no chapter '{w}'. Chapters: " + ", ".join(k for k, _, _ in chapters))
+        body = c[2].read_text(encoding="utf-8")
+        body = body[body.find("\n---", 3) + 4:].lstrip("\n") if body.startswith("---") else body
+        texts.append(body.rstrip("\n") + "\n")
+    page("\n\n".join(texts))
+
+
+def page(text: str):
+    """Print through a pager when there is a terminal and the text is longer than it; plain print otherwise."""
+    import shutil as _sh, subprocess as _sp
+    rows = _sh.get_terminal_size((80, 24)).lines
+    pager = os.environ.get("PAGER") or ("less" if _sh.which("less") else None)
+    if sys.stdout.isatty() and pager and text.count("\n") > rows - 2 and not os.environ.get("CI"):
+        try:
+            _sp.run([pager, "-R", "-F", "-X"] if pager == "less" else [pager], input=text, text=True)
+            return
+        except OSError:
+            pass
+    print(text, end="")
+
+
 def run_agents(args):
     """aix agents [NAME... | all] [--list]: which agents the project equips; checklist in a terminal."""
     import agents, install_skills as inst
@@ -1176,6 +1245,8 @@ def main(argv):
         run_instructions(args)
     elif cmd == "agents":
         run_agents(args)
+    elif cmd == "guide":
+        run_guide(args)
     elif cmd in ("version", "-V", "--version"):
         print(version_line())
     else:

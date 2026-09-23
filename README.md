@@ -95,6 +95,10 @@ Projects on the 1.x layout (kit folders at the root, `framework.yaml`) are migra
 
 In the kit repository itself, `docs/` is the kit's own ground truth (its ADRs, tasks, state, test map). Projects are seeded from `.aix/templates/docs/`, and pointer files from `.aix/templates/pointers/`; an organisation or a project overlays both by placing the same paths under its own `templates/`.
 
+## The guide
+
+`aix guide` prints the table of contents of the user guide, eleven chapters in plain language (`aix guide skills`, `aix guide 5`, `aix guide --all`); it travels with every project under `.aix/meta-docs/guide/`.
+
 ## Tests
 
 `aix self-test` (from the clone; the long form is `python -m unittest discover -s tests`) runs the kit's own suite in temporary folders (install, upgrade from the previous release, layers, instructions, skills, code tools, migration); `tests/README.md` explains it. `tests/` is not in the payload, so projects never receive it.
