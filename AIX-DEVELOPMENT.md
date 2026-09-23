@@ -51,7 +51,6 @@ AIX/
 ├── docs/                    # the kit's OWN ground truth (ADR-*, tasks, STATE.md, tests/suite.md); never copied into projects
 ├── .aix/templates/docs/     # the documentation seed projects receive (EXAMPLE domain); .aix/templates/pointers/ the pointer texts; both overlayable by org/ and custom/
 ├── .aix/bin/aix, aix.cmd    # launchers (bash / Windows batch) → .aix/scripts/aix.py; `aix install` links the bash one into ~/.local/bin
-├── .github/workflows/AIX-docs.yml   # CI: validate.py + coverage_matrix.py
 ├── scripts/
 │   ├── aix.py               # the CLI: install / validate / coverage / task / version (dispatches to the modules below)
 │   ├── doctor.py            # `aix doctor`: installation health checks with fixes

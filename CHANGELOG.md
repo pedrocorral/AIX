@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.19.3 — 2026-09-23
+
+- The remaining GitHub Actions workflow (`aix-docs.yml`, from the initial commit) is removed: nothing of AIX runs on GitHub.
+
 ## 2.19.2 — 2026-09-23
 
 - The GitHub Actions workflow `aix-tests.yml` (added in 2.14.0 without asking) is removed: nothing runs on GitHub on a push; the suite runs with `aix self-test`.
