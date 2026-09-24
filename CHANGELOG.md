@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.2 — 2026-09-24
+
+- The kit commits its own generated reports (`docs/tests/coverage-matrix.md`, `dependency-graph.md`, `code-style.md`, `code-security.md`, `code-stats.md`, `code-vulnerabilities.md`): the `.gitignore` lines that hid them are gone, as the kit already asks of projects. They are regenerated at release time only, so the history shows the numbers per release without churn in between.
+
 ## 2.21.1 — 2026-09-24
 
 - Dogfooding: the kit's own scripts pass the kit's own gates. `aix code style --gate` (every function under the readability limits, every file under 400 lines), `aix code graph --gate`, `aix code dead --functions --gate`, `aix code clones --gate`, `aix code security --gate` and `aix code vulnerabilities --gate` all pass on `.aix/scripts` and `tests/`; `aix check` on the kit (policy `minimal`) passes. 110 functions were over a limit, 3 clone groups existed; now none. The kit measures `.aix/scripts` and `tests` by default (in a project `.aix/` stays skipped).

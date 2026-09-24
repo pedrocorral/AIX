@@ -4,13 +4,6 @@
 .github/skills/
 .agents/skills/
 .cursor/skills/
-# generated reports
-docs/tests/coverage-matrix.md
-docs/tests/dependency-graph.md
-docs/tests/code-style.md
-docs/tests/code-security.md
-docs/tests/code-stats.md
-docs/tests/code-vulnerabilities.md
 # per-machine resolution of skill layers (depends on ~/.config/aix)
 .aix/index.json
 # usual suspects
