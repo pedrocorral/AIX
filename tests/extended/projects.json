@@ -1,0 +1,14 @@
+[
+  {"name": "flask", "url": "https://github.com/pallets/flask.git", "ref": "3.1.0", "commit": "ab8149664182b662453a563161aa89013c806dc9", "kind": "clean", "langs": ["python"]},
+  {"name": "requests", "url": "https://github.com/psf/requests.git", "ref": "v2.32.3", "commit": "0e322af87745eff34caffe4df68456ebc20d9068", "kind": "clean", "langs": ["python"]},
+  {"name": "express", "url": "https://github.com/expressjs/express.git", "ref": "4.21.2", "commit": "1faf228935aa0a13111f92c28ee795be64ce3f0f", "kind": "clean", "langs": ["js"]},
+  {"name": "excalidraw", "url": "https://github.com/excalidraw/excalidraw.git", "ref": "v0.17.6", "commit": "0dbd2a39319d41fda37b2945dea0dcbd58d6a564", "kind": "clean", "langs": ["js"]},
+  {"name": "spring-petclinic", "url": "https://github.com/spring-projects/spring-petclinic.git", "ref": "main", "commit": "818c4136ea971c21674525f9053de0d9c7ad8cfe", "kind": "clean", "langs": ["java"]},
+  {"name": "commons-lang", "url": "https://github.com/apache/commons-lang.git", "ref": "rel/commons-lang-3.17.0", "commit": "29ccc7665f3bc5d84155a3092ab2209a053324e6", "kind": "clean", "langs": ["java"]},
+  {"name": "ripgrep", "url": "https://github.com/BurntSushi/ripgrep.git", "ref": "14.1.1", "commit": "4649aa9700619f94cf9c66876e9549d83420e16c", "kind": "clean", "langs": ["rust"]},
+  {"name": "bat", "url": "https://github.com/sharkdp/bat.git", "ref": "v0.24.0", "commit": "fc9546854f5a7b38823f4990453c6cde386bfd3b", "kind": "clean", "langs": ["rust"]},
+  {"name": "NodeGoat", "url": "https://github.com/OWASP/NodeGoat.git", "ref": "master", "commit": "c5cb68a7084e4ae7dcc60e6a98768720a81841e8", "kind": "vulnerable", "langs": ["js"]},
+  {"name": "pygoat", "url": "https://github.com/adeyosemanputra/pygoat.git", "ref": "master", "commit": "19d17cc8874861142b330636d068bbde54e86b85", "kind": "vulnerable", "langs": ["python"]},
+  {"name": "WebGoat", "url": "https://github.com/WebGoat/WebGoat.git", "ref": "v2023.8", "commit": "5357a65e054976cd7d79b81ef3906ded050ed921", "kind": "vulnerable", "langs": ["java"]},
+  {"name": "juice-shop", "url": "https://github.com/juice-shop/juice-shop.git", "ref": "v17.1.1", "commit": "39b46860612990ae18d499a20472172839fe8c77", "kind": "vulnerable", "langs": ["js"]}
+]

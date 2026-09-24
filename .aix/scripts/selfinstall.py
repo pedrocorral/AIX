@@ -271,21 +271,30 @@ if __name__ == "__main__":
 
 
 def _test_patterns(args) -> list:
-    """`agents layers` -> test_agents.py, test_layers.py; nothing -> every test file."""
+    """`agents layers` -> test_agents.py, test_layers.py; nothing -> every test file; --extended alone -> the extended one."""
     names = [a for a in args if not a.startswith("-")]
+    if not names and "--extended" in args:
+        return ["test_extended.py"]
     return [f"test_{n.removeprefix('test_').removesuffix('.py')}.py" for n in names] or ["test_*.py"]
 
 
+def _test_env(args) -> dict:
+    flags = {"--network": "AIX_TEST_NETWORK", "--extended": "AIX_TEST_EXTENDED", "--record": "AIX_TEST_RECORD"}
+    return {**os.environ, **{var: "1" for flag, var in flags.items() if flag in args}}
+
+
 def _run_tests(pattern: str, args) -> int:
-    env = {**os.environ, **({"AIX_TEST_NETWORK": "1"} if "--network" in args else {})}
+    env = _test_env(args)
     verbose = [] if "-q" in args else ["-v"]
     cmd = [sys.executable, "-m", "unittest", "discover", "-s", str(KIT / "tests"), "-p", pattern, *verbose]
     return subprocess.run(cmd, cwd=str(KIT), env=env).returncode
 
 
 def self_test(args):
-    """aix self-test [NAME...] [--network] [-q]: the kit's own suite (tests/), from the clone. NAME = a file without
-    the test_ prefix (agents, layers, ...); --network adds the registry downloads; -q hides the per-test lines."""
+    """aix self-test [NAME...] [--network] [--extended [--record]] [-q]: the kit's own suite (tests/), from the clone.
+    NAME = a file without the test_ prefix (agents, layers, ...); --network adds the registry downloads; --extended
+    runs the code tools on real projects cloned into ~/.cache/aix/extended (--record accepts the numbers);
+    -q hides the per-test lines."""
     if not is_kit_clone() or not (KIT / "tests").is_dir():
         sys.exit("aix self-test: run it from a clone of AIX (the one `aix self-install` set up); projects carry no tests")
     results = [_run_tests(pattern, args) for pattern in _test_patterns(args)]

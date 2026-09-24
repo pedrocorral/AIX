@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.21.7 — 2026-09-24
+
+- `aix self-test --extended`: every code tool on twelve real projects (Flask, requests, Express, Excalidraw, Spring PetClinic, commons-lang, ripgrep, bat; NodeGoat, PyGoat, WebGoat, Juice Shop), cloned shallow at a pinned commit into `~/.cache/aix/extended/` on the first run and never into the repository. Per project: no traceback, each tool under 120 s, every recorded number within 10 % of `tests/extended/expected.json` (`--record` accepts a reviewed change), and every documented vulnerability of `tests/extended/known.json` found by the tool named for it (21 entries, verified line by line). Skipped in the normal suite.
+- Found by it and fixed: `aix install --into` crashed on a project that already had a `docs/` folder (every Sphinx or mkdocs project); such a project keeps its docs and gets only the road-map the commands need. `aix code graph` crashed on a JavaScript import of an asset (`lock.svg`, `package.json`); an import of a non-source file is not an edge. Vendored and minified files (`vendor/`, `third_party/`, `*.min.js`, `*.bundle.js`) are never measured. A `=` or `+` at the end of a line continues the statement for the assembled-then-used rule (WebGoat's SQL lessons build their queries that way). A rule with no sink in a language matched comment-only lines in Rust (25 false findings on ripgrep).
+- Seen and left for later, in the backlog: clone counts in the hundreds on real code and dead-module counts that ignore Spring reflection, TypeScript path aliases and Rust workspaces.
+
 ## 2.21.6 — 2026-09-24
 
 - `aix code security` reports a string assembled from a literal plus a value on one line and passed to a dangerous call within the next 40 lines, in Python, JavaScript/TypeScript, Java and Rust. The literal picks the sinks: SQL keyword, path (or `path.join`/`Paths.get`), HTML, template, URL; a shell or eval sink takes any literal. Every use of the variable is reported until it is reassigned. The SQL two-line rule of 2.21.3 became one row of this table. `tests/test_two_line.py`. The rule found one case in the kit itself (the registry download URL in `extern.py`), accepted in code with its reason.

@@ -84,19 +84,48 @@ def _copy_tree_over(src: Path, dst_root: Path):
             shutil.copy(f, dst)
 
 
+def _seed_target(project: Path, item: str):
+    """(sub-tree to copy, destination): the whole item when absent, its road-map when the project has its own docs/,
+    None when nothing is missing."""
+    dest = project / item
+    if not dest.exists():
+        return "", dest
+    sub = _missing_part(dest)
+    return (sub, dest / sub) if sub else None
+
+
+def _seed_one(project: Path, item: str):
+    """Copy the layers' templates for one seeded item; (layers used, sub-tree) or None when nothing was missing."""
+    target = _seed_target(project, item)
+    if target is None:
+        return None
+    sub, dest = target
+    sources = seed_sources(project, Path(payload.source_of(item)).name)
+    for _layer, d in sources:
+        _copy_tree_over(d / sub if sub else d, dest)
+    return [l for l, _ in sources], sub
+
+
 def seed_project(project: Path, kit: Path = KIT_ROOT) -> list:
-    """Lay down the seeded payload items that are absent (docs/): kit template overlaid by the layers, file by file."""
+    """Lay down the seeded payload items that are absent (docs/): kit template overlaid by the layers, file by file.
+    A project with its own docs/ keeps it and only gets the road-map the commands need."""
     done = []
     for item, mode in payload.items(kit):
-        if mode != payload.SEEDED or (project / item).exists():
-            continue
-        sources = seed_sources(project, Path(payload.source_of(item)).name)
-        for _layer, d in sources:
-            _copy_tree_over(d, project / item)
-        if sources:
-            done.append((item, [l for l, _ in sources]))
-            print(f"  seeded: {item} ({' < '.join(l for l, _ in sources)})")
+        seeded = _seed_one(project, item) if mode == payload.SEEDED else None
+        if seeded and seeded[0]:
+            layers_used, sub = seeded
+            done.append((item, layers_used))
+            print(f"  seeded: {item}{'/' + sub if sub else ''} ({' < '.join(layers_used)})" + ("  (the folder existed; only the road-map was added)" if sub else ""))
     return done
+
+
+KIT_NEEDS = "road-map"   # the part of docs/ the commands need (tasks, STATE.md) when a project already has its own docs/
+
+
+def _missing_part(existing: Path):
+    """For a seeded folder that already exists (a project with its own docs/): the sub-tree the kit needs when it is
+    absent, else None (nothing to add; the project's docs are left alone)."""
+    return KIT_NEEDS if not (existing / KIT_NEEDS).exists() else None
 
 
 def pointer_text(project: Path, name: str, fallback: str) -> str:

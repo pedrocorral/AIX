@@ -198,8 +198,9 @@ def _edges_of(f: Path, py_idx, java_idx) -> list:
 def module_graph(roots):
     files = list(source_files(roots))
     py_idx, java_idx = python_index(files), _java_index(files)
-    edges = {(rel(f), rel(t)) for f in files for t in _edges_of(f, py_idx, java_idx) if t.resolve() != f.resolve()}
-    return {rel(f) for f in files}, edges
+    nodes = {rel(f) for f in files}
+    edges = {(rel(f), rel(t)) for f in files for t in _edges_of(f, py_idx, java_idx) if t.resolve() != f.resolve() and rel(t) in nodes}
+    return nodes, edges  # an import of an asset (lock.svg, package.json) or of a file outside the roots is not an edge
 
 
 # ---- function-level graph (Python) -----------------------------------------------------------------------

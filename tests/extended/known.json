@@ -1,0 +1,32 @@
+{
+  "_comment": "Documented vulnerabilities of the vulnerable-by-design apps, verified line by line at the pinned commit; `tool` is the aix code tool whose report on that file must name file:line.",
+  "NodeGoat": [
+    {"file": "app/routes/contributions.js", "line": 32, "tool": "vulnerabilities", "what": "A1 injection: eval(req.body.preTax) (NodeGoat tutorial, A1)"},
+    {"file": "app/routes/contributions.js", "line": 33, "tool": "vulnerabilities", "what": "A1 injection: eval(req.body.afterTax)"},
+    {"file": "app/routes/contributions.js", "line": 34, "tool": "vulnerabilities", "what": "A1 injection: eval(req.body.roth)"},
+    {"file": "app/routes/contributions.js", "line": 32, "tool": "security", "what": "A1 injection: eval of request input, static rule"},
+    {"file": "app/routes/index.js", "line": 72, "tool": "vulnerabilities", "what": "A10 unvalidated redirect: res.redirect(req.query.url)"},
+    {"file": "app/routes/index.js", "line": 72, "tool": "security", "what": "A10 unvalidated redirect, static rule"}
+  ],
+  "pygoat": [
+    {"file": "introduction/views.py", "line": 162, "tool": "vulnerabilities", "what": "A1 SQL injection: login.objects.raw(sql_query) built from the request"},
+    {"file": "introduction/views.py", "line": 430, "tool": "vulnerabilities", "what": "A1 command injection: subprocess.Popen with request input, shell=True"},
+    {"file": "introduction/views.py", "line": 460, "tool": "vulnerabilities", "what": "A1 code injection: eval(val) of request input"},
+    {"file": "introduction/views.py", "line": 560, "tool": "vulnerabilities", "what": "A8 insecure deserialisation: yaml.load(file, yaml.Loader) of an upload"},
+    {"file": "introduction/views.py", "line": 927, "tool": "vulnerabilities", "what": "path traversal: open(filename) from the request"},
+    {"file": "introduction/views.py", "line": 963, "tool": "vulnerabilities", "what": "A10 SSRF: requests.get(url) from the request"},
+    {"file": "introduction/mitre.py", "line": 218, "tool": "vulnerabilities", "what": "CWE-94: eval(expression) from the request"},
+    {"file": "introduction/mitre.py", "line": 233, "tool": "vulnerabilities", "what": "CWE-78: subprocess.Popen(command, shell=True) from the request"},
+    {"file": "dockerized_labs/insec_des_lab/main.py", "line": 36, "tool": "vulnerabilities", "what": "A8 insecure deserialisation: pickle.loads of a cookie"}
+  ],
+  "WebGoat": [
+    {"file": "src/main/java/org/owasp/webgoat/lessons/sqlinjection/introduction/SqlInjectionLesson5a.java", "line": 67, "tool": "security", "what": "SQL injection lesson 5a: query built by concatenation on lines 62-63, executed on 67"},
+    {"file": "src/main/java/org/owasp/webgoat/lessons/cryptography/HashingAssignment.java", "line": 55, "tool": "security", "what": "cryptography lesson: MD5 used for a hash"}
+  ],
+  "juice-shop": [
+    {"file": "routes/search.ts", "line": 23, "tool": "vulnerabilities", "what": "SQL injection (search): sequelize.query with a template literal of req.query.q"},
+    {"file": "routes/login.ts", "line": 36, "tool": "vulnerabilities", "what": "SQL injection (login): sequelize.query with req.body.email in the template literal"},
+    {"file": "routes/search.ts", "line": 23, "tool": "security", "what": "SQL built from strings, static rule"},
+    {"file": "routes/userProfile.ts", "line": 36, "tool": "security", "what": "server-side template injection: eval(code) of the username expression"}
+  ]
+}

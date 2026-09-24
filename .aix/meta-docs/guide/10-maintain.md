@@ -22,7 +22,8 @@ Every release has a changelog entry and a git tag.
 
 ## The kit's own tests
 From a clone: `aix self-test` runs the whole suite in temporary folders; `aix self-test agents` one file;
-`--network` adds the registry downloads; `-q` hides the per-test lines. Projects carry no tests.
+`--network` adds the registry downloads; `-q` hides the per-test lines. `aix self-test --extended` runs the code tools
+on twelve real projects cloned into `~/.cache/aix/extended/` (never into the repository), before a release. Projects carry no tests.
 
 ## Common problems
 | Symptom | Cause | Fix |

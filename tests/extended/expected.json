@@ -1,0 +1,98 @@
+{
+ "NodeGoat": {
+  "clones": 32,
+  "dead": 7,
+  "graph": 32,
+  "security": 9,
+  "style": 76,
+  "vulnerabilities": 5
+ },
+ "WebGoat": {
+  "clones": 55,
+  "dead": 223,
+  "graph": 820,
+  "security": 74,
+  "style": 1437,
+  "vulnerabilities": 0
+ },
+ "bat": {
+  "clones": 739,
+  "dead": 28,
+  "graph": 85,
+  "security": 2,
+  "style": 2345,
+  "vulnerabilities": 0
+ },
+ "commons-lang": {
+  "clones": 474,
+  "dead": 18,
+  "graph": 1263,
+  "security": 4,
+  "style": 9339,
+  "vulnerabilities": 0
+ },
+ "excalidraw": {
+  "clones": 998,
+  "dead": 26,
+  "graph": 2594,
+  "security": 22,
+  "style": 2479,
+  "vulnerabilities": 3
+ },
+ "express": {
+  "clones": 59,
+  "dead": 4,
+  "graph": 161,
+  "security": 6,
+  "style": 288,
+  "vulnerabilities": 24
+ },
+ "flask": {
+  "clones": 26,
+  "dead": 2,
+  "graph": 565,
+  "security": 17,
+  "style": 836,
+  "vulnerabilities": 2
+ },
+ "juice-shop": {
+  "clones": 552,
+  "dead": 245,
+  "graph": 831,
+  "security": 57,
+  "style": 2052,
+  "vulnerabilities": 22
+ },
+ "pygoat": {
+  "clones": 79,
+  "dead": 63,
+  "graph": 29,
+  "security": 69,
+  "style": 362,
+  "vulnerabilities": 12
+ },
+ "requests": {
+  "clones": 382,
+  "dead": 0,
+  "graph": 104,
+  "security": 10,
+  "style": 1189,
+  "vulnerabilities": 7
+ },
+ "ripgrep": {
+  "clones": 978,
+  "dead": 65,
+  "graph": 71,
+  "security": 10,
+  "style": 5183,
+  "vulnerabilities": 0
+ },
+ "spring-petclinic": {
+  "clones": 6,
+  "dead": 5,
+  "graph": 91,
+  "security": 0,
+  "style": 174,
+  "vulnerabilities": 0
+ }
+}

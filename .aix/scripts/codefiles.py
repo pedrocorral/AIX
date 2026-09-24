@@ -5,7 +5,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SKIP = {"node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".git", "target", ".next", ".aix", "docs"}
+SKIP = {"node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".git", "target", ".next", ".aix", "docs", "vendor", "vendors", "third_party", "third-party"}
+MINIFIED = (".min.js", ".min.css", ".bundle.js", "-min.js")   # never the project's code
 
 
 def code_roots():
@@ -41,7 +42,7 @@ HUB_FAN = 3
 def _is_source(f: Path, base: Path) -> bool:
     """A non-empty source file whose path below `base` crosses no skipped or hidden folder."""
     inner = f.relative_to(base).parts[:-1] if base.is_dir() else ()
-    return f.is_file() and f.suffix in EXT and not any(s in SKIP or s.startswith(".") for s in inner) and f.stat().st_size > 0
+    return f.is_file() and f.suffix in EXT and not f.name.endswith(MINIFIED) and not any(s in SKIP or s.startswith(".") for s in inner) and f.stat().st_size > 0
 
 
 def source_files(roots):

@@ -277,6 +277,7 @@ def _pointer_files(project: Path):
             f.write_text(pointer_text(project, Path(rel).name, text), encoding="utf-8")
     state = project / "docs" / "road-map" / "going-on" / "STATE.md"
     if not state.exists():
+        state.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(project / ".aix" / "templates" / "session-state.md", state)
     if (project / ".aix").is_dir() and not (project / "AIX-DEVELOPMENT.md").exists():
         write_manifest(project)  # projects only: the kit checkout is edited by design

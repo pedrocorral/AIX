@@ -79,5 +79,21 @@ class LayersOverlayTheSeed(unittest.TestCase):
         self.assertIn("`.agents/skills/`", gemini, "a pointer the layer does not override keeps the kit's text")
 
 
+class ProjectWithItsOwnDocs(unittest.TestCase):
+    """A real project usually has a docs/ already (Sphinx, mkdocs): install keeps it and adds only the road-map."""
+    def test_own_docs_kept_road_map_added(self):
+        home = temp_home(self)
+        project = home / "app"
+        (project / "docs" / "api").mkdir(parents=True)
+        (project / "docs" / "index.md").write_text("# my docs\n", encoding="utf-8")
+        out = install(home, project).stdout
+        self.assertIn("seeded: docs/road-map", out)
+        self.assertEqual((project / "docs" / "index.md").read_text(encoding="utf-8"), "# my docs\n")
+        self.assertTrue((project / "docs" / "api").is_dir())
+        self.assertTrue((project / "docs" / "road-map" / "going-on" / "STATE.md").exists(), "the commands need the road-map and STATE.md")
+        self.assertFalse((project / "docs" / "requirements").exists(), "the EXAMPLE domain is not dropped into a real docs folder")
+        project_cmd(project, home, "install")   # a second install inside the project changes nothing and does not crash
+
+
 if __name__ == "__main__":
     unittest.main()

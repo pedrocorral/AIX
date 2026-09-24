@@ -52,6 +52,16 @@ skipped when git or a tag is missing).
 | `test_js_taint.py` | JS/TS taint on Express, Next, React/browser, Node CLI and Koa samples: every marked line found with its CWE, every other line clean (sanitisers, parameter arrays, argument lists, constants, callbacks, scopes); accepted marker, test tag, gate count, Python untouched |
 | `test_two_line.py` | assembled-then-used in Python, JS, Java and Rust: every sink kind once, the negatives (no literal, reassignment, argument list, no shell, no sink), the 40-line reach, the accepted marker, the two-line snippet |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
+| `test_extended.py` | `aix self-test --extended`: every code tool on twelve real projects (`extended/projects.json`, pinned commits, cloned into `~/.cache/aix/extended/`, never into the repo): no traceback, under 120 s per tool, numbers within 10 % of `extended/expected.json` (`--record` accepts them), the documented vulnerabilities of `extended/known.json` found |
+
+## Extended tests
+
+`tests/extended/` holds three small files: `projects.json` (twelve projects, URL, ref, pinned commit), `expected.json`
+(the recorded numbers per project and tool) and `known.json` (documented vulnerabilities of the four vulnerable-by-design
+apps, verified line by line at the pinned commit, with the tool that must find each). The projects themselves live in
+`~/.cache/aix/extended/<name>-<commit>/` and are never part of this repository. The test is skipped unless
+`aix self-test --extended`; the first run needs the network. After a deliberate change in a tool, review the new
+numbers and run `--extended --record`.
 
 ## Not covered
 

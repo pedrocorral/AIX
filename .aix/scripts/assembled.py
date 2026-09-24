@@ -21,7 +21,7 @@ SINKS = {  # kind -> (row, cwe, title, advice, {lang: sink regex; `name` is the 
                "java": r"(?:Runtime\.getRuntime\(\)\.exec|new ProcessBuilder)\([^;]*\b{name}\b",
                "rust": r"Command::new\([^)]*\)[^;]*\"-c\"[^;]*\.arg\(\s*&?{name}\b"}),
     "eval": ("VUL-INJ-002", "CWE-95", "code assembled from strings, evaluated below", "never eval assembled code; a dispatch table",
-             {"py": r"\b(?:eval|exec)\(\s*{name}\b", "js": r"(?:\beval|new Function)\(\s*{name}\b", "java": r"\.eval\(\s*{name}\b", "rust": r"$^"}),
+             {"py": r"\b(?:eval|exec)\(\s*{name}\b", "js": r"(?:\beval|new Function)\(\s*{name}\b", "java": r"\.eval\(\s*{name}\b", "rust": r"(?!)"}),
     "path": ("VUL-INJ-002", "CWE-22", "path assembled from strings, opened below", "resolve against a base directory and reject anything outside it",
              {"py": r"(?:\bopen|send_file|os\.remove|os\.unlink|shutil\.\w+|Path)\(\s*{name}\b",
               "js": r"(?:\bfs(?:\.promises)?\.\w+|\b(?:readFile|writeFile|readdir|unlink|createReadStream|createWriteStream)(?:Sync)?|\.sendFile)\(\s*{name}\b",
@@ -32,7 +32,7 @@ SINKS = {  # kind -> (row, cwe, title, advice, {lang: sink regex; `name` is the 
               "js": r"\.innerHTML\s*=\s*{name}\b|(?:\.send|document\.write|\.insertAdjacentHTML)\([^;]*\b{name}\b",
               "java": r"getWriter\(\)\.(?:print|println|write)\(\s*{name}\b", "rust": r"Html\(\s*{name}\b"}),
     "template": ("VUL-INJ-002", "CWE-1336", "template assembled from strings, rendered below", "render a file template with a context",
-                 {"py": r"(?:Template|render_template_string|from_string)\(\s*{name}\b", "js": r"\.compile\(\s*{name}\b", "java": r"$^", "rust": r"$^"}),
+                 {"py": r"(?:Template|render_template_string|from_string)\(\s*{name}\b", "js": r"\.compile\(\s*{name}\b", "java": r"(?!)", "rust": r"(?!)"}),
     "url": ("VUL-INPUT-001", "CWE-918", "URL assembled from strings, requested below", "allow-list hosts; block private ranges and redirects",
             {"py": r"(?:requests\.\w+|urlopen|httpx\.\w+)\(\s*{name}\b", "js": r"(?:\bfetch|axios(?:\.\w+)?|https?\.(?:get|request))\(\s*{name}\b",
              "java": r"(?:new URL|URI\.create|\.uri)\(\s*{name}\b", "rust": r"(?:reqwest::get|reqwest::blocking::get|Client::new\(\)\.get)\(\s*&?{name}\b"}),
@@ -75,11 +75,21 @@ def _finding(f, lines, i, j, rule) -> tuple:
     return (row, cwe, title, rel(f), j + 1, f"{lines[i].strip()[:70]}  ...  {lines[j].strip()[:40]}", advice, accepted)
 
 
+def _statement(lines: list, i: int, clean) -> str:
+    """The statement starting at line i, joined with the following lines while it ends with `=`, `+` or `(`."""
+    text = clean(lines[i]).rstrip()
+    for j in range(i + 1, min(i + 6, len(lines))):
+        if not text.endswith(("=", "+", "(", ",")):
+            break
+        text += " " + clean(lines[j]).strip()
+    return text
+
+
 def findings(f, lines: list, lang: str, clean) -> list:
     """Every (assembled at line i, used at line j) pair of the file; `clean` strips the language's comments."""
     out = []
     for i, raw in enumerate(lines):
-        m = ASSIGN.match(clean(raw))
+        m = ASSIGN.match(_statement(lines, i, clean))
         if not m or not (ASSEMBLED.search(m.group(2)) or PATH_BUILDERS.search(m.group(2))):
             continue
         for kind in sinks_for(kind_of(m.group(2))):
