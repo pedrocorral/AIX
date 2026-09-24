@@ -154,14 +154,20 @@ def clear_active(tid):
                 state.write_text(set_field(s, "active_task", "none"), encoding="utf-8")
 
 
-def cmd_done(tid):
+def cmd_done(tid, force=False):
     p = find(tid); month = datetime.date.today().strftime("%Y-%m")
+    import policy
+    task_policy = field(p.read_text(encoding="utf-8"), "policy") or None
+    if not policy.check(ROOT, task_policy) and not force:
+        sys.exit(f"{tid} not closed: a required check of the cycle failed (fix it, `aix task block {tid} \"reason\"`, or --force)")
     dst = RM / "completed" / month / p.name; dst.parent.mkdir(parents=True, exist_ok=True)
     idx = dst.parent / "INDEX.md"   # validate.py requires an INDEX.md in every docs folder
     if not idx.exists():
         idx.write_text(f"# road-map/completed/{month}/\nTasks completed this month, newest last.\n\n| Task | Title | Requirements |\n|---|---|---|\n", encoding="utf-8")
     t = set_field(p.read_text(encoding="utf-8"), "status", "completed")
     t = set_field(t, "completed", datetime.date.today().isoformat())
+    if force:
+        t = t.replace("## Decisions / open questions\n", f"## Decisions / open questions\n- CLOSED WITH --force {datetime.date.today().isoformat()}: a required check of the cycle had failed\n", 1)
     dst.write_text(t, encoding="utf-8"); p.unlink()
     clear_active(tid); seats.heartbeat(ROOT, "none"); write_overview(); print(dst.relative_to(ROOT))
 
@@ -190,6 +196,6 @@ if __name__ == "__main__":
     if a[0] == "new": cmd_new(a[1], a[3] if len(a) > 3 and a[2] == "--bucket" else "next")
     elif a[0] == "start": cmd_start(a[1], "--force" in a)
     elif a[0] == "block": cmd_block(a[1], a[2] if len(a) > 2 else "")
-    elif a[0] == "done": cmd_done(a[1])
+    elif a[0] == "done": cmd_done(a[1], "--force" in a)
     elif a[0] == "list": cmd_list()
     else: sys.exit(__doc__)

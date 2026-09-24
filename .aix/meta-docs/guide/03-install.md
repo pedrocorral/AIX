@@ -58,7 +58,7 @@ they differ.
 
 ## What travels and what stays
 The payload list, `.aix/scripts/payload.py`, is the only definition. Owned: `.aix/bin`, `scripts`, `templates`,
-`meta-docs`, `instructions`, `profiles`, the skill categories, `skills/INDEX.md`, the registry. Merged: `AGENTS.md`,
+`meta-docs`, `instructions`, `profiles`, `policies`, the skill categories, `skills/INDEX.md`, the registry. Merged: `AGENTS.md`,
 `CLAUDE.md`, `GEMINI.md`, `config.yaml`. Seeded: `docs/`. Layer: `org/`, `custom/`. Not on the list, therefore
 never copied and never touched: the kit's own `tests/`, `examples/`, developer documentation, changelog, downloaded
 skills, your code.

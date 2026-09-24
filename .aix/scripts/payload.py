@@ -39,7 +39,7 @@ def items(kit: Path, agents: list = None):
     skills = kit / ".aix" / "skills"
     categories = sorted(p.name for p in skills.iterdir() if p.is_dir() and p.name != "extern") if skills.is_dir() else []
     out = ([(".aix/config.yaml", MERGED), (".aix/bin", OWNED), (".aix/scripts", OWNED), (".aix/templates", OWNED),
-             (".aix/meta-docs", OWNED), (".aix/instructions", OWNED), (".aix/profiles", OWNED),
+             (".aix/meta-docs", OWNED), (".aix/instructions", OWNED), (".aix/profiles", OWNED), (".aix/policies", OWNED),
              (".aix/skills/INDEX.md", OWNED), (".aix/skills/extern/registry.json", OWNED)]
             + [(f".aix/skills/{c}", OWNED) for c in categories]
             + [("AGENTS.md", MERGED), ("CLAUDE.md", MERGED), ("GEMINI.md", MERGED), ("docs", SEEDED)]

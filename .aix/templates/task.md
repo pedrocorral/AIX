@@ -12,6 +12,7 @@ scope: []                   # paths/globs this task will change (aix task start 
 owner:                      # the seat that holds it (agent-001 ...), signed by aix task start
 claimed:
 claimed_by:                 # tool user@host behind the seat at that moment (stays after the seat is released)
+policy:                     # a cycle for this task only (hotfix, release, ...); empty = the project's (aix policy)
 ---
 # TASK-0000 — Title
 

@@ -15,3 +15,4 @@ Read this when: you want to know how to do something with AIX. Skip when: you al
 | `10-maintain.md` | Doctor, versions, self-test, troubleshooting | Something looks wrong |
 | `11-reference.md` | Every command with its syntax, one table | Looking up an option |
 | `12-team.md` | Several agents in one repository: seats, claims, scopes, one state per seat | More than one agent works on the repo |
+| `13-cycle.md` | The development cycle as a policy: steps, levels, `aix check`, anarchy | Deciding what must pass before a task closes |

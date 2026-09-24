@@ -1,0 +1,4 @@
+description: A bug under pressure: reproduce with a test, fix, scan, keep the documents consistent
+order: [unit-tests, implement, style, security, docs, review]
+required: [implement, style, security, docs]
+advised: [unit-tests, review]

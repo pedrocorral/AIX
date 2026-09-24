@@ -9,6 +9,11 @@ Reading budget: AGENTS.md (in context) + `docs/road-map/going-on/STATE.md` + the
 ## When NOT to use
 Pure questions with no code/doc change (answer directly, citing docs).
 
+## The cycle
+The steps below are the `standard` cycle. If `AGENTS.md` has a `## Cycle` section, that list wins: follow it in
+order, run `aix check` before closing, and `aix task done` refuses to close while a required check fails. Under
+`anarchy` (no section) nothing is checked; the steps below are still the recommended order.
+
 ## Procedure
 1. **Resume**: if STATE.md has an active task, run `core-session-resume`; else continue.
 2. **Classify the request** (one line to the user): new feature / change to existing behaviour / bug / refactor / infra / docs-only / exploration ("vibe").

@@ -81,6 +81,8 @@ The instructions                      (aix instructions ...)
                                       install links folders and pointer files only for those. No line = all
   aix agent claim|release|whoami|list  a seat (agent-001 ...) for this session when several agents share the repo;
       set total N | get total         how many seats; set lease 4h | get lease
+  aix policy [list|show|use|off]      the development cycle: minimal, standard, hotfix, release, or anarchy (none)
+  aix check [--step ID] [--task ID]   run the active policy's checks in order; aix task done runs it first
   aix instructions [list]             every instruction any layer offers: state (active / optional off / disabled /
                                       not in profile), layer, kind (block that builds AGENTS.md, scoped by globs, always)
   aix instructions info ID | show ID  details | the file
@@ -818,6 +820,25 @@ of a session; the hand-off skill does it. `aix doctor` reports stale seats and t
 Agents whose process is not recognised (claude, code, cursor, gemini, opencode, codex) still get a seat, listed as
 `agent`; AIX_TOOL names them, AIX_HOST overrides the host name."""
 
+TOPICS["policy"] = """aix policy [list] | show NAME | use NAME | off        aix check [--step ID] [--task TASK-ID]
+aix task done TASK-ID [--force]
+
+A policy is the development cycle: an ordered list of steps, each required or advised. Two kinds of step: a check
+the tool runs (aix code style --gate, aix docs validate, ...) and a skill the agent performs (spec-write-requirement,
+review-code-review, ...). `aix check` runs the checks in order and prints pass / advice / FAIL per step; a failed
+required check is the cycle not complete, and `aix task done` refuses to close the task (--force closes anyway,
+noted in the task). The active policy's steps are listed in the `## Cycle` section of AGENTS.md, so the agent
+and the tool follow one list.
+Which policy applies, later wins: anarchy (the kit's default: no cycle, nothing checked) < a layer's defaults.yaml
+(`policy: standard` in org/ or custom/) < `policy:` in .aix/config.yaml (aix policy use) < a task's own `policy:`
+line (a hotfix in a standard project). `none`, `nothing` and `freedom` are synonyms of anarchy.
+The kit ships: minimal (style, docs), standard (spec, tests, threat, implement, tests, style, modularity, security,
+docs, coverage, audit, review, drift), hotfix (test, fix, style, security, docs, review), release (adds
+vulnerabilities, dead code, clones, the register gate). A layer adds or replaces policies/<name>.yaml; a policy may
+define its own checks (`checks: {lint: npm run lint}`) and use them in `order`.
+Steps: spec, tests, threat, implement, unit-tests, audit, review, drift (skills); style, modularity, dead, clones,
+security, vulnerabilities, docs, coverage, register (checks). `aix policy show NAME` prints a policy's steps."""
+
 TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID      (alias: aix rules ...)
 
 Instructions are the second kind of thing a layer ships, next to skills. Two kinds:
@@ -898,7 +919,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: guide, self-install, install, upgrade, doctor, agent, agents, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: guide, self-install, install, upgrade, doctor, agent, agents, policy, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -1021,7 +1042,7 @@ def cmd_task(args):
     elif sub == "block" and rest:
         rm.cmd_block(rest[0], rest[1] if len(rest) > 1 else "")
     elif sub == "done" and rest:
-        rm.cmd_done(rest[0])
+        rm.cmd_done(rest[0], "--force" in rest)
     elif sub == "list":
         rm.cmd_list()
     else:
@@ -1213,6 +1234,53 @@ def run_instructions(args):
     sys.exit("usage: aix instructions [list] | info ID | show ID | enable ID | disable ID")
 
 
+def run_policy(args):
+    """aix policy [list] | show NAME | use NAME | off  — the development cycle; anarchy = none."""
+    import policy as pol, re
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    pols = pol.policies(ROOT)
+    name, source = pol.active_name(ROOT)
+    if sub == "list":
+        mark = "*" if name == pol.ANARCHY else " "
+        print(f"{mark} {pol.ANARCHY:12s} {'-':8s} no cycle: nothing checked, nobody stopped (also: none, nothing, freedom)")
+        for n, pp in pols.items():
+            print(f"{'*' if n == name else ' '} {n:12s} {pp['layer']:8s} {pp.get('description', '')}")
+        print(f"\n* = active ({source}). aix policy use NAME | aix policy off (= anarchy); a task may set its own `policy:` line; a layer its default in defaults.yaml")
+    elif sub == "show" and rest:
+        if pol.canonical(rest[0]) == pol.ANARCHY:
+            print("anarchy (also: none, nothing, freedom): no file, no steps. Nothing is checked, nobody is stopped."); return
+        pp = pols.get(rest[0]) or sys.exit(f"no policy '{rest[0]}' (aix policy list)")
+        print(pp["path"].read_text(encoding="utf-8"))
+        for sid, kind, what, label, level in pol.steps_of(pp):
+            print(f"  {sid:16s} {level:9s} {kind:5s} {what}")
+    elif sub in ("use", "off"):
+        want = pol.canonical(rest[0]) if sub == "use" and rest else pol.ANARCHY
+        if want != pol.ANARCHY and want not in pols:
+            sys.exit(f"no policy '{want}' (aix policy list)")
+        cfg = ROOT / ".aix" / "config.yaml"
+        text = cfg.read_text(encoding="utf-8")
+        line = f"policy: {want}   # the development cycle (aix policy use|off); anarchy = none"
+        text = re.sub(r"^policy:.*$", line, text, count=1, flags=re.M) if re.search(r"^policy:", text, re.M) else text.rstrip("\n") + "\n" + line + "\n"
+        cfg.write_text(text, encoding="utf-8")
+        print(f"policy: {want}; updating AGENTS.md")
+        import install_skills as inst
+        inst.install_into(ROOT, copy=False)
+    else:
+        sys.exit("usage: aix policy [list] | show NAME | use NAME | off")
+
+
+def run_check(args):
+    """aix check [--step ID] [--task TASK-ID]: run the active policy's checks in order."""
+    import policy as pol, re
+    only = args[args.index("--step") + 1] if "--step" in args and args.index("--step") + 1 < len(args) else None
+    task_policy = None
+    if "--task" in args and args.index("--task") + 1 < len(args):
+        import roadmap
+        tp = roadmap.find(args[args.index("--task") + 1]).read_text(encoding="utf-8")
+        task_policy = roadmap.field(tp, "policy") or None
+    sys.exit(0 if pol.check(ROOT, task_policy, only) else 1)
+
+
 def run_profile(args):
     """aix profile [list] | show NAME | use NAME | off  — a profile is a saved set of choices from a layer."""
     import layers, re
@@ -1293,6 +1361,10 @@ def main(argv):
         skills.main(args)
     elif cmd == "profile":
         run_profile(args)
+    elif cmd == "policy":
+        run_policy(args)
+    elif cmd == "check":
+        run_check(args)
     elif cmd == "instructions":
         run_instructions(args)
     elif cmd == "agents":

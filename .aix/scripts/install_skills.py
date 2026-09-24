@@ -146,7 +146,7 @@ def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
 INS_HEADER = "## Scoped instructions"
 
 
-MANAGED = ("## Organisation", "## Scoped instructions", "## Always-on skills", "## Project notes")
+MANAGED = ("## Organisation", "## Scoped instructions", "## Cycle", "## Always-on skills", "## Project notes")
 
 
 def render_agents(project: Path, profile) -> bool:
@@ -211,6 +211,10 @@ def render_instructions(project: Path, profile):
     for f in (project / "AGENTS.md", project / "GEMINI.md"):
         if f.exists():
             f.write_text(_replace_section(f.read_text(encoding="utf-8"), INS_HEADER, section), encoding="utf-8")
+    import policy
+    f = project / "AGENTS.md"
+    if f.exists():
+        f.write_text(_replace_section(f.read_text(encoding="utf-8"), "## Cycle", policy.cycle_section(project)), encoding="utf-8")
     org = (profile or {}).get("router") or _org_fragment(project)
     org_section = ("## Organisation\n" + org.strip() + "\n\n") if org else ""
     for f in (project / "AGENTS.md", project / "GEMINI.md", project / ".github" / "copilot-instructions.md"):

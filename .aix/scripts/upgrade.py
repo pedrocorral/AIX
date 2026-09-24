@@ -3,7 +3,7 @@
 
 What may change is decided by payload.py, the same list `aix install` copies (nothing else is ever touched):
   owned   overwritten, removed if gone from the kit (scripts, bin, templates, meta-docs, instructions, profiles,
-          skill categories, skills/INDEX.md, skills/extern/registry.json, CLAUDE.md)
+          skill categories, skills/INDEX.md, skills/extern/registry.json, policies, CLAUDE.md)
   merged  AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
           .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source, paths.code_roots lines and style: block)
   seeded  docs/ (never touched)
@@ -18,7 +18,7 @@ KIT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import payload
 MERGED_FILES = payload.merged_paths(KIT)
-PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom", "agents", "agents_total", "agents_lease", "style")  # config.yaml lines the project owns
+PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom", "agents", "agents_total", "agents_lease", "policy", "style")  # config.yaml lines the project owns
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
               "framework.yaml": ".aix/config.yaml"}
 OLD_TEXT = [("docs/meta-docs/", ".aix/meta-docs/"), ("`skills/INDEX.md`", "`.aix/skills/INDEX.md`"), ("`skills/`", "`.aix/skills/`"),

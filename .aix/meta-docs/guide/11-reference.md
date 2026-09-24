@@ -25,6 +25,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 | `aix code find [--list\|--yes]` | Which folders hold code (checklist) |
 | `aix agent claim [--force]\|release\|whoami\|list`, `set total N`, `get total`, `set lease 4h`, `get lease` | Seats for several agents in one repository (chapter 12) |
 | `aix profile [list\|show NAME\|use NAME\|off]` | Saved sets of instructions and skill choices |
+| `aix policy [list\|show NAME\|use NAME\|off]`, `aix check [--step ID] [--task ID]` | The development cycle (chapter 13); `anarchy` = none |
 | `aix instructions [list\|info ID\|show ID\|enable ID\|disable ID]` | The instruction files of every layer; alias `aix rules` |
 | `aix skills [list\|general\|specific [CATEGORY]]` | The catalogue with states |
 | `aix skills info NAME`, `show NAME` | One skill: state, layer, id, alternatives; its text |
@@ -39,7 +40,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 | `aix docs validate` | IDs, links, indexes, front matter, status claims, layers, near-miss names; exit 1 on errors |
 | `aix docs coverage` | Regenerate `docs/tests/coverage-matrix.md` |
 | `aix docs security [open\|validated] [--gate]` | The vulnerability register's state; the release gate |
-| `aix task new "title" \| start ID [--force] \| block ID "reason" \| done ID \| list` | Move tasks through the road map; `start` signs the task with your seat |
+| `aix task new "title" \| start ID [--force] \| block ID "reason" \| done ID [--force] \| list` | Move tasks through the road map; `start` signs the task with your seat, `done` runs the cycle's checks first |
 
 ## The code
 | Command | Does |
@@ -54,7 +55,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 
 ## Files a project owns in `.aix/config.yaml`
 `agents`, `paths.code_roots`, `profile`, `instructions`, `disabled_instructions`, `use` (skill pins),
-`disabled_skills`, `source`, `source_org`, `source_custom`, `agents_total`, `agents_lease`, `style` limits. `aix upgrade` keeps all of them.
+`disabled_skills`, `source`, `source_org`, `source_custom`, `agents_total`, `agents_lease`, `policy`, `style` limits. `aix upgrade` keeps all of them.
 
 ## Environment variables
 | Variable | Effect |

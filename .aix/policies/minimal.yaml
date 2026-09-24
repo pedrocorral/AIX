@@ -1,0 +1,4 @@
+description: The smallest cycle that still means something: consistent documents and readable functions
+order: [implement, style, docs]
+required: [style, docs]
+advised: [implement]
