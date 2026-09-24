@@ -6,6 +6,7 @@ from pathlib import Path
 
 from codefiles import EXT, rel, source_files
 from depedges import iter_functions
+from graphmetrics import is_root_or_test
 
 
 MIN_LINES, KGRAM, WINDOW, SIMILARITY = 6, 5, 4, 70
@@ -185,14 +186,22 @@ def find_clones(funcs, similarity):
     return exact, near
 
 
+def _all_tests(group: list) -> bool:
+    """A group made only of test functions: tests share a shape by nature (arrange, act, assert); listed, not gated."""
+    return all(is_root_or_test(fx[1]) for fx in group)
+
+
 def render_clones(roots, similarity):
     funcs = functions_for_clones(roots)
     exact, near = find_clones(funcs, similarity)
+    gated = [g for g in exact if not _all_tests(g)]
     lines = [f"Clones — {', '.join(roots)}", "",
-             f"  functions analysed {len(funcs)} (>= {MIN_LINES} lines); exact clone groups {len(exact)} (types 1-2: same structure, names and literals may differ); near-clones {len(near)} (type 3: >= {similarity:g} % shared fingerprints, winnowing k={KGRAM})", ""]
+             f"  functions analysed {len(funcs)} (>= {MIN_LINES} lines); exact clone groups {len(exact)} (types 1-2: same structure, names and literals may differ;"
+             f" {len(exact) - len(gated)} only in tests, listed not gated); near-clones {len(near)} (type 3: >= {similarity:g} % shared fingerprints, winnowing k={KGRAM})", ""]
     for g in exact[:20]:
-        lines.append(f"  EXACT  {len(g)} × ~{g[0][3]} lines: " + ", ".join(f"{fx[0]} (l.{fx[2]})" for fx in g) + "   -> keep one, make it a leaf")
+        tag = "  [tests]" if _all_tests(g) else ""
+        lines.append(f"  EXACT  {len(g)} × ~{g[0][3]} lines: " + ", ".join(f"{fx[0]} (l.{fx[2]})" for fx in g) + f"   -> keep one, make it a leaf{tag}")
     for dice, a, b in near[:30]:
         lines.append(f"  NEAR   {dice:3.0f} %  {a[0]} (l.{a[2]}, {a[3]} lines)  ~  {b[0]} (l.{b[2]}, {b[3]} lines)   -> extract the shared part into a leaf")
     lines.append("  Every line is a candidate: two functions may legitimately share a shape (adapters of one port); merge only when they share a purpose. Fix with: skill refactor-clone")
-    return "\n".join(lines), len(exact)
+    return "\n".join(lines), len(gated)

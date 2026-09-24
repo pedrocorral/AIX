@@ -22,7 +22,15 @@ def code_roots():
         if m:
             roots = [x.strip() for x in m.group(1).split(",") if x.strip()]
     found = [r for r in roots if (ROOT / r).exists()]
-    return found or ["."]
+    return outermost(found) or ["."]
+
+
+def outermost(roots: list) -> list:
+    """Roots with those inside another root dropped: `.` with `src` and `tests` is `.` alone, else every file
+    under `src/` would be measured twice (and every function would be its own clone)."""
+    def inside(r: str, other: str) -> bool:
+        return r != other and (other == "." or (ROOT / r).resolve().is_relative_to((ROOT / other).resolve()))
+    return [r for r in roots if not any(inside(r, o) for o in roots)]
 
 
 CODE_ROOTS = code_roots()

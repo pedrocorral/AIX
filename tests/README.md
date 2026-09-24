@@ -52,6 +52,7 @@ skipped when git or a tag is missing).
 | `test_js_taint.py` | JS/TS taint on Express, Next, React/browser, Node CLI and Koa samples: every marked line found with its CWE, every other line clean (sanitisers, parameter arrays, argument lists, constants, callbacks, scopes); accepted marker, test tag, gate count, Python untouched |
 | `test_two_line.py` | assembled-then-used in Python, JS, Java and Rust: every sink kind once, the negatives (no literal, reassignment, argument list, no shell, no sink), the 40-line reach, the accepted marker, the two-line snippet |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
+| `test_dead.py` | nested code roots measured once (no self-clones); Django, Cargo, Maven and tooling conventions live; Java container classes live; re-exports are uses; public dead functions tagged; a plain unused file still reported |
 | `test_extended.py` | `aix self-test --extended`: every code tool on twelve real projects (`extended/projects.json`, pinned commits, cloned into `~/.cache/aix/extended/`, never into the repo): no traceback, under 120 s per tool, numbers within 10 % of `extended/expected.json` (`--record` accepts them), the documented vulnerabilities of `extended/known.json` found |
 
 ## Extended tests

@@ -52,13 +52,19 @@ How to read the result
 Dead code (--dead)
   DEAD MODULES        files no entry module reaches through imports. Entry modules are live by definition:
                       composition roots and entry points (main, app, index, server, manage, wsgi, cli, ...),
-                      tests, tool/framework config, facades, and any Python file with an `if __name__ ==
-                      "__main__"` guard. Reachability, not fan-in: an orphan cluster importing itself is dead.
+                      tests (tests/, test/, __tests__/, spec/, Maven's src/it), tool/framework config (*.config.*,
+                      *rc.js, dot-files), facades, any Python file with an `if __name__ == "__main__"` guard, and what
+                      a framework loads by convention: Django migrations/admin/apps/urls/management commands, Cargo
+                      lib.rs/build.rs/benches/examples/src/bin, scripts/, public/, and Java classes the container
+                      instantiates (@Controller, @RestController, @Service, @Component, @Repository, @Entity, JAX-RS
+                      @Path, JUnit). Not resolved: tsconfig path aliases (`@/x`) and folders loaded as text.
+                      Reachability, not fan-in: an orphan cluster importing itself is dead.
   DEAD FUNCTIONS      with --functions, Python only: a function or method whose simple name is never referenced
                       anywhere else, as a bare name or an attribute. Decorated functions (routes, fixtures,
                       commands are called by the framework), dunder and implicit names, `__all__` exports and
                       entry/test code are excluded. Name-based like vulture, so a method called through any object
-                      of the same name is live: conservative, few false positives, some misses.
+                      of the same name is live, `from m import f` is a use: conservative, few false positives, some
+                      misses. A public name is tagged: in a library it is API used outside the repository.
   Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting.
   aix code dead --gate fails on any candidate.
 

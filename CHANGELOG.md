@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.8 — 2026-09-24
+
+- Nested code roots collapse into the outer one: `.` with `src` and `tests` measured every file under `src/` twice, so every function was its own exact clone and every count was inflated. On the twelve extended projects the clone groups went from 739 to 43 (bat), 978 to 77 (ripgrep), 382 to 13 (requests), 998 to 19 (Excalidraw). Clone groups made only of test functions are listed and not gated: tests share a shape by nature.
+- `aix code dead` knows what a framework loads by convention: Django migrations, admin, apps, urls and management commands; Cargo `lib.rs`, `build.rs`, benches, examples and `src/bin`; Maven `src/it`; `scripts/`, `public/`, dot-files and `*rc.js`; and the Java classes a container instantiates (`@Controller`, `@RestController`, `@Service`, `@Component`, `@Repository`, `@Entity`, JAX-RS `@Path`, JUnit). Dead modules on the extended projects: WebGoat 223 to 30, ripgrep 65 to 7, PyGoat 63 to 8. `from m import f` counts as a use of `f`; a public unreferenced function is tagged as API-or-dead. Left in the backlog: tsconfig path aliases and folders loaded as text (Juice Shop's 155). `tests/test_dead.py`.
+
 ## 2.21.7 — 2026-09-24
 
 - `aix self-test --extended`: every code tool on twelve real projects (Flask, requests, Express, Excalidraw, Spring PetClinic, commons-lang, ripgrep, bat; NodeGoat, PyGoat, WebGoat, Juice Shop), cloned shallow at a pinned commit into `~/.cache/aix/extended/` on the first run and never into the repository. Per project: no traceback, each tool under 120 s, every recorded number within 10 % of `tests/extended/expected.json` (`--record` accepts a reviewed change), and every documented vulnerability of `tests/extended/known.json` found by the tool named for it (21 entries, verified line by line). Skipped in the normal suite.
