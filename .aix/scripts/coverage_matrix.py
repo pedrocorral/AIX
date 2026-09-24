@@ -9,7 +9,7 @@ from collections import defaultdict
 ROOT = Path(__file__).resolve().parents[2]
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import CODE_ROOTS, SKIP  # the configured code roots (paths.code_roots, `aix code find`), one list for every tool
+from codefiles import CODE_ROOTS, SKIP  # the configured code roots (paths.code_roots, `aix code find`), one list for every tool
 MARK = re.compile(r"@(implements|tests|mitigates)\s+([A-Z]+-[A-Z0-9]+(?:-\d{3,4})?(?:\s*,\s*[A-Z]+-[A-Z0-9]+(?:-\d{3,4})?)*)")
 
 
@@ -36,39 +36,50 @@ def fm_status(folder, prefix):
     return out
 
 
+CLAIMS = (  # (folder, prefix, statuses that need a marker, marker word)
+    ("docs/requirements", "FR", ("implemented", "verified"), "implements"), ("docs/requirements", "NFR", ("implemented", "verified"), "implements"),
+    ("docs/requirements", "API", ("implemented", "verified"), "implements"), ("docs/tests", "TS", ("automated",), "tests"),
+    ("docs/security", "VUL", ("mitigated",), "mitigates"),
+)
+
+
 def status_drift():
     """Docs that claim more than the code shows. Errors: a status nobody can reach without a marker.
     FR/NFR/API `implemented`|`verified` need @implements; TS `automated` needs @tests; VUL `mitigated` needs @mitigates."""
     code = scan_code()
     errs = []
-    for prefix in ("FR", "NFR", "API"):
-        for rid, st in fm_status("docs/requirements", prefix).items():
-            if st in ("implemented", "verified") and rid not in code:
-                errs.append(f"{rid} is `{st}` but no code carries `@implements {rid}`")
-    for tid, st in fm_status("docs/tests", "TS").items():
-        if st == "automated" and tid not in code:
-            errs.append(f"{tid} is `automated` but no test carries `@tests {tid}`")
-    for vid, st in fm_status("docs/security", "VUL").items():
-        if st == "mitigated" and vid not in code:
-            errs.append(f"{vid} is `mitigated` but no code carries `@mitigates {vid}`")
+    for folder, prefix, needing, marker in CLAIMS:
+        for rid, st in fm_status(folder, prefix).items():
+            if st in needing and rid not in code:
+                errs.append(f"{rid} is `{st}` but no {'test' if marker == 'tests' else 'code'} carries `@{marker} {rid}`")
     return errs
+
+
+SKIP_SUFFIXES = {".png", ".jpg", ".lock", ".min.js"}
+
+
+def _markers_in(f: Path):
+    try:
+        text = f.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return
+    for m in MARK.finditer(text):
+        yield from re.split(r"\s*,\s*", m.group(2))
+
+
+def _code_files():
+    for root in CODE_ROOTS:
+        base = ROOT / root
+        for f in (base.rglob("*") if base.exists() else []):
+            if f.is_file() and not any(s in f.parts for s in SKIP) and f.suffix not in SKIP_SUFFIXES:
+                yield f
 
 
 def scan_code():
     hits = defaultdict(set)
-    for root in CODE_ROOTS:
-        base = ROOT / root
-        if not base.exists():
-            continue
-        for f in base.rglob("*"):
-            if f.is_dir() or any(s in f.parts for s in SKIP) or f.suffix in {".png", ".jpg", ".lock", ".min.js"}:
-                continue
-            try:
-                for m in MARK.finditer(f.read_text(encoding="utf-8", errors="ignore")):
-                    for rid in re.split(r"\s*,\s*", m.group(2)):
-                        hits[rid].add(str(f.relative_to(ROOT)))
-            except Exception:
-                pass
+    for f in _code_files():
+        for rid in _markers_in(f):
+            hits[rid].add(str(f.relative_to(ROOT)))
     return hits
 
 

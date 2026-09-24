@@ -10,7 +10,7 @@ import os, re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import EXT, SKIP, ROOT
+from codefiles import EXT, SKIP, ROOT
 
 MARKERS = {"pyproject.toml": "python project", "setup.py": "python project", "package.json": "node package", "Cargo.toml": "rust crate",
            "pom.xml": "maven project", "build.gradle": "gradle project", "build.gradle.kts": "gradle project", "go.mod": "go module"}
@@ -104,41 +104,76 @@ def prompt_list(rows, describe_row):
     return out
 
 
+def _row_colour(curses, status: str) -> int:
+    if status in ("new", "detected"):
+        return curses.color_pair(1)
+    if "not found" in status or status == "not selected":
+        return curses.color_pair(3)
+    return curses.color_pair(2) if "no code" in status else 0
+
+
+class _Screen:
+    """The checklist's screen: rows, how to describe one, the title and footer, the cursor and the scroll offset."""
+    def __init__(self, rows, title, describe_row, footer):
+        self.rows, self.title, self.describe_row, self.footer = rows, title, describe_row, footer
+        self.cur, self.top = 0, 0
+
+    def scroll(self, body: int):
+        if self.cur < self.top:
+            self.top = self.cur
+        elif self.cur >= self.top + body:
+            self.top = self.cur - body + 1
+
+    def line(self, r) -> str:
+        a, b, status = self.describe_row(r)
+        return f"  {'[x]' if r['on'] else '[ ]'} {r['name']:<26.26s} {a:<24.24s} {b:<15.15s} {status}"
+
+
+def _draw(scr, curses, s: "_Screen"):
+    scr.erase()
+    h, w = scr.getmaxyx()
+    scr.addnstr(0, 0, f" {s.title}", w - 1, curses.A_BOLD)
+    scr.addnstr(1, 0, "  space toggle · a all · n none · ↑↓/jk move · Enter apply · q cancel", w - 1, curses.color_pair(4))
+    s.scroll(h - 4)
+    for i, r in enumerate(s.rows[s.top:s.top + h - 4]):
+        status = s.describe_row(r)[2]
+        attr = curses.A_REVERSE if s.top + i == s.cur else 0
+        scr.addnstr(3 + i, 0, s.line(r).ljust(w - 1), w - 1, attr | _row_colour(curses, status))
+    on = sum(1 for r in s.rows if r["on"])
+    scr.addnstr(h - 1, 0, f"  {on} of {len(s.rows)} selected -> {s.footer}", w - 1, curses.A_DIM)
+    scr.refresh()
+
+
+def _handle_key(curses, k: int, rows, cur: int):
+    """(new cursor, result): result is None while browsing, a list on Enter, False on cancel."""
+    if k in (curses.KEY_UP, ord("k")):
+        return max(0, cur - 1), None
+    if k in (curses.KEY_DOWN, ord("j")):
+        return min(len(rows) - 1, cur + 1), None
+    if k == ord(" "):
+        rows[cur]["on"] = not rows[cur]["on"]
+    elif k in (ord("a"), ord("n")):
+        for r in rows:
+            r["on"] = k == ord("a")
+    elif k in (10, 13, curses.KEY_ENTER):
+        return cur, [r["name"] for r in rows if r["on"]]
+    elif k in (27, ord("q")):
+        return cur, False
+    return cur, None
+
+
 def tui(scr, rows, title, describe_row, footer):
     import curses
     curses.curs_set(0)
     curses.use_default_colors()
-    curses.init_pair(1, curses.COLOR_GREEN, -1); curses.init_pair(2, curses.COLOR_YELLOW, -1); curses.init_pair(3, curses.COLOR_RED, -1); curses.init_pair(4, curses.COLOR_CYAN, -1)
-    cur, top = 0, 0
+    for n, colour in ((1, curses.COLOR_GREEN), (2, curses.COLOR_YELLOW), (3, curses.COLOR_RED), (4, curses.COLOR_CYAN)):
+        curses.init_pair(n, colour, -1)
+    s = _Screen(rows, title, describe_row, footer)
     while True:
-        scr.erase()
-        h, w = scr.getmaxyx()
-        scr.addnstr(0, 0, f" {title}", w - 1, curses.A_BOLD)
-        scr.addnstr(1, 0, "  space toggle · a all · n none · ↑↓/jk move · Enter apply · q cancel", w - 1, curses.color_pair(4))
-        body = h - 4
-        if cur < top: top = cur
-        if cur >= top + body: top = cur - body + 1
-        for i, r in enumerate(rows[top:top + body]):
-            idx = top + i
-            a, b, status = describe_row(r)
-            box = "[x]" if r["on"] else "[ ]"
-            color = curses.color_pair(1) if status in ("new", "detected") else curses.color_pair(3) if "not found" in status or status == "not selected" else curses.color_pair(2) if "no code" in status else 0
-            attr = curses.A_REVERSE if idx == cur else 0
-            line = f"  {box} {r['name']:<26.26s} {a:<24.24s} {b:<15.15s} {status}"
-            scr.addnstr(3 + i, 0, line.ljust(w - 1), w - 1, attr | color)
-        on = sum(1 for r in rows if r["on"])
-        scr.addnstr(h - 1, 0, f"  {on} of {len(rows)} selected -> {footer}", w - 1, curses.A_DIM)
-        scr.refresh()
-        k = scr.getch()
-        if k in (curses.KEY_UP, ord("k")): cur = max(0, cur - 1)
-        elif k in (curses.KEY_DOWN, ord("j")): cur = min(len(rows) - 1, cur + 1)
-        elif k == ord(" "): rows[cur]["on"] = not rows[cur]["on"]
-        elif k == ord("a"):
-            for r in rows: r["on"] = True
-        elif k == ord("n"):
-            for r in rows: r["on"] = False
-        elif k in (10, 13, curses.KEY_ENTER): return [r["name"] for r in rows if r["on"]]
-        elif k in (27, ord("q")): return None
+        _draw(scr, curses, s)
+        s.cur, result = _handle_key(curses, scr.getch(), rows, s.cur)
+        if result is not None:
+            return result or None
 
 
 def report(project: Path, rows):
@@ -150,16 +185,27 @@ def report(project: Path, rows):
     print(f"\n  configured: {current_roots(project) or '-'}")
 
 
+def _interactive() -> bool:
+    return sys.stdin.isatty() and not os.environ.get("CI")
+
+
+def _report_only(project: Path, rows: list, list_only: bool, yes: bool) -> bool:
+    """Print the report instead of asking; True when that is all this run can do."""
+    if not list_only and (yes or _interactive()):
+        return False
+    report(project, rows)
+    if not list_only:
+        print("  (no terminal to ask: run `aix code find` interactively, or `aix code find --yes` to accept the suggestions)")
+    return True
+
+
 def run(project: Path, yes: bool = False, list_only: bool = False, title: str = "aix code find") -> bool:
     """Show the checklist and write code_roots. Returns True when config changed."""
     rows = rows_for(project)
     if not rows:
         print(f"aix code find: no source files ({', '.join(sorted(EXT))}) under {project}")
         return False
-    if list_only or (not yes and not (sys.stdin.isatty() and not os.environ.get("CI"))):
-        report(project, rows)
-        if not list_only:
-            print("  (no terminal to ask: run `aix code find` interactively, or `aix code find --yes` to accept the suggestions)")
+    if _report_only(project, rows, list_only, yes):
         return False
     chosen = [r["name"] for r in rows if r["on"]] if yes else checklist(rows, f"{title} — folders with code in {project}")
     if chosen is None:

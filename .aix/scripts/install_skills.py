@@ -13,6 +13,7 @@ KIT_ROOT = Path(__file__).resolve().parents[2]
 import agents  # which agents (Claude, Copilot, Cursor, Gemini, OpenCode, Codex) the project equips: folders and pointer files
 TARGETS = [a["skills"] for a in agents.AGENTS.values() if a["skills"]]  # every folder the kit knows; a project links the selected ones
 import payload  # THE list of what travels into a project (shared with upgrade, manifest, doctor)
+from seed import POINTERS, copy_kit_into, pointer_text, seed_project
 
 
 def flat_name(rel_parts):
@@ -111,33 +112,35 @@ def install_into(project: Path, copy: bool):
     print(f"installed {n} skills into {project} for {', '.join(agents.selected(project))}")
 
 
+def _unlink_everywhere(project: Path, targets, flat: str):
+    import catalog
+    catalog.unlink_everywhere(flat, project, targets)
+
+
+def _link_one(project: Path, targets, flat: str, info: dict, copy: bool):
+    mode = "-"
+    for t in targets:
+        mode = link_or_copy(info["path"], project / t / flat, copy)
+    origin = "" if info["layer"] == "kit" and not info["chosen_by"].startswith("config") else f"  [{info['chosen_by']}]"
+    print(f"  {flat:40s} -> {', '.join(targets) or 'AGENTS.md only'} ({mode}){origin}")
+
+
 def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
     import layers
     profile = layers.active_profile(project)
     active, layer_disabled = layers.resolve(project, profile)
     targets = agents.skill_dirs(project)
     for flat, layer in layer_disabled.items():  # removed by a DISABLED file in a higher layer
-        for t in targets:
-            p = project / t / flat
-            if p.is_symlink() or p.is_file(): p.unlink()
-            elif p.is_dir(): shutil.rmtree(p)
+        _unlink_everywhere(project, targets, flat)
         print(f"  {flat:40s} -> disabled by the {layer} layer")
     n = 0
     for flat, info in sorted(active.items()):
-        src = info["path"]
         if flat in off:
-            for t in targets:
-                p = project / t / flat
-                if p.is_symlink() or p.is_file(): p.unlink()
-                elif p.is_dir(): shutil.rmtree(p)
+            _unlink_everywhere(project, targets, flat)
             print(f"  {flat:40s} -> disabled (.aix/config.yaml)")
             continue
-        mode = "-"
-        for t in targets:
-            mode = link_or_copy(src, project / t / flat, copy)
+        _link_one(project, targets, flat, info, copy)
         n += 1
-        origin = "" if info["layer"] == "kit" and not info["chosen_by"].startswith("config") else f"  [{info['chosen_by']}]"
-        print(f"  {flat:40s} -> {', '.join(targets) or 'AGENTS.md only'} ({mode}){origin}")
     render_instructions(project, profile)
     layers.write_index(project)
     return n
@@ -180,49 +183,70 @@ def _section_text(text: str, header: str) -> str:
     return header + body.rstrip("\n") + "\n"
 
 
-def render_instructions(project: Path, profile):
-    if render_agents(project, profile):
-        print("  AGENTS.md assembled from instruction blocks")
-    """Scoped instructions -> native files per runtime (git-ignored, regenerated) + a managed section in AGENTS.md/GEMINI.md."""
-    import layers, re
-    ins = {k: v for k, v in layers.instructions(project, profile).items() if not v["block"]}
-    chosen = agents.selected(project)
-    gh, cur = project / ".github" / "instructions", project / ".cursor" / "rules"
-    for d, pat in ((gh, "aix-*.instructions.md"), (cur, "aix-*.mdc")):
+def _instruction_body(v: dict) -> str:
+    body = v["path"].read_text(encoding="utf-8")
+    return body[body.find("\n---", 3) + 4:].lstrip("\n") if body.startswith("---") else body
+
+
+def _render_native(project: Path, chosen, iid: str, v: dict):
+    """The Copilot and Cursor files for one scoped instruction, when those agents are selected."""
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", iid.lower()).strip("-")
+    slug = slug[4:] if slug.startswith("aix-") else slug  # the file already carries the aix- prefix
+    body, apply = _instruction_body(v), (",".join(v["applyTo"]) if v["applyTo"] else "**")
+    if "copilot" in chosen:
+        gh = project / ".github" / "instructions"
+        gh.mkdir(parents=True, exist_ok=True)
+        (gh / f"aix-{slug}.instructions.md").write_text(f"---\ndescription: \"{v['description']}\"\napplyTo: \"{apply}\"\n---\n{body}", encoding="utf-8")
+    if "cursor" in chosen:
+        cur = project / ".cursor" / "rules"
+        cur.mkdir(parents=True, exist_ok=True)
+        always = "true" if v["always"] or not v["applyTo"] else "false"
+        (cur / f"aix-{slug}.mdc").write_text(f"---\ndescription: {v['description']}\nglobs: {apply}\nalwaysApply: {always}\n---\n{body}", encoding="utf-8")
+
+
+def _instruction_line(project: Path, iid: str, v: dict) -> str:
+    shown = v["path"].relative_to(project) if v["path"].is_relative_to(project) else v["path"]
+    scope = "always" if v["always"] or not v["applyTo"] else "when touching " + ", ".join(v["applyTo"])
+    return f"- `{iid}` ({scope}): read `{shown}` — {v['description']}"
+
+
+def _write_section(project: Path, files, header: str, section: str):
+    for name in files:
+        f = project / name
+        if f.exists():
+            f.write_text(_replace_section(f.read_text(encoding="utf-8"), header, section), encoding="utf-8")
+
+
+def _clear_rendered(project: Path):
+    for d, pat in ((project / ".github" / "instructions", "aix-*.instructions.md"), (project / ".cursor" / "rules", "aix-*.mdc")):
         for old in (d.glob(pat) if d.is_dir() else []):
             old.unlink()
+
+
+def _rendered_where(chosen) -> list:
+    return [x for x, ok in (("AGENTS.md", True), (".github/instructions/aix-*.instructions.md", "copilot" in chosen), (".cursor/rules/aix-*.mdc", "cursor" in chosen)) if ok]
+
+
+def render_instructions(project: Path, profile):
+    """Scoped instructions -> native files per agent (git-ignored, regenerated) + managed sections in AGENTS.md/GEMINI.md."""
+    import layers, policy
+    if render_agents(project, profile):
+        print("  AGENTS.md assembled from instruction blocks")
+    ins = {k: v for k, v in layers.instructions(project, profile).items() if not v["block"]}
+    chosen = agents.selected(project)
+    _clear_rendered(project)
     lines = []
     for iid, v in sorted(ins.items()):
-        slug = re.sub(r"[^a-z0-9]+", "-", iid.lower()).strip("-")
-        slug = slug[4:] if slug.startswith("aix-") else slug  # the file already carries the aix- prefix
-        body = v["path"].read_text(encoding="utf-8")
-        body = body[body.find("\n---", 3) + 4:].lstrip("\n") if body.startswith("---") else body
-        apply = ",".join(v["applyTo"]) if v["applyTo"] else "**"
-        if "copilot" in chosen:
-            gh.mkdir(parents=True, exist_ok=True)
-            (gh / f"aix-{slug}.instructions.md").write_text(f"---\ndescription: \"{v['description']}\"\napplyTo: \"{apply}\"\n---\n{body}", encoding="utf-8")
-        if "cursor" in chosen:
-            cur.mkdir(parents=True, exist_ok=True)
-            (cur / f"aix-{slug}.mdc").write_text(f"---\ndescription: {v['description']}\nglobs: {apply}\nalwaysApply: {'true' if v['always'] or not v['applyTo'] else 'false'}\n---\n{body}", encoding="utf-8")
-        shown = v["path"].relative_to(project) if v["path"].is_relative_to(project) else v["path"]
-        scope = "always" if v["always"] or not v["applyTo"] else "when touching " + ", ".join(v["applyTo"])
-        lines.append(f"- `{iid}` ({scope}): read `{shown}` — {v['description']}")
+        _render_native(project, chosen, iid, v)
+        lines.append(_instruction_line(project, iid, v))
     section = (INS_HEADER + "\nRead these before working on matching files:\n" + "\n".join(lines) + "\n\n") if lines else ""
-    for f in (project / "AGENTS.md", project / "GEMINI.md"):
-        if f.exists():
-            f.write_text(_replace_section(f.read_text(encoding="utf-8"), INS_HEADER, section), encoding="utf-8")
-    import policy
-    f = project / "AGENTS.md"
-    if f.exists():
-        f.write_text(_replace_section(f.read_text(encoding="utf-8"), "## Cycle", policy.cycle_section(project)), encoding="utf-8")
+    _write_section(project, ("AGENTS.md", "GEMINI.md"), INS_HEADER, section)
+    _write_section(project, ("AGENTS.md",), "## Cycle", policy.cycle_section(project))
     org = (profile or {}).get("router") or _org_fragment(project)
-    org_section = ("## Organisation\n" + org.strip() + "\n\n") if org else ""
-    for f in (project / "AGENTS.md", project / "GEMINI.md", project / ".github" / "copilot-instructions.md"):
-        if f.exists():
-            f.write_text(_replace_section(f.read_text(encoding="utf-8"), "## Organisation", org_section), encoding="utf-8")
+    _write_section(project, ("AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"), "## Organisation", ("## Organisation\n" + org.strip() + "\n\n") if org else "")
     if lines:
-        where = [x for x, ok in (("AGENTS.md", True), (".github/instructions/aix-*.instructions.md", "copilot" in chosen), (".cursor/rules/aix-*.mdc", "cursor" in chosen)) if ok]
-        print(f"  rendered {len(lines)} scoped instruction(s) -> {', '.join(where)}")
+        print(f"  rendered {len(lines)} scoped instruction(s) -> {', '.join(_rendered_where(chosen))}")
 
 
 def _org_fragment(project: Path) -> str:
@@ -243,14 +267,6 @@ def _replace_section(text: str, header: str, section: str) -> str:
     return (text.rstrip("\n") + "\n\n" + section) if section else text
 
 
-POINTERS = {  # agent -> (file, text) for the agents that do not read AGENTS.md by themselves
-    "claude": ("CLAUDE.md", "Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.claude/skills/` (installed from `.aix/skills/` by `aix install`).\n"),
-    "copilot": (".github/copilot-instructions.md", "Read and follow `AGENTS.md` at the repository root before doing anything.\n"),
-    "cursor": (".cursor/rules/aix.mdc", "---\ndescription: AIX agent contract\nalwaysApply: true\n---\nRead and follow `AGENTS.md` at the repository root before doing anything. Skills are in `.cursor/skills/`.\n"),
-    "gemini": ("GEMINI.md", "Read and follow `AGENTS.md` at the repository root. It is the single source of agent instructions for this project. Skills are available under `.agents/skills/` (installed from `.aix/skills/` by `aix install`).\n"),
-}
-
-
 def _pointer_files(project: Path):
     """Pointer files for the selected agents that do not read AGENTS.md by themselves (text from templates/pointers/, a
     layer's copy winning), STATE.md, and the kit-file manifest (projects only)."""
@@ -265,131 +281,6 @@ def _pointer_files(project: Path):
     if (project / ".aix").is_dir() and not (project / "AIX-DEVELOPMENT.md").exists():
         write_manifest(project)  # projects only: the kit checkout is edited by design
 
-
-CHOICES = "[r]eplace  [s]kip  [m]erge  [R]eplace all  [S]kip all  [M]erge all  [a]bort"
-
-
-def ask_collision(item: str, is_dir: bool, remembered: dict) -> str:
-    """Return one of replace/skip/merge/abort for an existing payload item; honours 'all' answers."""
-    if remembered.get("all"):
-        return remembered["all"]
-    if not sys.stdin.isatty():
-        sys.exit(f"'{item}' already exists and no terminal to ask; rerun with --replace-all, --skip-all or --merge-all")
-    kind = "folder" if is_dir else "file"
-    while True:
-        ans = input(f"  {item} ({kind}) exists. {CHOICES}: ").strip()
-        table = {"r": "replace", "s": "skip", "m": "merge", "a": "abort"}
-        if ans in ("R", "S", "M"):
-            remembered["all"] = table[ans.lower()]
-            return remembered["all"]
-        if ans in table:
-            return table[ans]
-        print("    please answer r, s, m, R, S, M or a")
-
-
-def merge_dir(src: Path, dst: Path):
-    """Add files from src that dst lacks; never overwrite. Returns number of files added."""
-    added = 0
-    for f in src.rglob("*"):
-        if f.is_dir() or any(part in ("custom", "org", "__pycache__") for part in f.relative_to(src).parts) or f.name == "index.json":
-            continue
-        target = dst / f.relative_to(src)
-        if not target.exists():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(f, target)
-            added += 1
-    return added
-
-
-def replace_item(src: Path, dst: Path):
-    """Move the existing item to <name>.bak (previous .bak removed) and copy the kit's version in."""
-    bak = dst.with_name(dst.name + ".bak")
-    if bak.is_dir() and not bak.is_symlink():
-        shutil.rmtree(bak)
-    elif bak.exists() or bak.is_symlink():
-        bak.unlink()
-    dst.rename(bak)
-    copy_item(src, dst)
-
-
-def seed_sources(project: Path, name: str) -> list:
-    """The template folders for a seeded item, lowest layer first: the kit's .aix/templates/<name>, then org/, then custom/."""
-    import layers
-    out = []
-    for layer, root in layers.layer_roots(project):
-        if layer == "user":
-            continue
-        d = root / "templates" / name
-        if d.is_dir():
-            out.append((layer, d))
-    return out
-
-
-def seed_project(project: Path) -> list:
-    """Lay down the seeded payload items that are absent (docs/): kit template overlaid by the layers, file by file."""
-    done = []
-    for item, mode in payload.items(KIT_ROOT):
-        if mode != payload.SEEDED or (project / item).exists():
-            continue
-        sources = seed_sources(project, Path(payload.source_of(item)).name)
-        if not sources:
-            continue
-        for layer, d in sources:
-            for f in sorted(d.rglob("*")):
-                if f.is_file() and payload.is_payload_file(f.relative_to(d)):
-                    dst = project / item / f.relative_to(d)
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy(f, dst)
-        done.append((item, [l for l, _ in sources]))
-        print(f"  seeded: {item} ({' < '.join(l for l, _ in sources)})")
-    return done
-
-
-def pointer_text(project: Path, name: str, fallback: str) -> str:
-    """The pointer file's text: the highest layer's templates/pointers/<name>, else the kit's, else the built-in."""
-    text = fallback
-    for _layer, d in seed_sources(project, "pointers"):
-        f = d / name
-        if f.is_file():
-            text = f.read_text(encoding="utf-8")
-    return text
-
-
-def copy_item(src: Path, dst: Path):
-    """Copy one payload item (file or folder) without the ignored parts (__pycache__, *.pyc)."""
-    if src.is_dir():
-        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(*payload.IGNORED_PARTS, *("*" + s for s in payload.IGNORED_SUFFIXES)))
-    else:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(src, dst)
-
-
-def copy_kit_into(project: Path, on_collision: str = "ask"):
-    """Copy payload.items() into project. on_collision: ask | replace | skip | merge."""
-    project.mkdir(parents=True, exist_ok=True)
-    remembered = {} if on_collision == "ask" else {"all": on_collision}
-    for item, mode in payload.items(KIT_ROOT):
-        src, dst = KIT_ROOT / payload.source_of(item), project / item
-        if not src.exists() or mode == payload.SEEDED or item in payload.AGENT_OF:
-            continue  # seeded items (docs/) and pointer files are laid down once the layers are in place (seed_project, _pointer_files)
-        if not dst.exists():
-            copy_item(src, dst)
-            print(f"  added: {item}")
-            continue
-        choice = ask_collision(item, src.is_dir(), remembered)
-        if choice == "abort":
-            sys.exit("aborted; items already added above were left in place")
-        if choice == "skip":
-            print(f"  skipped: {item}")
-        elif choice == "merge" and src.is_dir():
-            print(f"  merged: {item} (+{merge_dir(src, dst)} files, nothing overwritten)")
-        elif choice == "merge":
-            print(f"  skipped: {item} (files cannot be merged)")
-        else:
-            replace_item(src, dst)
-            print(f"  replaced: {item} (old kept as {item}.bak)")
-    if (project / "AGENTS.md").exists() and on_collision != "replace":
-        print("NOTE: if the project already had agent instructions, merge them into AGENTS.md section 5.")
 
 
 if __name__ == "__main__":

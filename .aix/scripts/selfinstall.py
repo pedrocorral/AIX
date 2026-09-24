@@ -21,12 +21,12 @@ MARK = "# added by aix self-install"
 
 
 def home() -> Path:
-    return Path(os.environ.get("HOME") or Path.home()) if os.name != "nt" else Path(os.environ.get("USERPROFILE") or Path.home())
+    return Path(os.environ.get("HOME") or Path.home()) if os.name != "nt" else Path(os.environ.get("USERPROFILE") or Path.home())  # aix: accepted VUL-SECRET-001 the person's own HOME, SHELL and PATH decide where their link goes; nothing crosses a trust boundary
 
 
 def bin_dir() -> Path:
     if os.name == "nt":
-        return Path(os.environ.get("LOCALAPPDATA") or (home() / "AppData" / "Local")) / "aix" / "bin"
+        return Path(os.environ.get("LOCALAPPDATA") or (home() / "AppData" / "Local")) / "aix" / "bin"  # aix: accepted VUL-SECRET-001 the person's own HOME, SHELL and PATH decide where their link goes; nothing crosses a trust boundary
     return home() / ".local" / "bin"
 
 
@@ -54,10 +54,8 @@ def link_state(link: Path):
     return "missing"
 
 
-def write_link(link: Path, dry: bool, actions: list):
-    state = link_state(link)
-    if state == "ok" or (state == "wrapper" and os.name == "nt"):
-        actions.append(f"link    {link} already points to this clone"); return
+def _move_aside(link: Path, state: str, dry: bool, actions: list):
+    """A foreign file is kept as .bak; a link elsewhere or an old wrapper is dropped."""
     if state == "foreign":
         actions.append(f"keep    {link} is not aix's: moved to {link}.bak")
         if not dry:
@@ -66,11 +64,9 @@ def write_link(link: Path, dry: bool, actions: list):
         actions.append(f"replace {link} pointed elsewhere")
         if not dry:
             link.unlink()
-    if os.name == "nt":
-        actions.append(f"write   {link} (wrapper calling {LAUNCHER})")
-        if not dry:
-            link.write_text(f"@echo off\r\nrem {MARK}\r\n\"{LAUNCHER}\" %*\r\n", encoding="utf-8")
-        return
+
+
+def _write_posix_link(link: Path, dry: bool, actions: list):
     actions.append(f"link    {link} -> {LAUNCHER}")
     if dry:
         return
@@ -82,25 +78,40 @@ def write_link(link: Path, dry: bool, actions: list):
         actions[-1] = f"write   {link} (wrapper: this filesystem cannot symlink)"
 
 
+def write_link(link: Path, dry: bool, actions: list):
+    state = link_state(link)
+    if state == "ok" or (state == "wrapper" and os.name == "nt"):
+        actions.append(f"link    {link} already points to this clone"); return
+    _move_aside(link, state, dry, actions)
+    if os.name != "nt":
+        return _write_posix_link(link, dry, actions)
+    actions.append(f"write   {link} (wrapper calling {LAUNCHER})")
+    if not dry:
+        link.write_text(f"@echo off\r\nrem {MARK}\r\n\"{LAUNCHER}\" %*\r\n", encoding="utf-8")
+
+
 # ---- step 3: PATH ----------------------------------------------------------------------------------------------------
+
+def _shells(home_dir: Path) -> dict:
+    """Which shells this user has, by rc file or $SHELL; bash when nothing else is found."""
+    shell = Path(os.environ.get("SHELL", "")).name  # aix: accepted VUL-SECRET-001 the person's own HOME, SHELL and PATH decide where their link goes; nothing crosses a trust boundary
+    zsh = shell == "zsh" or (home_dir / ".zshrc").exists()
+    fish = shell == "fish" or (home_dir / ".config" / "fish" / "config.fish").exists()
+    return dict(zsh=zsh, fish=fish, bash=shell == "bash" or (home_dir / ".bashrc").exists() or not zsh)
+
 
 def profile_files() -> list:
     """(file, line to append) for every shell this user has; login profiles on macOS where Terminal opens login shells."""
-    h = home()
-    shell = Path(os.environ.get("SHELL", "")).name
+    home_dir = home()
+    has = _shells(home_dir)
     posix = f'{MARK}\nexport PATH="$HOME/.local/bin:$PATH"\n'
-    out = []
-    if shell == "zsh" or (h / ".zshrc").exists():
-        out.append((h / ".zshrc", posix))
-    if shell == "bash" or (h / ".bashrc").exists() or not out:
-        out.append((h / ".bashrc", posix))
-        if sys.platform == "darwin":
-            out.append((h / ".bash_profile", posix))
-    if shell == "fish" or (h / ".config" / "fish" / "config.fish").exists():
-        out.append((h / ".config" / "fish" / "config.fish", f"{MARK}\nfish_add_path -g $HOME/.local/bin\n"))
-    if (h / ".profile").exists() and not any(f.name == ".profile" for f, _ in out):
-        out.append((h / ".profile", posix))
-    return out
+    fish_line = f"{MARK}\nfish_add_path -g $HOME/.local/bin\n"
+    candidates = [(has["zsh"], home_dir / ".zshrc", posix),
+                  (has["bash"], home_dir / ".bashrc", posix),
+                  (has["bash"] and sys.platform == "darwin", home_dir / ".bash_profile", posix),
+                  (has["fish"], home_dir / ".config" / "fish" / "config.fish", fish_line),
+                  ((home_dir / ".profile").exists(), home_dir / ".profile", posix)]
+    return [(path, line) for wanted, path, line in candidates if wanted]
 
 
 def extend_path(dry: bool, actions: list) -> bool:
@@ -143,7 +154,7 @@ def verify(actions: list) -> bool:
     found = shutil.which("aix", path=path)
     if not found:
         actions.append("verify  FAILED: no aix found even with the link folder on PATH"); return False
-    same = Path(found).resolve() == LAUNCHER.resolve() or (Path(found).is_file() and MARK in Path(found).read_text(encoding="utf-8", errors="replace"))
+    same = Path(found).resolve() == LAUNCHER.resolve() or (Path(found).is_file() and MARK in Path(found).read_text(encoding="utf-8", errors="replace"))  # aix: accepted VUL-SECRET-001 the person's own HOME, SHELL and PATH decide where their link goes; nothing crosses a trust boundary
     if not same:
         actions.append(f"verify  WARNING: another aix comes first on PATH: {found}. Remove it or put {folder} before it. A shell alias named aix hides ours too: `unalias aix`.")
         return False
@@ -161,29 +172,7 @@ def python_ok(actions: list) -> bool:
     actions.append(f"python  {sys.version.split()[0]} at {sys.executable}"); return True
 
 
-def main(args):
-    dry, no_profile = "--dry-run" in args, "--no-profile" in args
-    if any(a not in ("--dry-run", "--no-profile") for a in args):
-        sys.exit("usage: aix self-install [--dry-run] [--no-profile]   (alias: aix install aix)")
-    if not is_kit_clone():
-        sys.exit(f"aix self-install: {KIT} is a project's copy of the kit, not a clone of AIX. Run it from the clone: "
-                 "git clone <AIX repo> ~/AIX && ~/AIX/.aix/bin/aix self-install")
-    actions = []
-    print(f"aix self-install — kit clone at {KIT}" + (" (dry run, nothing written)" if dry else ""))
-    ok = python_ok(actions)
-    folder, link = bin_dir(), bin_dir() / ("aix.cmd" if os.name == "nt" else "aix")
-    if not folder.is_dir():
-        actions.append(f"mkdir   {folder}")
-        if not dry:
-            folder.mkdir(parents=True, exist_ok=True)
-    write_link(link, dry, actions)
-    needs_new_shell = False if no_profile else extend_path(dry, actions)
-    if not dry:
-        ok = verify(actions) and ok
-    for a in actions:
-        print("  " + a)
-    if dry:
-        return
+def _closing_words(needs_new_shell: bool, ok: bool):
     if needs_new_shell:
         rc = "a new terminal" if os.name == "nt" else "a new terminal, or in this one: export PATH=\"$HOME/.local/bin:$PATH\""
         print(f"\nPATH changed: open {rc}. Then `aix version` from anywhere, `aix install --into <project>` to equip a project.")
@@ -191,6 +180,48 @@ def main(args):
         print("\n`aix` works from any terminal. Next: `aix install --into <project>`; later `aix self-update` refreshes this clone.")
     else:
         print("\nsomething above needs a hand; `aix doctor` inside a project reports the same checks.")
+
+
+def _ensure_bin_dir(folder: Path, dry: bool, actions: list):
+    if folder.is_dir():
+        return
+    actions.append(f"mkdir   {folder}")
+    if not dry:
+        folder.mkdir(parents=True, exist_ok=True)
+
+
+def _check_invocation(args):
+    if any(a not in ("--dry-run", "--no-profile") for a in args):
+        sys.exit("usage: aix self-install [--dry-run] [--no-profile]   (alias: aix install aix)")
+    if not is_kit_clone():
+        sys.exit(f"aix self-install: {KIT} is a project's copy of the kit, not a clone of AIX. Run it from the clone: "
+                 "git clone <AIX repo> ~/AIX && ~/AIX/.aix/bin/aix self-install")
+
+
+def _install(dry: bool, no_profile: bool, actions: list):
+    """(all steps ok, a new shell is needed) after writing the link and extending PATH."""
+    ok = python_ok(actions)
+    folder = bin_dir()
+    _ensure_bin_dir(folder, dry, actions)
+    write_link(folder / ("aix.cmd" if os.name == "nt" else "aix"), dry, actions)
+    needs_new_shell = False if no_profile else extend_path(dry, actions)
+    if not dry:
+        ok = verify(actions) and ok
+    return ok, needs_new_shell
+
+
+def main(args):
+    """aix self-install [--dry-run] [--no-profile]: put `aix` on PATH from a clone of AIX."""
+    _check_invocation(args)
+    dry = "--dry-run" in args
+    actions = []
+    print(f"aix self-install — kit clone at {KIT}" + (" (dry run, nothing written)" if dry else ""))
+    ok, needs_new_shell = _install(dry, "--no-profile" in args, actions)
+    for a in actions:
+        print("  " + a)
+    if dry:
+        return
+    _closing_words(needs_new_shell, ok)
     sys.exit(0 if ok else 1)
 
 
@@ -239,19 +270,23 @@ if __name__ == "__main__":
     main(sys.argv[1:])
 
 
+def _test_patterns(args) -> list:
+    """`agents layers` -> test_agents.py, test_layers.py; nothing -> every test file."""
+    names = [a for a in args if not a.startswith("-")]
+    return [f"test_{n.removeprefix('test_').removesuffix('.py')}.py" for n in names] or ["test_*.py"]
+
+
+def _run_tests(pattern: str, args) -> int:
+    env = {**os.environ, **({"AIX_TEST_NETWORK": "1"} if "--network" in args else {})}
+    verbose = [] if "-q" in args else ["-v"]
+    cmd = [sys.executable, "-m", "unittest", "discover", "-s", str(KIT / "tests"), "-p", pattern, *verbose]
+    return subprocess.run(cmd, cwd=str(KIT), env=env).returncode
+
+
 def self_test(args):
     """aix self-test [NAME...] [--network] [-q]: the kit's own suite (tests/), from the clone. NAME = a file without
     the test_ prefix (agents, layers, ...); --network adds the registry downloads; -q hides the per-test lines."""
     if not is_kit_clone() or not (KIT / "tests").is_dir():
         sys.exit("aix self-test: run it from a clone of AIX (the one `aix self-install` set up); projects carry no tests")
-    names = [a for a in args if not a.startswith("-")]
-    env = dict(os.environ)
-    if "--network" in args:
-        env["AIX_TEST_NETWORK"] = "1"
-    verbose = [] if "-q" in args else ["-v"]
-    patterns = [f"test_{n.removeprefix('test_').removesuffix('.py')}.py" for n in names] or ["test_*.py"]
-    failed = 0
-    for pat in patterns:
-        r = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", str(KIT / "tests"), "-p", pat, *verbose], cwd=str(KIT), env=env)
-        failed += r.returncode != 0
-    sys.exit(1 if failed else 0)
+    results = [_run_tests(pattern, args) for pattern in _test_patterns(args)]
+    sys.exit(1 if any(results) else 0)

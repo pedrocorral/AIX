@@ -5,7 +5,7 @@
   roadmap.py block TASK-0007 "reason"                    -> moves to blocked/, clears active_task
   roadmap.py done  TASK-0007                              -> moves to completed/YYYY-MM/, stamps completion
   roadmap.py list                                         -> one-line summary of every task"""
-import re, sys, shutil, datetime, fnmatch
+import re, sys, datetime, fnmatch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -104,16 +104,16 @@ def cmd_new(title, bucket="next"):
     dst.write_text(t, encoding="utf-8"); print(dst.relative_to(ROOT))
 
 
-def cmd_start(tid, force=False):
-    p = find(tid)
-    text = p.read_text(encoding="utf-8")
-    seat = seats.claim(ROOT, force)
+def _refuse_if_held(tid: str, text: str, seat: str, force: bool):
     owner = field(text, "owner")
-    if owner and owner != seat and field(text, "status") == "going-on":
-        holder = seats.all_seats(ROOT).get(owner)
-        if holder and holder["state"] in ("live", "remote") and not force:
-            sys.exit(f"{tid} is held by {owner} ({holder.get('tool')} {holder.get('user')}@{holder.get('host')}, {holder['state']}); pick another task, or --force to take it over")
-    my_scope = scope_of(text)
+    if not owner or owner == seat or field(text, "status") != "going-on":
+        return
+    holder = seats.all_seats(ROOT).get(owner)
+    if holder and holder["state"] in ("live", "remote") and not force:
+        sys.exit(f"{tid} is held by {owner} ({holder.get('tool')} {holder.get('user')}@{holder.get('host')}, {holder['state']}); pick another task, or --force to take it over")
+
+
+def _warn_scope_overlaps(tid: str, my_scope: list):
     for other in going_on():
         if other.name.startswith(tid):
             continue
@@ -121,19 +121,34 @@ def cmd_start(tid, force=False):
         hits = [(a, b) for a in my_scope for b in scope_of(o) if overlaps(a, b)]
         if hits:
             print(f"  warning: scope overlaps {other.name[:9]} ({field(o, 'owner') or 'unowned'}): " + ", ".join(f"{a} ~ {b}" for a, b in hits))
-    dst = RM / "going-on" / p.name
+
+
+def _sign(text: str, seat: str) -> str:
+    """status going-on, owner, claimed, and who held the seat (readable long after the seat is released)."""
+    _, _, tool = seats.session()
     t = set_field(text, "status", "going-on")
     t = set_or_add_field(t, "owner", seat)
     t = set_or_add_field(t, "claimed", seats.now())
-    _, _, tool = seats.session()
-    t = set_or_add_field(t, "claimed_by", f"{tool} {seats.user()}@{seats.host()}")  # who held the seat: readable long after the seat is released
-    dst.write_text(t, encoding="utf-8")
+    return set_or_add_field(t, "claimed_by", f"{tool} {seats.user()}@{seats.host()}")
+
+
+def _set_active(seat: str, tid: str):
+    state = ensure_state(seat)
+    s = set_field(state.read_text(encoding="utf-8"), "active_task", tid)
+    state.write_text(set_field(s, "updated", datetime.datetime.now().isoformat(timespec="minutes")), encoding="utf-8")
+
+
+def cmd_start(tid, force=False):
+    p = find(tid)
+    text = p.read_text(encoding="utf-8")
+    seat = seats.claim(ROOT, force)
+    _refuse_if_held(tid, text, seat, force)
+    _warn_scope_overlaps(tid, scope_of(text))
+    dst = RM / "going-on" / p.name
+    dst.write_text(_sign(text, seat), encoding="utf-8")
     if p != dst:
         p.unlink()
-    state = ensure_state(seat)
-    s = state.read_text(encoding="utf-8")
-    s = set_field(s, "active_task", tid); s = set_field(s, "updated", datetime.datetime.now().isoformat(timespec="minutes"))
-    state.write_text(s, encoding="utf-8")
+    _set_active(seat, tid)
     seats.heartbeat(ROOT, tid); write_overview()
     print(f"{dst.relative_to(ROOT)}  ({seat})")
 
@@ -172,22 +187,24 @@ def cmd_done(tid, force=False):
     clear_active(tid); seats.heartbeat(ROOT, "none"); write_overview(); print(dst.relative_to(ROOT))
 
 
+def _open_overlaps(tasks) -> list:
+    """(task a, task b, hits) for every pair of open tasks whose scopes collide."""
+    open_tasks = [(p, t) for p, t in tasks if field(t, "status") != "completed"]
+    out = []
+    for i, (p, t) in enumerate(open_tasks):
+        for q, u in open_tasks[i + 1:]:
+            hits = [(a, b) for a in scope_of(t) for b in scope_of(u) if overlaps(a, b)]
+            if hits:
+                out.append((p.name[:9], q.name[:9], hits))
+    return out
+
+
 def cmd_list():
     tasks = [(p, p.read_text(encoding="utf-8")) for p in all_tasks()]
     for p, t in tasks:
-        owner = field(t, "owner")
-        print(f"{p.name[:9]}  {field(t, 'status') or '?':10s}  {owner or '':10s} {field(t, 'title') or p.name}")
-    warned = set()
-    for p, t in tasks:
-        if field(t, "status") == "completed":
-            continue
-        for q, u in tasks:
-            if q <= p or field(u, "status") == "completed":
-                continue
-            hits = [(a, b) for a in scope_of(t) for b in scope_of(u) if overlaps(a, b)]
-            if hits and (p.name[:9], q.name[:9]) not in warned:
-                warned.add((p.name[:9], q.name[:9]))
-                print(f"  overlap: {p.name[:9]} and {q.name[:9]} touch " + ", ".join(f"{a} ~ {b}" for a, b in hits) + " — order them (after:) or merge them")
+        print(f"{p.name[:9]}  {field(t, 'status') or '?':10s}  {field(t, 'owner') or '':10s} {field(t, 'title') or p.name}")
+    for a, b, hits in _open_overlaps(tasks):
+        print(f"  overlap: {a} and {b} touch " + ", ".join(f"{x} ~ {y}" for x, y in hits) + " — order them (after:) or merge them")
 
 
 if __name__ == "__main__":

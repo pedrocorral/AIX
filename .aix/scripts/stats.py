@@ -11,8 +11,9 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import CODE_ROOTS, ROOT, default_roots, rel, source_files
-from style import functions_in, limit, thresholds
+from codefiles import ROOT, default_roots, source_files
+from style import limit
+from stylemetrics import functions_in, thresholds
 
 BINS = {
     "lines": [(1, 5), (6, 10), (11, 20), (21, 30), (31, 40), (41, 60), (61, 100), (101, 200), (201, None)],
@@ -59,20 +60,27 @@ def bar(count, biggest, width):
     return BAR * full + (HALF if cells - full >= 0.5 else "")
 
 
+def _bin_label(lo, hi) -> str:
+    if hi is None:
+        return f"{lo}+"
+    return f"{lo}-{hi}" if hi != lo else f"{lo}"
+
+
+def _bin_mark(lo, hi, lim) -> str:
+    if lim is None:
+        return ""
+    if lo > lim:
+        return "  <- over the limit"
+    return "  <- limit inside this bin" if hi is not None and lo <= lim < hi else ""
+
+
 def histogram(values, metric, lim, width):
     edges = BINS[metric]
     counts = bin_counts(values, edges)
     biggest = max(counts) if counts else 0
     label_w = 10
     bar_w = max(10, width - label_w - 14)
-    lines = []
-    for (lo, hi), c in zip(edges, counts):
-        label = f"{lo}-{hi}" if hi is not None and hi != lo else (f"{lo}+" if hi is None else f"{lo}")
-        over = lim is not None and lo > lim
-        straddle = lim is not None and hi is not None and lo <= lim < hi
-        mark = "  <- over the limit" if over else ("  <- limit inside this bin" if straddle else "")
-        lines.append(f"  {label:>{label_w}} {bar(c, biggest, bar_w)} {c}{mark}")
-    return lines
+    return [f"  {_bin_label(lo, hi):>{label_w}} {bar(c, biggest, bar_w)} {c}{_bin_mark(lo, hi, lim)}" for (lo, hi), c in zip(edges, counts)]
 
 
 # ---- offenders -----------------------------------------------------------------------------------------------------
@@ -97,6 +105,20 @@ def offenders(fxs, metric, th, top=10):
 
 # ---- report ----------------------------------------------------------------------------------------------------------
 
+def _offender_lines(fxs, metric, th) -> list:
+    worst, _over_fx, files, folders = offenders(fxs, metric, th)
+    tail = ["", f"  largest functions ({LABEL[metric]}):"]
+    for fx in worst:
+        flag = " *" if fx[metric] > limit(fx, th, metric) else ""
+        tail.append(f"    {fx[metric]:>5}{flag:2}  {fx['file']}:{fx['name']}  (line {fx['line']})")
+    for title, rows, suffix in (("  files pushing most functions over the limit (functions over / total, excess):", files, ""), ("  folders (depth 2):", folders, "/")):
+        if any(v[1] for _, v in rows):
+            tail.append(title)
+            tail += [f"    {o:>3} / {n:<3}  +{ex:<5} {f}{suffix}" for f, (n, o, ex) in rows if o]
+    tail.append("  * = over its limit.  Detail: aix code style FILE:FUNCTION   Other metrics: --metric cognitive | cyclomatic | nesting | params")
+    return tail
+
+
 def render(fxs, metric, th, width, paths):
     values = [fx[metric] for fx in fxs]
     d = describe(values)
@@ -104,27 +126,10 @@ def render(fxs, metric, th, width, paths):
         return f"Code stats — {', '.join(paths)}\n\n  no functions found", 0
     lim = th.get("max_" + metric)
     over = sum(1 for fx in fxs if fx[metric] > limit(fx, th, metric))
+    limit_note = f"   limit {lim}: {over} over ({over / d['n'] * 100:.1f} %)" if lim is not None else ""
     head = [f"Code stats — {LABEL[metric]} — {', '.join(paths)}", "",
-            f"  functions {d['n']}   mean {d['mean']:.1f}   sd {d['sd']:.1f}   median {d['median']:g}   p90 {d['p90']}   p95 {d['p95']}   max {d['max']}"
-            + (f"   limit {lim}: {over} over ({over / d['n'] * 100:.1f} %)" if lim is not None else ""), ""]
-    body = histogram(values, metric, lim, width)
-    worst, over_fx, files, folders = offenders(fxs, metric, th)
-    tail = ["", f"  largest functions ({LABEL[metric]}):"]
-    for fx in worst:
-        flag = " *" if fx[metric] > limit(fx, th, metric) else ""
-        tail.append(f"    {fx[metric]:>5}{flag:2}  {fx['file']}:{fx['name']}  (line {fx['line']})")
-    if any(v[1] for _, v in files):
-        tail.append("  files pushing most functions over the limit (functions over / total, excess):")
-        for f, (n, o, ex) in files:
-            if o:
-                tail.append(f"    {o:>3} / {n:<3}  +{ex:<5} {f}")
-    if any(v[1] for _, v in folders):
-        tail.append("  folders (depth 2):")
-        for f, (n, o, ex) in folders:
-            if o:
-                tail.append(f"    {o:>3} / {n:<3}  +{ex:<5} {f}/")
-    tail.append(f"  * = over its limit.  Detail: aix code style FILE:FUNCTION   Other metrics: --metric cognitive | cyclomatic | nesting | params")
-    return "\n".join(head + body + tail), over
+            f"  functions {d['n']}   mean {d['mean']:.1f}   sd {d['sd']:.1f}   median {d['median']:g}   p90 {d['p90']}   p95 {d['p95']}   max {d['max']}{limit_note}", ""]
+    return "\n".join(head + histogram(values, metric, lim, width) + _offender_lines(fxs, metric, th)), over
 
 
 # ---- self-test --------------------------------------------------------------------------------------------------------
@@ -146,6 +151,15 @@ def selftest():
 USAGE = "usage: aix code stats [PATH...] [--metric lines|cognitive|cyclomatic|nesting|params] [--report] [--selftest]"
 
 
+def _functions_under(paths) -> list:
+    fxs = []
+    for p in paths:
+        base = (ROOT / p) if not Path(p).is_absolute() else Path(p)
+        for f in ([base] if base.is_file() else source_files([str(base)])):
+            fxs += functions_in(f)
+    return fxs
+
+
 def main(args):
     if "--selftest" in args:
         return selftest()
@@ -154,17 +168,11 @@ def main(args):
         i = args.index("--metric"); metric = args[i + 1]; del args[i:i + 2]
     if metric not in BINS:
         sys.exit(USAGE)
-    report = "--report" in args
     paths = [a for a in args if not a.startswith("--")] or default_roots()
-    fxs = []
-    for p in paths:
-        base = (ROOT / p) if not Path(p).is_absolute() else Path(p)
-        for f in ([base] if base.is_file() else source_files([str(base)])):
-            fxs += functions_in(f)
     width = shutil.get_terminal_size((100, 20)).columns
-    text, _ = render(fxs, metric, thresholds(), width, paths)
+    text, _ = render(_functions_under(paths), metric, thresholds(), width, paths)
     print(text)
-    if report:
+    if "--report" in args:
         out = ROOT / "docs" / "tests" / "code-stats.md"
         out.write_text("# Code stats (generated — do not edit)\n\n```\n" + text + "\n```\n", encoding="utf-8")
         print(f"\n  wrote {out.relative_to(ROOT)}")

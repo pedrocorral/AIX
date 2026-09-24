@@ -2,7 +2,7 @@
 """Leaf: the agents AIX equips (the tools that read the files, whatever model they run) and which of them a project
 selected. `agents: [claude, copilot]` in .aix/config.yaml; no line means all of them. `aix agents` sets the line;
 install, upgrade, doctor and the skills commands read it here."""
-import os, re, shutil
+import re, shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,10 +64,6 @@ def skill_dirs(project: Path = ROOT) -> list:
     return [AGENTS[n]["skills"] for n in selected(project) if AGENTS[n]["skills"]]
 
 
-def agent_of_dir(d: str) -> str:
-    return next(n for n, a in AGENTS.items() if a["skills"] == d)
-
-
 def pointer_files(project: Path = ROOT) -> list:
     return [p for n in selected(project) for p in AGENTS[n]["pointers"]]
 
@@ -90,6 +86,37 @@ def is_aix_pointer(path: Path) -> bool:
         return False
 
 
+def _remove_links(project: Path, a: dict, removed: list):
+    d = project / a["skills"] if a["skills"] else None
+    if not d or not d.is_dir():
+        return
+    known = _indexed(project) if (project / ".aix" / "index.json").exists() else set()
+    for p in d.iterdir():
+        if p.is_symlink():
+            p.unlink(); removed.append(str(p.relative_to(project)))
+        elif p.is_dir() and (p / "SKILL.md").exists() and p.name in known:
+            shutil.rmtree(p); removed.append(str(p.relative_to(project)))
+    _rmdir_empty(d, project)
+
+
+def _remove_pointers(project: Path, a: dict, removed: list):
+    for rel in a["pointers"]:
+        p = project / rel
+        if is_aix_pointer(p):
+            p.unlink(); removed.append(rel)
+            _rmdir_empty(p.parent, project)
+
+
+def _remove_rendered(project: Path, a: dict, removed: list):
+    for rel in a["rendered"]:
+        d = project / rel
+        if not d.is_dir():
+            continue
+        for p in d.glob("aix-*"):
+            p.unlink(); removed.append(str(p.relative_to(project)))
+        _rmdir_empty(d, project)
+
+
 def remove_deselected(project: Path, keep: list) -> list:
     """Drop what AIX created for agents no longer selected: skill links, AIX pointer files, rendered aix-* files.
     Returns what was removed (project-relative)."""
@@ -97,24 +124,9 @@ def remove_deselected(project: Path, keep: list) -> list:
     for n, a in AGENTS.items():
         if n in keep:
             continue
-        d = project / a["skills"] if a["skills"] else None
-        if d and d.is_dir():
-            for p in d.iterdir():
-                if p.is_symlink():
-                    p.unlink(); removed.append(str(p.relative_to(project)))
-                elif p.is_dir() and (p / "SKILL.md").exists() and (project / ".aix" / "index.json").exists() and p.name in _indexed(project):
-                    shutil.rmtree(p); removed.append(str(p.relative_to(project)))
-            _rmdir_empty(d, project)
-        for rel in a["pointers"]:
-            p = project / rel
-            if is_aix_pointer(p):
-                p.unlink(); removed.append(rel)
-                _rmdir_empty(p.parent, project)
-        for rel in a["rendered"]:
-            d = project / rel
-            for p in (d.glob("aix-*") if d.is_dir() else []):
-                p.unlink(); removed.append(str(p.relative_to(project)))
-            _rmdir_empty(d, project) if d.is_dir() else None
+        _remove_links(project, a, removed)
+        _remove_pointers(project, a, removed)
+        _remove_rendered(project, a, removed)
     return removed
 
 
@@ -131,15 +143,20 @@ def _rmdir_empty(d: Path, stop: Path):
         d.rmdir(); d = d.parent
 
 
+def _row_status(name: str, conf, det) -> str:
+    if conf:
+        return "configured" if name in conf else "not selected"
+    return "detected" if name in det else "-"
+
+
 def rows(project: Path = ROOT) -> list:
     """Checklist rows: every agent, preselected when configured (or, without a line, when detected; nothing detected = all)."""
     conf, det = configured(project), detect(project)
     out = []
     for n, a in AGENTS.items():
         on = (n in conf) if conf else (n in det if det else True)
-        status = ("configured" if conf and n in conf else "not selected" if conf else "detected" if n in det else "-")
         files = ", ".join(x for x in [a["skills"], *a["pointers"]] if x) or "AGENTS.md"
-        out.append({"name": n, "label": a["label"], "files": files, "status": status, "on": on})
+        out.append({"name": n, "label": a["label"], "files": files, "status": _row_status(n, conf, det), "on": on})
     return out
 
 
@@ -181,20 +198,33 @@ def run(project: Path, names=None, list_only=False, title="aix agents") -> bool:
     return set(before) != set(now)
 
 
+def _is_aix_entry(p: Path, known: set) -> bool:
+    """A link into .aix/, an AIX-indexed skill folder, or a backup AIX made."""
+    if p.is_symlink():
+        try:
+            return ".aix" in p.resolve().parts
+        except OSError:
+            return True  # a broken link is nobody's work worth keeping
+    return p.name in known or p.name.endswith("-bak")
+
+
 def _foreign_skills_dir(d: Path, project: Path) -> bool:
     """A skills folder someone else made: has entries that are neither links into .aix/ nor AIX-indexed skills."""
     known = _indexed(project)
-    for p in d.iterdir():
-        if p.is_symlink():
-            try:
-                if ".aix" in p.resolve().parts:
-                    continue
-            except OSError:
-                continue
-        if p.name in known or p.name.endswith("-bak"):
-            continue
-        return True
-    return False
+    return any(not _is_aix_entry(p, known) for p in d.iterdir())
+
+
+def _bak_name(p: Path) -> Path:
+    bak, i = p.with_name(p.name + "-bak"), 2
+    while bak.exists():
+        bak = p.with_name(f"{p.name}-bak{i}"); i += 1
+    return bak
+
+
+def _is_foreign(p: Path, project: Path) -> bool:
+    if not p.exists() or p.is_symlink():
+        return False
+    return _foreign_skills_dir(p, project) if p.is_dir() else not is_aix_pointer(p)
 
 
 def backup_foreign(project: Path, names=None) -> list:
@@ -202,18 +232,10 @@ def backup_foreign(project: Path, names=None) -> list:
     moved = []
     for n in (names or selected(project)):
         a = AGENTS[n]
-        targets = ([a["skills"]] if a["skills"] else []) + a["pointers"]
-        for rel in targets:
+        for rel in ([a["skills"]] if a["skills"] else []) + a["pointers"]:
             p = project / rel
-            if not p.exists() or p.is_symlink():
-                continue
-            foreign = _foreign_skills_dir(p, project) if p.is_dir() else not is_aix_pointer(p)
-            if not foreign:
-                continue
-            bak = p.with_name(p.name + "-bak")
-            i = 2
-            while bak.exists():
-                bak = p.with_name(f"{p.name}-bak{i}"); i += 1
-            p.rename(bak)
-            moved.append((rel, str(bak.relative_to(project))))
+            if _is_foreign(p, project):
+                bak = _bak_name(p)
+                p.rename(bak)
+                moved.append((rel, str(bak.relative_to(project))))
     return moved

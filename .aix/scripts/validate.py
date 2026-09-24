@@ -57,35 +57,45 @@ def _check_skill(md, base):
             warnings.append(f"{md}: description too short to trigger reliably")
 
 
+INSTRUCTION_TREES = (ROOT / ".aix" / "instructions", ROOT / ".aix" / "custom" / "instructions", ROOT / ".aix" / "org" / "instructions")
+
+
+def _check_instruction(md):
+    fm, _ = frontmatter(md)
+    if not fm or not fm.get("id"):
+        errors.append(f"{md.relative_to(ROOT)}: instruction needs front-matter with `id:`"); return
+    if fm.get("block") == "true":
+        if not fm.get("section") and fm.get("order", "0") != "0":
+            errors.append(f"{md.relative_to(ROOT)}: a block needs `section:` (its H2 title) unless it is the header (order 0)")
+        return  # blocks are AGENTS.md text; the description is for people, no trigger length needed
+    if len(fm.get("description", "")) < 40:
+        warnings.append(f"{md.relative_to(ROOT)}: description too short for the runtimes to pick it")
+
+
 def check_instructions():
-    for base in [ROOT / ".aix" / "instructions", ROOT / ".aix" / "custom" / "instructions", ROOT / ".aix" / "org" / "instructions"]:
+    for base in INSTRUCTION_TREES:
         for md in (base.rglob("*.md") if base.is_dir() else []):
-            fm, _ = frontmatter(md)
-            if not fm or not fm.get("id"):
-                errors.append(f"{md.relative_to(ROOT)}: instruction needs front-matter with `id:`"); continue
-            if fm.get("block") == "true" and not fm.get("section") and fm.get("order", "0") != "0":
-                errors.append(f"{md.relative_to(ROOT)}: a block needs `section:` (its H2 title) unless it is the header (order 0)")
-            if fm.get("block") == "true":
-                continue  # blocks are AGENTS.md text; the description is for people, no trigger length needed
-            if len(fm.get("description", "")) < 40:
-                warnings.append(f"{md.relative_to(ROOT)}: description too short for the runtimes to pick it")
+            _check_instruction(md)
+
+
+def _unlisted(d, listed: str):
+    for f in d.iterdir():
+        if f.name in {"INDEX.md", ".gitkeep"} or f.name.startswith("."):
+            continue
+        if f.name not in listed and f.name.replace(".md", "") not in listed:
+            yield f
 
 
 def check_indexes():
-    for d in [DOCS, META, *[p for p in DOCS.rglob("*") if p.is_dir()], *[p for p in META.rglob("*") if p.is_dir()]]:
-        if d.name in {"pending", "going-on", "completed", "next", "backlog", "ideas"} and d.parent.name in {"road-map", "pending"}:
-            pass
+    folders = [DOCS, META, *[p for p in DOCS.rglob("*") if p.is_dir()], *[p for p in META.rglob("*") if p.is_dir()]]
+    for d in folders:
         idx = d / "INDEX.md"
         if not idx.exists():
             errors.append(f"{d.relative_to(ROOT)}: missing INDEX.md"); continue
-        listed = idx.read_text(encoding="utf-8")
-        for f in d.iterdir():
-            if f.name in {"INDEX.md", ".gitkeep"} or f.name.startswith("."):
-                continue
-            if f.name not in listed and f.name.replace(".md", "") not in listed:
-                if "road-map" in str(d):
-                    continue  # task files move often; road-map INDEX lists folders, not tasks
-                warnings.append(f"{idx.relative_to(ROOT)}: does not list {f.name}")
+        if "road-map" in str(d):
+            continue  # task files move often; road-map INDEX lists folders, not tasks
+        for f in _unlisted(d, idx.read_text(encoding="utf-8")):
+            warnings.append(f"{idx.relative_to(ROOT)}: does not list {f.name}")
 
 
 def collect_ids():
@@ -97,38 +107,58 @@ def collect_ids():
     return defined
 
 
+def _check_links(md, text: str):
+    for m in LINK_RE.finditer(text):
+        target = m.group(1)
+        if target.startswith(("http", "mailto:")):
+            continue
+        if not (md.parent / target).exists() and not (ROOT / target).exists():
+            errors.append(f"{md.relative_to(ROOT)}: broken link {target}")
+
+
+def _check_covers(md, defined):
+    fm, _ = frontmatter(md)
+    for rid in (fm or {}).get("covers", "").replace("[", "").replace("]", "").split(","):
+        rid = rid.strip()
+        if rid and rid not in defined and "EXAMPLE" not in rid:
+            errors.append(f"{md.relative_to(ROOT)}: covers unknown requirement {rid}")
+
+
 def check_references(defined):
     all_md = list(DOCS.rglob("*.md")) + list(META.rglob("*.md")) + list(SKILLS.rglob("*.md")) + [ROOT / "AGENTS.md"]
     for md in all_md:
-        text = md.read_text(encoding="utf-8", errors="replace")
-        for m in LINK_RE.finditer(text):
-            target = m.group(1)
-            if target.startswith(("http", "mailto:")):
-                continue
-            if not (md.parent / target).exists() and not (ROOT / target).exists():
-                errors.append(f"{md.relative_to(ROOT)}: broken link {target}")
+        _check_links(md, md.read_text(encoding="utf-8", errors="replace"))
         if md.parent.name in {"functional", "non-functional"} and "tests" in md.parts:
-            fm, _ = frontmatter(md)
-            for rid in (fm or {}).get("covers", "").replace("[", "").replace("]", "").split(","):
-                rid = rid.strip()
-                if rid and rid not in defined and "EXAMPLE" not in rid:
-                    errors.append(f"{md.relative_to(ROOT)}: covers unknown requirement {rid}")
+            _check_covers(md, defined)
+
+
+def _table_fields(md):
+    """The first-column names of every data row in a document's tables."""
+    for line in md.read_text(encoding="utf-8").splitlines():
+        if line.startswith("| ") and not line.startswith(("| Field", "| Code", "| Path", "|---")):
+            yield line.split("|")[1].strip().strip("`")
+
+
+def _known_fields(dic: Path) -> set:
+    rows = (l for l in dic.read_text(encoding="utf-8").splitlines() if l.startswith("| ") and not l.startswith("| Field"))
+    return {l.split("|")[1].strip() for l in rows}
+
+
+def _check_fields_of(md: Path, known: set):
+    for name in _table_fields(md):
+        if re.fullmatch(r"[a-z][a-z0-9_]*", name) and name not in known:
+            warnings.append(f"{md.relative_to(ROOT)}: field '{name}' not in field-dictionary.md")
 
 
 def check_field_dictionary():
     dic = DOCS / "requirements" / "data-model" / "field-dictionary.md"
     if not dic.exists():
         return
-    known = {l.split("|")[1].strip() for l in dic.read_text(encoding="utf-8").splitlines() if l.startswith("| ") and not l.startswith("| Field")}
+    known = _known_fields(dic)
     for folder in ["requirements/data-model", "requirements/api"]:
         for md in (DOCS / folder).rglob("*.md"):
-            if md.name in {"INDEX.md", "field-dictionary.md"}:
-                continue
-            for line in md.read_text(encoding="utf-8").splitlines():
-                if line.startswith("| ") and not line.startswith(("| Field", "| Code", "| Path", "|---")):
-                    name = line.split("|")[1].strip().strip("`")
-                    if re.fullmatch(r"[a-z][a-z0-9_]*", name) and name not in known:
-                        warnings.append(f"{md.relative_to(ROOT)}: field '{name}' not in field-dictionary.md")
+            if md.name not in {"INDEX.md", "field-dictionary.md"}:
+                _check_fields_of(md, known)
 
 
 def check_status_drift():
@@ -161,15 +191,11 @@ def check_orphans():
     """A layer file that overrides nothing: a near-miss of a kit name is an error (a typo), a genuine addition a warning."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import layers
-    new = {}
-    for kind, name, layer, path, near in layers.orphans(ROOT):
-        shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-        if near:
-            errors.append(f"{shown}: {kind} {name} ({layer} layer) overrides nothing; did you mean {near}? (names must match character by character)")
-        else:
-            new.setdefault((kind, layer), []).append(name)
-    for (kind, layer), names in sorted(new.items()):
-        warnings.append(f"{len(names)} new {kind}{'s' if len(names) > 1 else ''} from the {layer} layer override nothing in the kit: {', '.join(names)}")
+    typos, additions = layers.orphan_report(ROOT)
+    for kind, name, layer, shown, near in typos:
+        errors.append(f"{shown}: {kind} {name} ({layer} layer) overrides nothing; did you mean {near}? (names must match character by character)")
+    for (kind, layer), names in sorted(additions.items()):
+        warnings.append(layers.additions_line(kind, layer, names))
 
 
 if __name__ == "__main__":

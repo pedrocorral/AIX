@@ -27,11 +27,8 @@ def setting(project: Path, key: str, default: str) -> str:
 
 
 def set_setting(project: Path, key: str, value: str, comment: str):
-    cfg = project / ".aix" / "config.yaml"
-    text = cfg.read_text(encoding="utf-8")
-    line = f"{key}: {value}   # {comment}"
-    text = re.sub(rf"^{key}:.*$", line, text, count=1, flags=re.M) if re.search(rf"^{key}:", text, re.M) else text.rstrip("\n") + "\n" + line + "\n"
-    cfg.write_text(text, encoding="utf-8")
+    import layers
+    layers.set_key(project, key, value, comment)
 
 
 def total(project: Path = ROOT) -> int:
@@ -59,19 +56,23 @@ def user() -> str:
     return os.environ.get("AIX_USER_NAME") or os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
 
-def ancestors():
-    """[(pid, name)] from this process's parent upwards (POSIX via ps; Windows: the parent only)."""
-    if os.name == "nt":
-        return [(os.getppid(), "shell")]
+def _process_table() -> dict:
+    """pid -> (ppid, name) from ps; empty when ps is unavailable."""
     try:
         out = subprocess.run(["ps", "-eo", "pid=,ppid=,comm="], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.TimeoutExpired):
-        return [(os.getppid(), "shell")]
+        return {}
     table = {}
     for line in out.splitlines():
         parts = line.split(None, 2)
         if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
             table[int(parts[0])] = (int(parts[1]), Path(parts[2].strip()).name)
+    return table
+
+
+def ancestors():
+    """[(pid, name)] from this process's parent upwards (POSIX via ps; Windows: the parent only)."""
+    table = {} if os.name == "nt" else _process_table()
     chain, pid = [], os.getppid()
     while pid > 1 and pid in table and len(chain) < 30:
         ppid, name = table[pid]
@@ -205,6 +206,28 @@ def bind(project: Path, name: str):
     binding_file(project).write_text(json.dumps({"seat": name, "since": now()}) + "\n", encoding="utf-8")
 
 
+def _take(project: Path, name: str, info: dict, message: str) -> str:
+    write_seat(project, name, info); bind(project, name)
+    print(f"{name}: yours{message}")
+    return name
+
+
+def _stale_reason(project: Path, seat: dict, force: bool):
+    """Why a taken seat may be taken over now, or None."""
+    if seat["state"] == "dead":
+        return "its process is gone (the session ended without releasing)"
+    if seat["state"] == "expired" and force:
+        return f"its heartbeat is older than {setting(project, 'agents_lease', '4h')} (--force)"
+    return None
+
+
+def _full_table(project: Path, seats: dict):
+    lines = [f"  {n}: {s.get('tool')} {s.get('user')}@{s.get('host')}, task {s.get('task')}, {s['state']}, heartbeat {int(age_seconds(s.get('heartbeat', '')) // 60)} min ago" for n, s in seats.items() if s]
+    expired = [n for n, s in seats.items() if s and s["state"] == "expired"]
+    hint = f"; {', '.join(expired)} expired on another machine: `aix agent claim --force` takes it" if expired else "; `aix agent set total N` adds seats"
+    sys.exit(f"aix agent: all {total(project)} seats are taken{hint}\n" + "\n".join(lines))
+
+
 def claim(project: Path = ROOT, force: bool = False) -> str:
     """Take a seat for this session (or keep the one it has). Prints what happened; exits when the table is full."""
     have = mine(project)
@@ -217,20 +240,13 @@ def claim(project: Path = ROOT, force: bool = False) -> str:
     seats = all_seats(project)
     for name, seat in seats.items():
         if seat is None:
-            write_seat(project, name, info); bind(project, name)
-            print(f"{name}: yours ({tool}, {info['user']}@{info['host']})")
-            return name
+            return _take(project, name, info, f" ({tool}, {info['user']}@{info['host']})")
     for name, seat in seats.items():
-        if seat["state"] == "dead" or (seat["state"] == "expired" and force):
-            why = "its process is gone (the session ended without releasing)" if seat["state"] == "dead" else f"its heartbeat is older than {setting(project, 'agents_lease', '4h')} (--force)"
+        why = _stale_reason(project, seat, force)
+        if why:
             info["took_over"] = f"{seat.get('tool')} {seat.get('user')}@{seat.get('host')} pid {seat.get('pid')}: {why}"
-            write_seat(project, name, info); bind(project, name)
-            print(f"{name}: yours, taken over: {why}")
-            return name
-    lines = [f"  {n}: {s.get('tool')} {s.get('user')}@{s.get('host')}, task {s.get('task')}, {s['state']}, heartbeat {int(age_seconds(s.get('heartbeat', '')) // 60)} min ago" for n, s in seats.items() if s]
-    expired = [n for n, s in seats.items() if s and s["state"] == "expired"]
-    hint = f"; {', '.join(expired)} expired on another machine: `aix agent claim --force` takes it" if expired else "; `aix agent set total N` adds seats"
-    sys.exit(f"aix agent: all {total(project)} seats are taken{hint}\n" + "\n".join(lines))
+            return _take(project, name, info, f", taken over: {why}")
+    _full_table(project, seats)
 
 
 def heartbeat(project: Path = ROOT, task: str = None):

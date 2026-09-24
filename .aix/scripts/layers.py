@@ -17,73 +17,14 @@ Instructions: `instructions/**/*.md` with front matter `id`, `description`; eith
 and rendered per runtime, or a BLOCK (`block: true`, `section`, `order`) assembled into AGENTS.md itself. The kit's
 own AGENTS.md is the blocks under `.aix/instructions/agents/`; a layer replaces a block by id or adds a section.
 Profiles: `profiles/<name>.yaml` = a saved set of choices (instructions, skills, always-on, router)."""
-import hashlib, json, os, re, sys
+import hashlib, json, os, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 USER_DIR = Path(os.environ.get("AIX_USER_DIR") or (Path.home() / ".config" / "aix"))
 LAYER_NAMES = ("kit", "org", "user", "project")
+from yamlmini import front_matter, parse_yaml
 
-
-# ---- tiny YAML subset (no dependency): scalars, lists, one-level maps, `key: |` blocks --------------------------------
-
-def parse_yaml(text: str) -> dict:
-    out, key, mode, buf = {}, None, None, []
-    for raw in text.splitlines():
-        if mode == "block":
-            if not raw.strip() or raw.startswith(("  ", "\t")):
-                buf.append(raw[2:] if raw.startswith("  ") else raw[1:]); continue
-            out[key] = "\n".join(buf).rstrip() + "\n"; mode, buf = None, []
-        if not raw.strip() or raw.lstrip().startswith("#"):
-            continue
-        if raw.startswith("  - "):
-            if not isinstance(out.get(key), list):
-                out[key] = []
-            out[key].append(_scalar(raw[4:])); continue
-        if raw.startswith(("  ", "\t")) and ":" in raw:
-            k, v = raw.strip().split(":", 1)
-            if not isinstance(out.get(key), dict):
-                out[key] = {}
-            out[key][k.strip()] = _scalar(v); continue
-        if ":" in raw:
-            key, v = raw.split(":", 1)
-            key, v = key.strip(), _strip_comment(v)
-            if v == "|":
-                mode = "block"
-            elif v == "":
-                out[key] = None
-            elif v.startswith("[") and v.endswith("]"):
-                out[key] = [_scalar(x) for x in v[1:-1].split(",") if x.strip()]
-            else:
-                out[key] = _scalar(v)
-    if mode == "block":
-        out[key] = "\n".join(buf).rstrip() + "\n"
-    return out
-
-
-def _strip_comment(v: str) -> str:
-    v = v.strip()
-    if v and v[0] in "\"'":
-        end = v.find(v[0], 1)
-        return v[:end + 1] if end > 0 else v
-    return v.split("#", 1)[0].strip()
-
-
-def _scalar(v: str):
-    v = _strip_comment(v)
-    if v and v[0] in "\"'" and v[-1] == v[0] and len(v) > 1:
-        return v[1:-1]
-    if v in ("true", "false"):
-        return v == "true"
-    return v
-
-
-def front_matter(md: Path) -> dict:
-    text = md.read_text(encoding="utf-8", errors="replace")
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    return parse_yaml(text[3:end]) if end > 0 else {}
 
 
 # ---- layers -------------------------------------------------------------------------------------------------------
@@ -108,6 +49,20 @@ def layer_roots(project: Path = ROOT):
 def config(project: Path = ROOT) -> dict:
     f = project / ".aix" / "config.yaml"
     return parse_yaml(f.read_text(encoding="utf-8")) if f.exists() else {}
+
+
+def set_key(project: Path, key: str, value, comment: str = ""):
+    """Write one top-level `key: value` line into .aix/config.yaml (replacing the line when present); value None
+    removes the line. The one writer every `aix ... use|set` command goes through."""
+    import re
+    cfg = project / ".aix" / "config.yaml"
+    text = cfg.read_text(encoding="utf-8")
+    line = "" if value is None else f"{key}: {value}" + (f"   # {comment}" if comment else "")
+    if re.search(rf"^{key}:.*$", text, re.M):
+        text = re.sub(rf"^{key}:.*\n?", (line + "\n") if line else "", text, count=1, flags=re.M)
+    elif line:
+        text = text.rstrip("\n") + "\n" + line + "\n"
+    cfg.write_text(text, encoding="utf-8")
 
 
 def class_of_path(rel_parts) -> str:
@@ -149,30 +104,48 @@ def implementations(project: Path = ROOT):
     return found, disabled
 
 
+def _use_map(cfg: dict, profile: dict) -> dict:
+    """class -> implementation id: the config's `use:` over the profile's `skills:`."""
+    use = {flat(k): v for k, v in (cfg.get("use") or {}).items()}
+    if profile and isinstance(profile.get("skills"), dict):
+        return {**{flat(k): v for k, v in profile["skills"].items()}, **use}
+    return use
+
+
+def _disabled_on_top(cls: str, impls: list, disabled: dict) -> bool:
+    """A DISABLED file wins only when it sits in the highest layer that mentions the class."""
+    if cls not in disabled:
+        return False
+    top = max(LAYER_NAMES.index(i["layer"]) for i in impls)
+    return LAYER_NAMES.index(disabled[cls]) >= top
+
+
+def _top_layer_choice(impls: list):
+    """The canonical implementation of the highest layer, and the reason."""
+    top_layer = max(impls, key=lambda i: LAYER_NAMES.index(i["layer"]))["layer"]
+    top = [i for i in impls if i["layer"] == top_layer]
+    chosen = next((i for i in top if i["canonical"]), top[0])
+    override = " override" if top_layer != "kit" and len(impls) > 1 else ""
+    return chosen, f"{top_layer} layer{override}"
+
+
+def _choose(cls: str, impls: list, use: dict):
+    """(implementation, why): the pinned id when it exists, else the canonical one of the highest layer."""
+    pinned = next((i for i in impls if i["id"] == use.get(cls)), None) if cls in use else None
+    if pinned:
+        return pinned, f"config use: {use[cls]}"
+    return _top_layer_choice(impls)
+
+
 def resolve(project: Path = ROOT, profile: dict = None):
     """class -> {path, layer, id, version, manual, shadowed, chosen_by}; plus disabled {class: layer}."""
     found, disabled = implementations(project)
-    cfg = config(project)
-    use = dict(cfg.get("use") or {})
-    if profile and isinstance(profile.get("skills"), dict):
-        use = {**{flat(k): v for k, v in profile["skills"].items()}, **{flat(k): v for k, v in use.items()}}
-    else:
-        use = {flat(k): v for k, v in use.items()}
+    use = _use_map(config(project), profile)
     active = {}
     for cls, impls in found.items():
-        if cls in disabled:
-            top = max(LAYER_NAMES.index(i["layer"]) for i in impls)
-            if LAYER_NAMES.index(disabled[cls]) >= top:
-                continue  # DISABLED in the highest layer that mentions the class
-        chosen, why = None, ""
-        if cls in use:
-            chosen = next((i for i in impls if i["id"] == use[cls]), None)
-            why = f"config use: {use[cls]}" if chosen else ""
-        if chosen is None:
-            top_layer = max(impls, key=lambda i: LAYER_NAMES.index(i["layer"]))["layer"]
-            top = [i for i in impls if i["layer"] == top_layer]
-            chosen = next((i for i in top if i["canonical"]), top[0])
-            why = f"{top_layer} layer" + (" override" if top_layer != "kit" and len(impls) > 1 else "")
+        if _disabled_on_top(cls, impls, disabled):
+            continue
+        chosen, why = _choose(cls, impls, use)
         others = [i for i in impls if i is not chosen]
         active[cls] = {**chosen, "chosen_by": why, "shadowed": [(i["layer"], i["path"], i["id"]) for i in others]}
     return active, {c: l for c, l in disabled.items() if c not in active}
@@ -180,53 +153,68 @@ def resolve(project: Path = ROOT, profile: dict = None):
 
 # ---- instructions -------------------------------------------------------------------------------------------------
 
-def instructions(project: Path = ROOT, profile: dict = None):
-    """id -> {path, layer, description, applyTo: [globs], always}. Later layer wins per id. No user layer."""
-    out = {}
+def _instruction_files(project: Path):
+    """(layer, path, front matter) for every instruction file of every layer but the user's, kit first."""
     for layer, root in layer_roots(project):
-        if layer == "user":
-            continue
         base = root / "instructions"
-        if not base.is_dir():
+        if layer == "user" or not base.is_dir():
             continue
         for md in sorted(base.rglob("*.md")):
             fm = front_matter(md)
-            if not fm.get("id"):
-                continue
-            globs = fm.get("applyTo", "")
-            globs = [g.strip() for g in (globs if isinstance(globs, list) else str(globs).split(",")) if g.strip()]
-            out[fm["id"]] = {"path": md, "layer": layer, "name": fm.get("name", fm["id"]), "description": fm.get("description", ""),
-                             "applyTo": globs, "always": fm.get("always") is True,
-                             "block": fm.get("block") is True, "section": str(fm.get("section", "")), "order": int(fm.get("order", 100) or 100),
-                             "optional": fm.get("optional") is True}
-    cfg = config(project)
+            if fm.get("id"):
+                yield layer, md, fm
+
+
+def _instruction_record(layer: str, md: Path, fm: dict) -> dict:
+    globs = fm.get("applyTo", "")
+    globs = [g.strip() for g in (globs if isinstance(globs, list) else str(globs).split(",")) if g.strip()]
+    return {"path": md, "layer": layer, "name": fm.get("name", fm["id"]), "description": fm.get("description", ""),
+            "applyTo": globs, "always": fm.get("always") is True, "block": fm.get("block") is True,
+            "section": str(fm.get("section", "")), "order": int(fm.get("order", 100) or 100), "optional": fm.get("optional") is True}
+
+
+def _wanted_instructions(cfg: dict, profile) -> set:
     wanted = set(cfg.get("instructions") or [])
-    off = set(cfg.get("disabled_instructions") or [])
     if profile and isinstance(profile.get("instructions"), list):
         wanted |= set(profile["instructions"])
-        out = {k: v for k, v in out.items() if k in wanted or v["layer"] == "kit"}
-    return {k: v for k, v in out.items() if (not v["optional"] or k in wanted) and k not in off}
+    return wanted
+
+
+def _keep_instruction(record: dict, key: str, wanted: set, off: set, listed: bool) -> bool:
+    """Optional instructions need to be wanted; a profile that lists instructions keeps only those and the kit's."""
+    if key in off or (record["optional"] and key not in wanted):
+        return False
+    return not listed or key in wanted or record["layer"] == "kit"
+
+
+def instructions(project: Path = ROOT, profile: dict = None):
+    """id -> {path, layer, description, applyTo: [globs], always}. Later layer wins per id. No user layer."""
+    out = {fm["id"]: _instruction_record(layer, md, fm) for layer, md, fm in _instruction_files(project)}
+    cfg = config(project)
+    wanted = _wanted_instructions(cfg, profile)
+    off = set(cfg.get("disabled_instructions") or [])
+    listed = bool(profile) and isinstance(profile.get("instructions"), list)
+    return {k: v for k, v in out.items() if _keep_instruction(v, k, wanted, off, listed)}
+
+
+def _instruction_state(iid: str, v: dict, active: dict, off: set) -> str:
+    if iid in active:
+        return "active"
+    if iid in off:
+        return "disabled"
+    return "optional (off)" if v["optional"] else "not in profile"
 
 
 def all_instructions(project: Path = ROOT):
     """Every instruction any layer offers, with its state: active | optional (off) | disabled | not in profile."""
-    prof = active_profile(project)
-    active = instructions(project, prof)
-    cfg = config(project)
-    off = set(cfg.get("disabled_instructions") or [])
+    active = instructions(project, active_profile(project))
+    off = set(config(project).get("disabled_instructions") or [])
     everything = {}
-    for layer, root in layer_roots(project):
-        if layer == "user":
-            continue
-        base = root / "instructions"
-        for md in (sorted(base.rglob("*.md")) if base.is_dir() else []):
-            fm = front_matter(md)
-            if fm.get("id"):
-                everything[fm["id"]] = {"path": md, "layer": layer, "description": fm.get("description", ""),
-                                        "applyTo": fm.get("applyTo", ""), "block": fm.get("block") is True, "optional": fm.get("optional") is True,
-                                        "section": str(fm.get("section", ""))}
+    for layer, md, fm in _instruction_files(project):
+        everything[fm["id"]] = {"path": md, "layer": layer, "description": fm.get("description", ""), "applyTo": fm.get("applyTo", ""),
+                                "block": fm.get("block") is True, "optional": fm.get("optional") is True, "section": str(fm.get("section", ""))}
     for iid, v in everything.items():
-        v["state"] = "active" if iid in active else "disabled" if iid in off else "optional (off)" if v["optional"] else "not in profile"
+        v["state"] = _instruction_state(iid, v, active, off)
     return everything
 
 
@@ -288,19 +276,19 @@ if __name__ == "__main__":
 
 # ---- orphans: layer files that override nothing ---------------------------------------------------------------------
 
-def orphans(project: Path = ROOT, cutoff: float = 0.85) -> list:
-    """Skills and instructions in org/ or custom/ (or the user layer) that match nothing in the kit: a genuine addition,
-    or a typo one character away from a kit name. [(kind, name, layer, path, suggestion|None)]; `suggestion` is the
-    closest kit name when it is close enough (difflib ratio >= cutoff) — almost always a typo."""
-    out = []
+def _orphan_skills(project: Path, cutoff: float) -> list:
     found, _ = implementations(project)
     kit_classes = sorted(c for c, impls in found.items() if any(i["layer"] == "kit" for i in impls))
+    out = []
     for cls, impls in sorted(found.items()):
-        if any(i["layer"] == "kit" for i in impls):
+        if cls in kit_classes:
             continue
         near = near_miss(cls, kit_classes, "-", cutoff)
-        for i in impls:
-            out.append(("skill", cls, i["layer"], i["path"], near))
+        out += [("skill", cls, i["layer"], i["path"], near) for i in impls]
+    return out
+
+
+def _orphan_instructions(project: Path, cutoff: float) -> list:
     kit_ids, layer_ids = set(), []
     for layer, root in layer_roots(project):
         base = root / "instructions"
@@ -309,11 +297,31 @@ def orphans(project: Path = ROOT, cutoff: float = 0.85) -> list:
             if not iid:
                 continue
             (kit_ids.add(iid) if layer == "kit" else layer_ids.append((iid, layer, md)))
-    for iid, layer, md in layer_ids:
-        if iid in kit_ids:
-            continue
-        out.append(("instruction", iid, layer, md, near_miss(iid, sorted(kit_ids), "/", cutoff)))
-    return out
+    return [("instruction", iid, layer, md, near_miss(iid, sorted(kit_ids), "/", cutoff)) for iid, layer, md in layer_ids if iid not in kit_ids]
+
+
+def orphans(project: Path = ROOT, cutoff: float = 0.85) -> list:
+    """Skills and instructions in org/ or custom/ (or the user layer) that match nothing in the kit: a genuine addition,
+    or a typo one character away from a kit name. [(kind, name, layer, path, suggestion|None)]; `suggestion` is the
+    closest kit name when it is close enough (difflib ratio >= cutoff) — almost always a typo."""
+    return _orphan_skills(project, cutoff) + _orphan_instructions(project, cutoff)
+
+
+def orphan_report(project: Path = ROOT):
+    """(typos, additions): typos = [(kind, name, layer, shown path, suggestion)], additions = {(kind, layer): [names]}.
+    Doctor turns typos into problems and additions into a note; validate into errors and a warning."""
+    typos, additions = [], {}
+    for kind, name, layer, path, near in orphans(project):
+        shown = path.relative_to(project) if path.is_relative_to(project) else path
+        if near:
+            typos.append((kind, name, layer, shown, near))
+        else:
+            additions.setdefault((kind, layer), []).append(name)
+    return typos, additions
+
+
+def additions_line(kind: str, layer: str, names: list) -> str:
+    return f"{len(names)} new {kind}{'s' if len(names) > 1 else ''} from the {layer} layer (override nothing in the kit): {', '.join(names)}"
 
 
 def near_miss(name: str, known: list, sep: str, cutoff: float = 0.85):

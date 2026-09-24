@@ -38,3 +38,10 @@ Several agents may share this repository: a task is taken with `aix task start I
 ## Output
 Docs use the front-matter in `.aix/meta-docs/conventions/document-format.md`. Commits: `<type>(<scope>): <summary> [IDs]`.
 Task report: what changed · IDs touched · tests · security rows still open · next step.
+
+## Cycle
+Policy `minimal` (config). Follow these steps in order; `aix check` runs the checks and `aix task done` refuses to close a task while a required one fails.
+- implement (advised): skill `implement-feature` — the code carries @implements markers
+- style (required): `aix code style --gate` — no function over a readability limit
+- docs (required): `aix docs validate` — IDs, links, indexes and statuses are consistent
+

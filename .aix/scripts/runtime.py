@@ -23,7 +23,8 @@ def _first(root: Path, names, depth=2):
                 yield d / n
 
 
-def python(root: Path):
+def _python_from_declaration(root: Path):
+    """pyproject requires-python, then .python-version."""
     for f in _first(root, ["pyproject.toml"]):
         m = re.search(r'requires-python\s*=\s*"([^"]+)"', f.read_text(encoding="utf-8", errors="replace"))
         if m and _min_version(m.group(1)):
@@ -32,41 +33,58 @@ def python(root: Path):
         v = _min_version(f.read_text(encoding="utf-8").strip())
         if v:
             return v, f"Python {v[0]}.{v[1]}", str(f.relative_to(root))
-    venvs = [root / d / "pyvenv.cfg" for d in (".venv", "venv")] + [c for sub in root.iterdir() if sub.is_dir() and not sub.name.startswith(".") for c in (sub / ".venv" / "pyvenv.cfg", sub / "venv" / "pyvenv.cfg")]
-    for f in [v for v in venvs if v.is_file()]:
+    return None
+
+
+def _python_from_venv(root: Path):
+    candidates = [root / d / "pyvenv.cfg" for d in (".venv", "venv")]
+    candidates += [c for sub in root.iterdir() if sub.is_dir() and not sub.name.startswith(".") for c in (sub / ".venv" / "pyvenv.cfg", sub / "venv" / "pyvenv.cfg")]
+    for f in [v for v in candidates if v.is_file()]:
         m = re.search(r"^version(?:_info)?\s*=\s*(\d+)\.(\d+)", f.read_text(encoding="utf-8", errors="replace"), re.M)
         if m:
             return (int(m.group(1)), int(m.group(2))), f"Python {m.group(1)}.{m.group(2)}", f"{f.relative_to(root)} (venv)"
+    return None
+
+
+def _python_on_path():
     exe = shutil.which("python3") or shutil.which("python")
-    if exe:
-        try:
-            out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10).stdout
-            v = _min_version(out)
-            if v:
-                return v, f"Python {v[0]}.{v[1]}", "python on PATH (assumed: nothing in the project declares a version)"
-        except Exception:
-            pass
-    return None, "Python: version unknown", "nothing declares it"
+    if not exe:
+        return None
+    try:
+        v = _min_version(subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10).stdout)
+    except Exception:
+        return None
+    return (v, f"Python {v[0]}.{v[1]}", "python on PATH (assumed: nothing in the project declares a version)") if v else None
+
+
+def python(root: Path):
+    return _python_from_declaration(root) or _python_from_venv(root) or _python_on_path() or (None, "Python: version unknown", "nothing declares it")
 
 
 ES_TARGETS = {"es3": 3, "es5": 5, "es6": 2015, "es2015": 2015, "es2016": 2016, "es2017": 2017, "es2018": 2018, "es2019": 2019,
               "es2020": 2020, "es2021": 2021, "es2022": 2022, "es2023": 2023, "es2024": 2024, "esnext": 2024}
 
 
+def _node_year(major: int) -> int:
+    return 2022 if major >= 18 else 2020 if major >= 14 else 2018 if major >= 10 else 2015
+
+
+def _engines_node(f: Path):
+    try:
+        return json.loads(f.read_text(encoding="utf-8", errors="replace")).get("engines", {}).get("node")
+    except json.JSONDecodeError:
+        return None
+
+
 def javascript(root: Path):
     for f in _first(root, ["tsconfig.json", "tsconfig.base.json"]):
         m = re.search(r'"target"\s*:\s*"([^"]+)"', f.read_text(encoding="utf-8", errors="replace"))
         if m and m.group(1).lower() in ES_TARGETS:
-            year = ES_TARGETS[m.group(1).lower()]
-            return (year,), f"TypeScript, target {m.group(1)}", f"{f.relative_to(root)} compilerOptions.target"
+            return (ES_TARGETS[m.group(1).lower()],), f"TypeScript, target {m.group(1)}", f"{f.relative_to(root)} compilerOptions.target"
     for f in _first(root, ["package.json"]):
-        try:
-            node = json.loads(f.read_text(encoding="utf-8", errors="replace")).get("engines", {}).get("node")
-        except json.JSONDecodeError:
-            node = None
+        node = _engines_node(f)
         if node and _min_version(node):
-            major = _min_version(node)[0]
-            year = 2022 if major >= 18 else 2020 if major >= 14 else 2018 if major >= 10 else 2015
+            year = _node_year(_min_version(node)[0])
             return (year,), f"Node {node} (≈ ES{year})", f"{f.relative_to(root)} engines.node"
     return None, "JavaScript: target unknown", "no tsconfig target or engines.node"
 

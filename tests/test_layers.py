@@ -116,7 +116,7 @@ class OrphansInLayers(unittest.TestCase):
         upgrade(self.project, self.home, kit=self.fork)
         v = project_cmd(self.project, self.home, "docs", "validate")
         self.assertIn("0 errors", v.stdout)
-        self.assertIn("new skill from the org layer override nothing in the kit: implement-tdd", v.stdout, "ACME's genuinely new class is a warning, not an error")
+        self.assertIn("new skill from the org layer (override nothing in the kit): implement-tdd", v.stdout, "ACME's genuinely new class is a warning, not an error")
         self.assertIn("new instructions from the org layer", v.stdout)
         d = project_cmd(self.project, self.home, "doctor").stdout
         self.assertIn("note: 1 new skill from the org layer (override nothing in the kit): implement-tdd", d)

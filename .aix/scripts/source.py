@@ -91,15 +91,14 @@ def install_layers(project: Path, resolved: dict, dry: bool = False):
 
 def record(project: Path, source: str, key: str = "source"):
     """Write `source:` (the origin, --from), `source_org:` or `source_custom:` (--from-org / --from-custom) into config.yaml."""
-    cfg = project / ".aix" / "config.yaml"
-    text = cfg.read_text(encoding="utf-8")
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import layers
     if Path(source).expanduser().exists():
         source = str(Path(source).expanduser().resolve())  # a relative path would break `aix upgrade` run from elsewhere
     what = {"source": "origin of the kit and its layers (aix install --from)", "source_org": "where .aix/org/ comes from (--from-org)",
             "source_custom": "where .aix/custom/ comes from (--from-custom)"}[key]
-    line = f"{key}: {source}   # {what}; followed by aix upgrade"
-    text = re.sub(rf"^{key}:.*$", line, text, count=1, flags=re.M) if re.search(rf"^{key}:", text, re.M) else text.rstrip("\n") + "\n" + line + "\n"
-    cfg.write_text(text, encoding="utf-8")
+    layers.set_key(project, key, source, f"{what}; followed by aix upgrade")
 
 
 def configured(project: Path, key: str = "source"):

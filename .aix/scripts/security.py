@@ -69,6 +69,31 @@ def print_group(title, group):
     print()
 
 
+def _gate(open_rows, probs):
+    bad = [r["id"] for r in open_rows]
+    if bad or probs:
+        print(f"GATE FAILED: {len(bad)} rows not validated, {len(probs)} without evidence")
+        sys.exit(1)
+    print("GATE PASSED: every row validated with evidence")
+
+
+def _print_sections(which, open_rows, validated):
+    if which in (None, "open"):
+        print_group("NOT VALIDATED — run the audit skill named in the register", open_rows)
+        todo = sorted({r["skill"] for r in open_rows})
+        if todo:
+            print("Audit skills still to run: " + ", ".join(todo) + "\n")
+    if which in (None, "validated"):
+        print_group("VALIDATED — addressed with evidence, accepted by ADR, or not applicable", validated)
+
+
+def _print_problems(probs) -> None:
+    for p in probs:
+        print(f"PROBLEM {p}")
+    if probs:
+        print("        fix: write the audit report (.aix/templates/audit-report.md) or revert the status\n")
+
+
 def cmd_report(which=None, gate=False):
     all_rows = rows()
     validated = [r for r in all_rows if r["status"] in VALIDATED]
@@ -77,25 +102,11 @@ def cmd_report(which=None, gate=False):
     for r in all_rows:
         counts[r["status"]] = counts.get(r["status"], 0) + 1
     print("Vulnerability register: " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())) + f"  (total {len(all_rows)})\n")
-    if which in (None, "open"):
-        print_group("NOT VALIDATED — run the audit skill named in the register", open_rows)
-    if which in (None, "validated"):
-        print_group("VALIDATED — addressed with evidence, accepted by ADR, or not applicable", validated)
-    if which in (None, "open"):
-        todo = sorted({r["skill"] for r in open_rows})
-        if todo:
-            print("Audit skills still to run: " + ", ".join(todo) + "\n")
+    _print_sections(which, open_rows, validated)
     probs = problems()
-    for p in probs:
-        print(f"PROBLEM {p}")
-    if probs:
-        print("        fix: write the audit report (.aix/templates/audit-report.md) or revert the status\n")
+    _print_problems(probs)
     if gate:
-        bad = [r["id"] for r in open_rows]
-        if bad or probs:
-            print(f"GATE FAILED: {len(bad)} rows not validated, {len(probs)} without evidence")
-            sys.exit(1)
-        print("GATE PASSED: every row validated with evidence")
+        _gate(open_rows, probs)
 
 
 def main(args):

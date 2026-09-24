@@ -7,7 +7,7 @@ Activation levels (derived, not configured):
   orchestrator entry-point skills that chain other skills
   on-demand    invoked by an orchestrator, the user, or the agent when the description matches
 Disabled skills are listed in .aix/config.yaml under `disabled_skills:` and are not linked by `aix install`."""
-import re, sys
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -96,14 +96,25 @@ def installed_in(flat: str):
     return [RUNTIME[t] for t in agents.skill_dirs(ROOT) if (ROOT / t / flat).exists()]
 
 
-def unlink_everywhere(flat):
+def unlink_everywhere(flat, project=None, targets=None):
+    """Remove a skill's link (or copied folder) from every agent folder; the project's and the selected agents' by default."""
     import shutil
-    for t in TARGETS:
-        p = ROOT / t / flat
+    project = project or ROOT
+    for t in (targets if targets is not None else agents.skill_dirs(project)):
+        p = project / t / flat
         if p.is_symlink() or p.is_file():
             p.unlink()
         elif p.is_dir():
             shutil.rmtree(p)
+
+
+def _use_entries(block: str) -> dict:
+    entries = {}
+    for line in block.splitlines():
+        k, _, v = line.strip().partition(":")
+        if k and v.strip():
+            entries[k.strip()] = v.split("#")[0].strip().strip("'\"")
+    return entries
 
 
 def set_use(flat, iid):
@@ -112,15 +123,12 @@ def set_use(flat, iid):
     cfg = ROOT / ".aix" / "config.yaml"
     text = cfg.read_text(encoding="utf-8")
     m = re.search(r"^use:[^\n]*\n((?:[ \t]+\S[^\n]*\n?)*)", text, re.M)
-    entries = {}
-    if m:
-        for line in m.group(1).splitlines():
-            k, _, v = line.strip().partition(":")
-            if k and v.strip():
-                entries[k.strip()] = v.split("#")[0].strip().strip("'\"")
-    entries = {k: v for k, v in entries.items() if k.replace("/", "-") != flat}
+    entries = {k: v for k, v in _use_entries(m.group(1) if m else "").items() if k.replace("/", "-") != flat}
     if iid:
         entries[flat] = iid
     block = "" if not entries else "use:   # skill implementation per class, managed by `aix skills use`\n" + "".join(f"  {k}: \"{v}\"\n" for k, v in sorted(entries.items()))
-    text = text[:m.start()] + block + text[m.end():] if m else (text.rstrip("\n") + "\n" + block if block else text)
+    if m:
+        text = text[:m.start()] + block + text[m.end():]
+    elif block:
+        text = text.rstrip("\n") + "\n" + block
     cfg.write_text(text, encoding="utf-8")

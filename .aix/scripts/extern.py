@@ -118,13 +118,10 @@ def always_on_names(text: str):
 
 
 def set_always(text: str, names, intro: str):
+    """The `## Always-on skills` section rewritten with `names` (removed when empty); the rest of the file untouched."""
+    import install_skills
     block = "" if not names else ALWAYS_HEADER + "\n" + intro + "\n" + "".join(f"- `{n}`\n" for n in names) + "\n"
-    if ALWAYS_HEADER in text:
-        head, rest = text.split(ALWAYS_HEADER, 1)
-        tail = rest.split("\n## ", 1)
-        remainder = ("## " + tail[1]) if len(tail) > 1 else ""
-        return head + block + remainder
-    return text.rstrip("\n") + "\n\n" + block if block else text
+    return install_skills._replace_section(text, ALWAYS_HEADER, block)
 
 
 def mark_always(name: str, on: bool):
@@ -158,6 +155,20 @@ def cmd_registry(group=None, only=None):
           "An entry with `class` is installed as that kit class's implementation (selected on add); one without keeps its bare name.")
 
 
+def _install_extras(name: str, entry: dict, extra):
+    for x in extra:
+        if x not in entry.get("also", []):
+            sys.exit(f"'{x}' is not a listed extra of {name}")
+        install_one(x, {"repo": entry["repo"], "path": entry["path"].rsplit("/", 1)[0] + "/" + x, "group": "specific"})
+
+
+def _make_always(name: str, entry: dict, styles_on: list):
+    if entry["kind"] == "style" and any(s != name for s in styles_on):
+        print(f"  warning: another style skill is already always-on ({', '.join(styles_on)}); two output styles conflict")
+    mark_always(name, True)
+    print(f"  {name}: always-on (AGENTS.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc, GEMINI.md)")
+
+
 def cmd_add(names, always: bool, on_demand: bool, extra):
     """General skills become always-on unless --on-demand; specific ones stay on-demand unless --always."""
     reg = registry()
@@ -165,15 +176,9 @@ def cmd_add(names, always: bool, on_demand: bool, extra):
     for name in names:
         entry = reg.get(name) or sys.exit(f"'{name}' is not in the registry; see `aix skills registry`")
         install_one(name, entry)
-        for x in extra:
-            if x not in entry.get("also", []):
-                sys.exit(f"'{x}' is not a listed extra of {name}")
-            install_one(x, {"repo": entry["repo"], "path": entry["path"].rsplit("/", 1)[0] + "/" + x, "group": "specific"})
+        _install_extras(name, entry, extra)
         if always or (entry.get("group") == "general" and not on_demand):
-            if entry["kind"] == "style" and any(s != name for s in styles_on):
-                print(f"  warning: another style skill is already always-on ({', '.join(styles_on)}); two output styles conflict")
-            mark_always(name, True)
-            print(f"  {name}: always-on (AGENTS.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc, GEMINI.md)")
+            _make_always(name, entry, styles_on)
 
 
 def cmd_remove(names):
@@ -222,20 +227,17 @@ def main(args):
         extra = rest[i + 1].split(",")
         del rest[i:i + 2]
     rest = [r for r in rest if r not in ("--always", "--on-demand")]
-    if sub == "registry":
-        cmd_registry()
-    elif sub == "add" and rest:
-        cmd_add(rest, always, on_demand, extra)
-    elif sub == "remove" and rest:
-        cmd_remove(rest)
-    elif sub == "update":
-        cmd_update(rest)
-    elif sub == "always" and rest:
-        cmd_always(rest[0], True)
-    elif sub == "on-demand" and rest:
-        cmd_always(rest[0], False)
-    else:
+    actions = {
+        "registry": lambda: cmd_registry(),
+        "add": lambda: cmd_add(rest, always, on_demand, extra),
+        "remove": lambda: cmd_remove(rest),
+        "update": lambda: cmd_update(rest),
+        "always": lambda: cmd_always(rest[0], True),
+        "on-demand": lambda: cmd_always(rest[0], False),
+    }
+    if sub not in actions or (sub in ("add", "remove", "always", "on-demand") and not rest):
         sys.exit(USAGE)
+    actions[sub]()
 
 
 if __name__ == "__main__":

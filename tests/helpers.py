@@ -2,7 +2,7 @@
 ~/.cache/aix and the person layer are never touched), CI=1 and AIX_NO_USER=1 (no prompts, no TUI, no person layer),
 and the real launcher run as a subprocess. Nothing here writes outside that folder except the tests of the checkout
 itself (test_kit.py), which run `aix install` on the checkout the way a developer does."""
-import filecmp, os, re, shutil, subprocess, sys, tempfile
+import filecmp, os, re, shutil, subprocess, tempfile
 from pathlib import Path
 
 KIT = Path(__file__).resolve().parents[1]
@@ -37,14 +37,54 @@ def env(home: Path) -> dict:
     return e
 
 
-def run(args, cwd: Path, home: Path, launcher: Path = LAUNCHER, check: bool = True, stdin: str = None, extra_env: dict = None):
-    """Run the launcher with args; return CompletedProcess (stdout/stderr as text). check=True fails the call on a non-zero exit."""
+def run(args, cwd: Path, home: Path, check: bool = True, **opts):
+    """Run the launcher with args; return CompletedProcess (stdout/stderr as text). check=True fails the call on a non-zero
+    exit. opts: launcher (another kit's), stdin (text), extra_env (dict)."""
     e = env(home)
-    e.update(extra_env or {})
-    r = subprocess.run([str(launcher), *map(str, args)], cwd=str(cwd), env=e, capture_output=True, text=True, input=stdin)
+    e.update(opts.get("extra_env") or {})
+    launcher = opts.get("launcher") or LAUNCHER
+    r = subprocess.run([str(launcher), *map(str, args)], cwd=str(cwd), env=e, capture_output=True, text=True, input=opts.get("stdin"))
     if check and r.returncode != 0:
         raise AssertionError(f"aix {' '.join(map(str, args))} failed ({r.returncode}) in {cwd}\n--- stdout\n{r.stdout}\n--- stderr\n{r.stderr}")
     return r
+
+
+class Terminal:
+    """The launcher in a pseudo terminal, for the checklists and the y/N questions; `out` collects everything read."""
+    def __init__(self, cwd: Path, home: Path, args, size: dict = None):
+        import pty
+        self.pid, self.fd = pty.fork()
+        if self.pid == 0:  # child: the real launcher on a real tty
+            os.chdir(cwd)
+            e = env(home); e.pop("CI", None); e.update(size or {})
+            os.execve(str(LAUNCHER), [str(LAUNCHER), *args], e)
+        self.out = b""
+
+    def read(self, seconds: float):
+        """Collect output for that long, or until the child closes the terminal."""
+        import select, time
+        end = time.time() + seconds
+        while time.time() < end:
+            ready, _, _ = select.select([self.fd], [], [], 0.1)
+            if ready and not self._chunk():
+                return
+
+    def _chunk(self) -> bool:
+        try:
+            self.out += os.read(self.fd, 65536)
+        except OSError:
+            return False
+        return True
+
+    def send(self, data: bytes, wait: float = 0.5):
+        os.write(self.fd, data); self.read(wait)
+
+    def wait(self):
+        os.waitpid(self.pid, 0)
+
+    def plain(self) -> str:
+        """The output without ANSI escape sequences."""
+        return re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", self.out).decode(errors="replace")
 
 
 def install(home: Path, into: Path, *flags, kit: Path = KIT):

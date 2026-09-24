@@ -49,22 +49,41 @@ def items(kit: Path, agents: list = None):
     return out
 
 
+PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom",
+                "agents", "agents_total", "agents_lease", "policy", "style")   # config.yaml lines a project owns (kept by upgrade)
+
+
+def clean_config(text: str) -> str:
+    """The kit's config.yaml without the kit's own project choices (its policy, profile, agents, pins): what a fresh
+    project starts from. `style:` stays, it is the kit's default limits."""
+    import re
+    for key in PROJECT_KEYS:
+        if key == "style":
+            continue
+        text = re.sub(rf"^{key}:.*\n(?:[ \t]+\S.*\n?)*", "", text, flags=re.M)
+    return text
+
+
 def is_payload_file(path: Path) -> bool:
     return not (IGNORED_PARTS & set(path.parts)) and path.suffix not in IGNORED_SUFFIXES
+
+
+def _files_under(root: Path, rel: str):
+    for f in sorted((root / rel).rglob("*")):
+        if f.is_file() and is_payload_file(f.relative_to(root)):
+            yield f.relative_to(root)
 
 
 def files(root: Path, mode: str = OWNED, agents: list = None):
     """Every payload file of the given mode under `root` (a kit checkout or an installed project), as (relative path)."""
     for rel, m in items(root, agents):
-        if m != mode:
-            continue
         p = root / rel
+        if m != mode or not p.exists():
+            continue
         if p.is_file():
             yield Path(rel)
-        elif p.is_dir() and m != SEEDED:
-            for f in sorted(p.rglob("*")):
-                if f.is_file() and is_payload_file(f.relative_to(root)):
-                    yield f.relative_to(root)
+        elif m != SEEDED:
+            yield from _files_under(root, rel)
 
 
 def owned_paths(kit: Path, agents: list = None):

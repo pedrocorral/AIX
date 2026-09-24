@@ -1,7 +1,7 @@
 """11. aix agents: the fixed list, names and aliases, only the selected agents' folders and pointer files, deselection
 removes AIX files and keeps a person's, --agents at install, upgrade keeps the line, the checklist through a pty."""
 import os, re, unittest
-from helpers import KIT, LAUNCHER, assert_healthy, config, env, install, previous_kit, project_cmd, run, temp_home, upgrade
+from helpers import KIT, Terminal, assert_healthy, config, install, previous_kit, project_cmd, run, temp_home, upgrade
 
 FILES = {"claude": [".claude/skills/core-sdd-workflow", "CLAUDE.md"], "copilot": [".github/skills/core-sdd-workflow", ".github/copilot-instructions.md"],
          "cursor": [".cursor/skills/core-sdd-workflow", ".cursor/rules/aix.mdc"], "gemini": [".agents/skills/core-sdd-workflow", "GEMINI.md"],
@@ -118,34 +118,17 @@ class AgentsAtInstallAndUpgrade(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "curses checklist: Linux/macOS only")
     def test_checklist_through_a_pseudo_terminal(self):
         """Select all (a), untick the first row (claude), apply: agents = everything but claude."""
-        import pty, select, time
         project = self.home / "app"
         install(self.home, project)
-        pid, fd = pty.fork()
-        if pid == 0:
-            os.chdir(project)
-            e = env(self.home); e.pop("CI", None); e.update({"LINES": "24", "COLUMNS": "120"})
-            os.execve(str(LAUNCHER), [str(LAUNCHER), "agents"], e)
-        out = b""
-        def read(seconds):
-            nonlocal out
-            end = time.time() + seconds
-            while time.time() < end:
-                r, _, _ = select.select([fd], [], [], 0.1)
-                if r:
-                    try:
-                        out += os.read(fd, 65536)
-                    except OSError:
-                        return
-        read(1.5)
+        term = Terminal(project, self.home, ["agents"], {"LINES": "24", "COLUMNS": "120"})
+        term.read(1.5)
         for key in (b"a", b" ", b"\r"):
-            os.write(fd, key); read(0.5)
-        read(2.0)
-        self.assertIn(b"add them to .gitignore? [y/N]", out, "the .gitignore question follows the selection")
-        os.write(fd, b"n\n"); read(1.5)
-        os.waitpid(pid, 0)
-        plain = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", out).decode(errors="replace")
-        self.assertIn("which agents does this project equip", plain)
+            term.send(key)
+        term.read(2.0)
+        self.assertIn(b"add them to .gitignore? [y/N]", term.out, "the .gitignore question follows the selection")
+        term.send(b"n\n", 1.5)
+        term.wait()
+        self.assertIn("which agents does this project equip", term.plain())
         self.assertRegex(config(project), r"(?m)^agents: \[copilot, cursor, gemini, opencode, codex\]")
         self.assertFalse((project / "CLAUDE.md").exists())
         self.assertFalse((project / ".gitignore").exists(), "answered n")

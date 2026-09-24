@@ -6,9 +6,12 @@ from helpers import assert_healthy, config, install, project_cmd, run, temp_home
 HERE = str(os.getpid())   # the test runner: alive for the whole test, so its sessions are live
 
 
-def agent(project, home, session, *args, check=True, host="lab", pid=HERE, tool="claude"):
-    """Run an aix command as a given session (AIX_SESSION identifies it; the pid decides liveness on this host)."""
-    return run(args, cwd=project, home=home, check=check, extra_env={"AIX_SESSION": session, "AIX_SESSION_PID": pid, "AIX_TOOL": tool, "AIX_HOST": host})
+def agent(project, home, session, *args, check=True, **who):
+    """Run an aix command as a given session (AIX_SESSION identifies it; the pid decides liveness on this host).
+    who: host (default lab), pid (default this runner, alive), tool (default claude)."""
+    who = {"host": "lab", "pid": HERE, "tool": "claude", **who}
+    env_extra = {"AIX_SESSION": session, "AIX_SESSION_PID": who["pid"], "AIX_TOOL": who["tool"], "AIX_HOST": who["host"]}
+    return run(args, cwd=project, home=home, check=check, extra_env=env_extra)
 
 
 def seat_file(project, name):

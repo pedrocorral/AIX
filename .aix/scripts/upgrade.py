@@ -18,7 +18,7 @@ KIT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import payload
 MERGED_FILES = payload.merged_paths(KIT)
-PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom", "agents", "agents_total", "agents_lease", "policy", "style")  # config.yaml lines the project owns
+PROJECT_KEYS = payload.PROJECT_KEYS  # config.yaml lines the project owns
 OLD_LAYOUT = {"scripts": ".aix/scripts", "templates": ".aix/templates", "skills": ".aix/skills", "docs/meta-docs": ".aix/meta-docs",
               "framework.yaml": ".aix/config.yaml"}
 OLD_TEXT = [("docs/meta-docs/", ".aix/meta-docs/"), ("`skills/INDEX.md`", "`.aix/skills/INDEX.md`"), ("`skills/`", "`.aix/skills/`"),
@@ -32,34 +32,35 @@ def version_of(root: Path) -> str:
     return m.group(1) if m else "?"
 
 
+def _payload_files(base: Path) -> set:
+    return {p.relative_to(base) for p in base.rglob("*") if p.is_file() and payload.is_payload_file(p.relative_to(base))} if base.exists() else set()
+
+
 def diff_dir(src: Path, dst: Path):
     """Return (added, updated, removed) file lists comparing kit dir `src` with project dir `dst`."""
-    added, updated, removed = [], [], []
-    src_files = {p.relative_to(src) for p in src.rglob("*") if p.is_file() and payload.is_payload_file(p.relative_to(src))}
-    dst_files = {p.relative_to(dst) for p in dst.rglob("*") if p.is_file() and payload.is_payload_file(p.relative_to(dst))} if dst.exists() else set()
-    for rel in sorted(src_files - dst_files):
-        added.append(rel)
-    for rel in sorted(src_files & dst_files):
-        if not filecmp.cmp(src / rel, dst / rel, shallow=False):
-            updated.append(rel)
-    for rel in sorted(dst_files - src_files):
-        removed.append(rel)
+    src_files, dst_files = _payload_files(src), _payload_files(dst)
+    added = sorted(src_files - dst_files)
+    updated = [rel for rel in sorted(src_files & dst_files) if not filecmp.cmp(src / rel, dst / rel, shallow=False)]
+    removed = sorted(dst_files - src_files)
     return added, updated, removed
+
+
+def _owned_rows(project: Path, d: str) -> list:
+    src, dst = KIT / d, project / d
+    if src.is_dir():
+        a, u, r = diff_dir(src, dst)
+        return [(d, "add", x) for x in a] + [(d, "update", x) for x in u] + [(d, "remove", x) for x in r]
+    if src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
+        return [(".", "update" if dst.exists() else "add", Path(d))]
+    return []
 
 
 def plan(project: Path):
     """Everything the upgrade would do, as (label, action, path) rows."""
-    rows = []
     sys.path.insert(0, str(KIT / ".aix" / "scripts"))
     import agents as agmod
     chosen = agmod.selected(project)
-    for d in payload.owned_paths(KIT, chosen):
-        src, dst = KIT / d, project / d
-        if src.is_dir():
-            a, u, r = diff_dir(src, dst)
-            rows += [(d, "add", x) for x in a] + [(d, "update", x) for x in u] + [(d, "remove", x) for x in r]
-        elif src.exists() and (not dst.exists() or not filecmp.cmp(src, dst, shallow=False)):
-            rows.append((".", "update" if dst.exists() else "add", Path(d)))
+    rows = [row for d in payload.owned_paths(KIT, chosen) for row in _owned_rows(project, d)]
     for f in payload.merged_paths(KIT, chosen):
         current = (project / f).read_text(encoding="utf-8") if (project / f).exists() else None
         if merged_text(project, f) != current:
@@ -76,34 +77,56 @@ def section(text: str, header: str) -> str:
     return header + body.rstrip("\n") + "\n\n"
 
 
-def merged_text(project: Path, name) -> str:
-    name = str(name)
-    if name in ("CLAUDE.md", "GEMINI.md"):  # pointer files: the template inside .aix/, a layer's copy winning
+def _kit_text(project: Path, name: str) -> str:
+    """The kit's text of a merged file: pointer files come from the layer-resolved template."""
+    if name in ("CLAUDE.md", "GEMINI.md"):
         import install_skills as inst
         agent = payload.AGENT_OF[name]
-        kit_text = inst.pointer_text(project, name, inst.POINTERS[agent][1])
-    else:
-        kit_text = (KIT / name).read_text(encoding="utf-8")
-    proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
-    if name in ("AGENTS.md", "GEMINI.md", "CLAUDE.md"):
-        out = kit_text
-        for h in KEEP_SECTIONS:
-            keep = section(proj_text, h)
-            if keep and h not in out:
-                out = out.rstrip("\n") + "\n\n" + keep
+        return inst.pointer_text(project, name, inst.POINTERS[agent][1])
+    return (KIT / name).read_text(encoding="utf-8")
+
+
+def _merge_sections(kit_text: str, proj_text: str) -> str:
+    """AGENTS.md / GEMINI.md / CLAUDE.md: the kit's text plus the project's managed sections."""
+    out = kit_text
+    for h in KEEP_SECTIONS:
+        keep = section(proj_text, h)
+        if keep and h not in out:
+            out = out.rstrip("\n") + "\n\n" + keep
+    return out
+
+
+def _carry_key(out: str, proj_text: str, key: str) -> str:
+    """Copy one project-owned key (and, for maps such as use: and style:, its indented body) into the kit's text."""
+    pat = rf"^{key}:.*\n(?:[ \t]+\S.*\n?)*"
+    m = re.search(pat, proj_text, re.M)
+    if not m:
         return out
-    out = kit_text  # config.yaml: kit text, but the project's disabled_skills line and style: block win
+    block = m.group(0) if m.group(0).endswith("\n") else m.group(0) + "\n"
+    if re.search(rf"^{key}:", out, re.M):
+        return re.sub(pat, lambda _: block, out, count=1, flags=re.M)
+    return out.rstrip("\n") + "\n" + block
+
+
+def _merge_config(kit_text: str, proj_text: str) -> str:
+    """config.yaml: the kit's clean text, then the project's own keys and its code_roots line win."""
+    out = payload.clean_config(kit_text)
     proj_text = proj_text.replace("aix/stacks/", "aix/frameworks/")  # 2.8.3 renamed the kit's framework standards
-    for key in PROJECT_KEYS:  # a key and, for maps such as use: and style:, its indented body
-        pat = rf"^{key}:.*\n(?:[ \t]+\S.*\n?)*"
-        m = re.search(pat, proj_text, re.M)
-        if m:
-            block = m.group(0) if m.group(0).endswith("\n") else m.group(0) + "\n"
-            out = re.sub(pat, lambda _: block, out, count=1, flags=re.M) if re.search(rf"^{key}:", out, re.M) else out.rstrip("\n") + "\n" + block
+    for key in PROJECT_KEYS:
+        out = _carry_key(out, proj_text, key)
     m = re.search(r"^[ \t]+code_roots:.*$", proj_text, re.M)  # nested under paths:, set by `aix code find`
     if m:
         out = re.sub(r"^[ \t]+code_roots:.*$", lambda _: m.group(0), out, count=1, flags=re.M)
     return out
+
+
+def merged_text(project: Path, name) -> str:
+    name = str(name)
+    kit_text = _kit_text(project, name)
+    proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
+    if name in ("AGENTS.md", "GEMINI.md", "CLAUDE.md"):
+        return _merge_sections(kit_text, proj_text)
+    return _merge_config(kit_text, proj_text)
 
 
 def apply(project: Path, rows):
@@ -154,24 +177,25 @@ def line_delta(src: Path, dst: Path, new_text: str = None) -> str:
     return f"+{added} -{removed} lines"
 
 
+def _merge_note(project: Path, rel: Path, dst: Path) -> str:
+    if rel.name == "config.yaml":
+        return ", keeping your disabled_skills, instructions, profile, use, source and style limits"
+    kept = [h for h in KEEP_SECTIONS if section(dst.read_text(encoding="utf-8"), h)] if dst.exists() else []
+    return ", keeping your " + " and ".join(f"'{h[3:]}'" for h in kept) if kept else ""
+
+
 def describe(project: Path, d: str, action: str, rel: Path, edited=()) -> str:
     """One verbose line for the dry run: what happens to this file and how big the change is."""
     src, dst = KIT / d / rel, project / d / rel
     shown = f"{d}/{rel}" if d != "." else str(rel)
     warn = "  !! LOCAL EDIT WILL BE LOST (move the change to the kit)" if shown in edited else ""
-    if warn and action == "update":
-        return f"  update  {shown}  ({line_delta(src, dst)}){warn}"
     if action == "add":
         return f"  add     {shown}  ({line_count(src)} lines, new in kit)"
     if action == "remove":
         return f"  remove  {shown}  ({line_count(dst)} lines, no longer in kit)"
     if action == "merge":
-        kept = [h for h in KEEP_SECTIONS if section(dst.read_text(encoding="utf-8"), h)] if dst.exists() else []
-        keep = ", keeping your " + " and ".join(f"'{h[3:]}'" for h in kept) if kept else ""
-        if rel.name == "config.yaml":
-            keep = ", keeping your disabled_skills, instructions, profile, use, source and style limits"
-        return f"  merge   {shown}  (kit text{keep}; {line_delta(src, dst, merged_text(project, rel))})"
-    return f"  update  {shown}  ({line_delta(src, dst)})"
+        return f"  merge   {shown}  (kit text{_merge_note(project, rel, dst)}; {line_delta(src, dst, merged_text(project, rel))})"
+    return f"  update  {shown}  ({line_delta(src, dst)}){warn}"
 
 
 def confirm(question: str) -> bool:
@@ -184,26 +208,12 @@ def old_layout(project: Path) -> bool:
     return (project / "framework.yaml").exists() and not (project / ".aix" / "config.yaml").exists()
 
 
-def migrate_layout(project: Path, dry: bool):
-    """1.x layout -> 2.0: kit-owned folders move under .aix/, root launchers go, pointer texts are rewritten.
-    Project-owned docs, code, runtime folders and git history are untouched (moves are plain renames)."""
-    moves = [(project / src, project / dst) for src, dst in OLD_LAYOUT.items() if (project / src).exists()]
-    print("  1.x layout detected: migrating to .aix/ (kit-owned folders move; only the root launchers are deleted)")
-    for src, dst in moves:
-        print(f"    move    {src.relative_to(project)} -> {dst.relative_to(project)}")
-    for f in ("aix", "aix.cmd"):
-        if (project / f).exists():
-            print(f"    remove  {f}  (the aix on PATH runs .aix/scripts/aix.py)")
-    if dry:
-        return
-    (project / ".aix").mkdir(exist_ok=True)
-    for src, dst in moves:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        src.rename(dst)
-    for f in ("aix", "aix.cmd"):
-        if (project / f).exists():
-            (project / f).unlink()
-    for f in ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".cursor/rules/aix.mdc", "docs/INDEX.md"):
+ROOT_LAUNCHERS = ("aix", "aix.cmd")
+POINTER_TEXT_FILES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md", ".cursor/rules/aix.mdc", "docs/INDEX.md")
+
+
+def _rewrite_old_paths(project: Path):
+    for f in POINTER_TEXT_FILES:
         p = project / f
         if p.exists():
             text = p.read_text(encoding="utf-8")
@@ -212,41 +222,115 @@ def migrate_layout(project: Path, dry: bool):
             p.write_text(text, encoding="utf-8")
 
 
-def main(args):
-    global KIT
-    yes, dry = "--yes" in args, "--dry-run" in args
-    args = [a for a in args if a not in ("--yes", "--dry-run")]
-    layer_src = {}
+def migrate_layout(project: Path, dry: bool):
+    """1.x layout -> 2.0: kit-owned folders move under .aix/, root launchers go, pointer texts are rewritten.
+    Project-owned docs, code, runtime folders and git history are untouched (moves are plain renames)."""
+    moves = [(project / src, project / dst) for src, dst in OLD_LAYOUT.items() if (project / src).exists()]
+    launchers = [f for f in ROOT_LAUNCHERS if (project / f).exists()]
+    print("  1.x layout detected: migrating to .aix/ (kit-owned folders move; only the root launchers are deleted)")
+    for src, dst in moves:
+        print(f"    move    {src.relative_to(project)} -> {dst.relative_to(project)}")
+    for f in launchers:
+        print(f"    remove  {f}  (the aix on PATH runs .aix/scripts/aix.py)")
+    if dry:
+        return
+    (project / ".aix").mkdir(exist_ok=True)
+    for src, dst in moves:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dst)
+    for f in launchers:
+        (project / f).unlink()
+    _rewrite_old_paths(project)
+
+
+def _layer_flags(args) -> dict:
+    """--from-org SRC / --from-custom SRC taken out of args (in place)."""
+    out = {}
     for layer in ("org", "custom"):
         flag = f"--from-{layer}"
         if flag in args:
             i = args.index(flag)
             if i + 1 >= len(args) or args[i + 1].startswith("-"):
                 sys.exit(f"aix upgrade {flag} SOURCE needs a source")
-            layer_src[layer] = args[i + 1]; del args[i:i + 2]
+            out[layer] = args[i + 1]; del args[i:i + 2]
+    return out
+
+
+def _find_target(args) -> Path:
     from project import find_project
     project = Path(args[0]).resolve() if args else find_project(Path.cwd())
     if project is None or not ((project / ".aix" / "config.yaml").exists() or (project / "framework.yaml").exists()):
         sys.exit("aix upgrade: no project found (nearest .aix/config.yaml, or a 1.x framework.yaml); pass the project path")
+    return project
+
+
+def _refresh_layers(project: Path, layer_src: dict, dry: bool):
+    """Follow the recorded origin (a fork may replace the kit) and refresh org/ and custom/."""
+    global KIT
     import source as srcmod
     src = srcmod.configured(project)
     origin = KIT
     if src:
-        kind, payload_root, bare = srcmod.classify(srcmod.fetch(src, refresh=not dry))
+        kind, payload_root, _bare = srcmod.classify(srcmod.fetch(src, refresh=not dry))
         if kind == "kit":
             KIT = origin = payload_root
         else:
-            layer_src.setdefault("org", None)
-            layer_src["org"] = layer_src["org"] or src
+            layer_src["org"] = layer_src.get("org") or src
         print(f"  origin: {src} ({kind})")
     srcmod.install_layers(project, srcmod.resolve_layers(origin, srcmod.layer_sources(project, layer_src), refresh=not dry), dry=dry)
-    if old_layout(project):
-        if not dry and not yes and not confirm("  Migrate this project's kit files into .aix/ (2.0 layout)? [y/N] "):
-            sys.exit("aborted")
-        migrate_layout(project, dry)
-        if dry:
-            print("  (after the migration, the plan below would apply)")
-            return
+
+
+def _migrate_if_old(project: Path, yes: bool, dry: bool) -> bool:
+    """Returns True when the run should stop here (dry run of a migration)."""
+    if not old_layout(project):
+        return False
+    if not dry and not yes and not confirm("  Migrate this project's kit files into .aix/ (2.0 layout)? [y/N] "):
+        sys.exit("aborted")
+    migrate_layout(project, dry)
+    if dry:
+        print("  (after the migration, the plan below would apply)")
+    return dry
+
+
+def _print_rows(project: Path, rows, edited):
+    for area in dict.fromkeys(d for d, _, _ in rows):
+        print(f"  [{area if area != '.' else 'root'}]")
+        for d, action, rel in rows:
+            if d == area:
+                print("  " + describe(project, d, action, rel, edited))
+
+
+def _print_plan(project: Path, rows, edited, dry: bool):
+    counts = {a: sum(1 for _, x, _ in rows if x == a) for a in ("add", "update", "remove", "merge")}
+    print("  plan: " + ", ".join(f"{n} {a}" for a, n in counts.items() if n) + (" (dry run, nothing written)" if dry else ""))
+    _print_rows(project, rows, edited)
+    if edited:
+        print(f"  !! {len(edited)} kit-owned file(s) were edited in this project; upgrade overwrites them (see lines above)")
+    print("  untouched: docs/ (requirements, tests, security, conflicts, operations, road-map), .aix/skills/extern, your config values, runtime folders, your code")
+
+
+def _apply_plan(project: Path, rows, yes: bool):
+    import install_skills as inst, gitignore
+    print("\n  WARNING: `aix upgrade` is an experimental feature. Kit-owned files listed above are overwritten;\n"
+          "  your git history is the backup. Review the plan before answering.")
+    if not yes and not confirm("  Are you sure you want to use this? [y/N] "):
+        sys.exit("aborted")
+    apply(project, rows)
+    inst.write_manifest(project)
+    gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")  # after the files, so the agents line is final
+    print(f"  applied {len(rows)} changes; relinking skills in the project")
+    subprocess.call([sys.executable, str(project / ".aix" / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
+    print("  done. Run `aix doctor` and `aix docs validate` in the project.")
+
+
+def main(args):
+    yes, dry = "--yes" in args, "--dry-run" in args
+    args = [a for a in args if a not in ("--yes", "--dry-run")]
+    layer_src = _layer_flags(args)
+    project = _find_target(args)
+    _refresh_layers(project, layer_src, dry)
+    if _migrate_if_old(project, yes, dry):
+        return
     if project == KIT:
         sys.exit("aix upgrade: you are running this project's own copy of aix, which cannot upgrade itself. "
                  "Run the kit checkout's aix (the one on PATH, or /path/to/kit/aix upgrade) from inside the project.")
@@ -258,32 +342,12 @@ def main(args):
             import gitignore
             gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")
         return
-    counts = {a: sum(1 for _, x, _ in rows if x == a) for a in ("add", "update", "remove", "merge")}
-    print("  plan: " + ", ".join(f"{n} {a}" for a, n in counts.items() if n) + (" (dry run, nothing written)" if dry else ""))
     import install_skills as inst
-    edited = set(inst.modified_kit_files(project) or [])
-    for area in dict.fromkeys(d for d, _, _ in rows):
-        print(f"  [{area if area != '.' else 'root'}]")
-        for d, action, rel in rows:
-            if d == area:
-                print("  " + describe(project, d, action, rel, edited))
-    if edited:
-        print(f"  !! {len(edited)} kit-owned file(s) were edited in this project; upgrade overwrites them (see lines above)")
-    print("  untouched: docs/ (requirements, tests, security, conflicts, operations, road-map), .aix/skills/extern, your config values, runtime folders, your code")
+    _print_plan(project, rows, set(inst.modified_kit_files(project) or []), dry)
     if dry:
         print("  then: relink skills in the project (aix install) and suggest aix doctor + aix docs validate")
         return
-    print("\n  WARNING: `aix upgrade` is an experimental feature. Kit-owned files listed above are overwritten;\n"
-          "  your git history is the backup. Review the plan before answering.")
-    if not yes and not confirm("  Are you sure you want to use this? [y/N] "):
-        sys.exit("aborted")
-    apply(project, rows)
-    inst.write_manifest(project)
-    import gitignore
-    gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")  # after the files, so the agents line is final
-    print(f"  applied {len(rows)} changes; relinking skills in the project")
-    subprocess.call([sys.executable, str(project / ".aix" / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
-    print("  done. Run `aix doctor` and `aix docs validate` in the project.")
+    _apply_plan(project, rows, yes)
 
 
 if __name__ == "__main__":

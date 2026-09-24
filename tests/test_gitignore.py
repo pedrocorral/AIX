@@ -1,7 +1,7 @@
 """12. .gitignore and backups: the missing AIX lines are printed without a terminal and touched only on a yes
 (`upgrade --yes`, or a y answer through a pseudo-terminal), added once; a person's file where AIX writes is kept as -bak."""
 import os, re, unittest
-from helpers import LAUNCHER, env, install, project_cmd, temp_home, upgrade
+from helpers import Terminal, install, project_cmd, temp_home, upgrade
 
 
 def gitignore(project):
@@ -50,27 +50,11 @@ class GitignoreLines(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "pseudo-terminal: Linux/macOS only")
     def test_agents_asks_and_a_y_answer_writes(self):
         install(self.home, self.project)
-        import pty, select, time
-        pid, fd = pty.fork()
-        if pid == 0:
-            os.chdir(self.project)
-            e = env(self.home); e.pop("CI", None)
-            os.execve(str(LAUNCHER), [str(LAUNCHER), "agents", "claude"], e)
-        out = b""
-        def read(seconds):
-            nonlocal out
-            end = time.time() + seconds
-            while time.time() < end:
-                r, _, _ = select.select([fd], [], [], 0.1)
-                if r:
-                    try:
-                        out += os.read(fd, 65536)
-                    except OSError:
-                        return
-        read(2.0)
-        self.assertIn(b"add them to .gitignore? [y/N]", out)
-        os.write(fd, b"y\n"); read(1.5)
-        os.waitpid(pid, 0)
+        term = Terminal(self.project, self.home, ["agents", "claude"])
+        term.read(2.0)
+        self.assertIn(b"add them to .gitignore? [y/N]", term.out)
+        term.send(b"y\n", 1.5)
+        term.wait()
         text = gitignore(self.project)
         self.assertIn(".aix/\n", text)
         self.assertIn(".claude/skills/\n", text)

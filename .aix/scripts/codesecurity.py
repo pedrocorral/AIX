@@ -9,133 +9,14 @@ Suppress a reviewed finding in place with a comment on the same line:  # aix: ac
 Suppressions are listed, never hidden. `--audit` writes docs/security/audits/AUDIT-<date>-code.md with the findings
 table filled in: the evidence `aix docs security` requires before a status may change.
 aix: skip-security-scan this file holds the rule patterns and the known-bad self-test snippets"""
-import ast, re, sys
+import re, sys
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graph import ROOT, CODE_ROOTS, default_roots, SKIP, rel
-
-TEXT_EXT = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".rs", ".java", ".kt", ".yml", ".yaml", ".json", ".toml", ".env",
-            ".ini", ".cfg", ".conf", ".txt", ".html", ".jinja", ".jinja2", ".j2", ".sh", ".properties", ".xml", ".tf"}
-ACCEPT = re.compile(r"aix:\s*accepted\s+(VUL-[A-Z]+-\d{3})(.*)$")
-SKIP_FILE = re.compile(r"aix:\s*skip-security-scan\b(.*)$")   # in the first MARKER_LINES lines: whole file skipped, listed as such
-MARKER_LINES = 30
-
-# (vul, cwe, title, languages or {"*"}, regex, advice)   regexes run per line, comments stripped first
-RULES = [
-    # --- injection --------------------------------------------------------------------------------------------
-    ("VUL-INJ-001", "CWE-89", "SQL built from strings", {"py"},
-     r"\.(?:execute|executemany|raw|executescript)\(\s*(?:f['\"]|['\"][^'\"]*['\"]\s*(?:%|\+|\.format\()|[A-Za-z_]\w*\s*(?:%|\+)\s*)",
-     "parameterise: cursor.execute(sql, params); never interpolate values into SQL"),
-    ("VUL-INJ-001", "CWE-89", "SQL built from strings", {"js"},
-     r"\.(?:query|execute|raw)\(\s*(?:`[^`]*\$\{|['\"][^'\"]*['\"]\s*\+)",
-     "use placeholders ($1 / ?) with a parameter array; never a template literal with user values"),
-    ("VUL-INJ-001", "CWE-89", "SQL built from strings", {"java"},
-     r"(?:createQuery|createNativeQuery|executeQuery|executeUpdate|execute|prepareStatement)\(\s*\"[^\"]*\"\s*\+",
-     "PreparedStatement with ? placeholders; never concatenate values into the statement"),
-    ("VUL-INJ-002", "CWE-78", "OS command with a shell", {"py"},
-     r"(?:subprocess\.\w+\([^)]*shell\s*=\s*True|\bos\.system\(|\bos\.popen\(|commands\.getoutput\()",
-     "subprocess.run([...], shell=False) with an argument list; validate each argument"),
-    ("VUL-INJ-002", "CWE-78", "OS command with a shell", {"js"},
-     r"(?:child_process\.)?\b(?:exec|execSync)\(\s*(?:`[^`]*\$\{|['\"][^'\"]*['\"]\s*\+|[A-Za-z_]\w*\s*[+`])",
-     "execFile/spawn with an argument array; never build a shell string from input"),
-    ("VUL-INJ-002", "CWE-78", "OS command with a shell", {"java"},
-     r"Runtime\.getRuntime\(\)\.exec\(\s*(?:\"[^\"]*\"\s*\+|[A-Za-z_]\w*\s*\+)",
-     "ProcessBuilder with a list of arguments; validate each"),
-    ("VUL-INJ-002", "CWE-95", "eval / exec of dynamic code", {"py"},
-     r"(?<![\w.])(?:eval|exec)\(\s*(?!['\"])[A-Za-z_(]", "no eval/exec on data; use ast.literal_eval for literals, a dispatch table for names"),
-    ("VUL-INJ-002", "CWE-95", "eval / dynamic Function", {"js"},
-     r"(?<![\w.])(?:eval|new\s+Function)\(\s*(?!['\"])", "no eval; JSON.parse for data, a lookup table for names"),
-    ("VUL-INJ-002", "CWE-1336", "server-side template built from strings", {"py"},
-     r"(?:render_template_string|Template)\(\s*(?:f['\"]|['\"][^'\"]*['\"]\s*(?:%|\+|\.format\()|[A-Za-z_]\w*\s*(?:%|\+))",
-     "render a file template with a context; never a template string built from input"),
-    ("VUL-INJ-002", "CWE-22", "path from input without normalisation", {"py"},
-     r"(?:open|send_file|send_from_directory|os\.remove|shutil\.\w+)\(\s*(?:request\.|params\.|args\.|form\.)",
-     "resolve against a base directory and reject anything outside it (Path.resolve, is_relative_to)"),
-    # --- deserialisation / input -----------------------------------------------------------------------------
-    ("VUL-INPUT-002", "CWE-502", "unsafe deserialisation", {"py"},
-     r"(?:\bpickle\.loads?\(|\bmarshal\.loads?\(|\bshelve\.open\(|yaml\.load\((?![^)]*Loader\s*=\s*(?:yaml\.)?(?:Safe|CSafe|Base)Loader)(?![^)]*safe)|\bjsonpickle\.decode\()",
-     "json or yaml.safe_load; never unpickle data you did not produce"),
-    ("VUL-INPUT-002", "CWE-502", "unsafe deserialisation", {"java"},
-     r"new\s+ObjectInputStream\(|\.readObject\(\)|XMLDecoder\(", "allow-list classes via ObjectInputFilter, or use JSON"),
-    ("VUL-INPUT-002", "CWE-502", "unsafe deserialisation", {"js"},
-     r"(?:node-serialize|serialize-javascript)|\bunserialize\(", "JSON.parse; never unserialize untrusted data"),
-    ("VUL-INPUT-001", "CWE-20", "XML parsed with external entities possible", {"py"},
-     r"(?:xml\.etree|xml\.dom\.minidom|xml\.sax|lxml\.etree)\.(?:parse|fromstring|XMLParser)\(", "defusedxml, or disable entity resolution"),
-    # --- secrets & config ------------------------------------------------------------------------------------
-    ("VUL-SECRET-001", "CWE-798", "private key in repository", {"*"},
-     r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY", "remove, rotate the key, load from a secret store"),
-    ("VUL-SECRET-001", "CWE-798", "cloud / API token literal", {"*"},
-     r"(?:AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|sk-ant-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35})",
-     "revoke and rotate now; read it from the environment or a secret manager"),
-    ("VUL-SECRET-001", "CWE-798", "hard-coded password / secret literal", {"*"},
-     r"(?i)\b(?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|private[_-]?key)\b\s*[:=]\s*['\"][^'\"$%{}<>\s]{6,}['\"]",
-     "load from the environment / secret manager; a literal in code is in every clone and every log of the repo"),
-    ("VUL-SECRET-002", "CWE-295", "TLS verification disabled", {"*"},
-     r"(?:verify\s*=\s*False|_create_unverified_context|rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]?0|InsecureSkipVerify\s*:\s*true|danger_accept_invalid_certs\(\s*true|TrustAllCerts|setHostnameVerifier\(\s*\(?[^)]*true)",
-     "verify certificates; pin or supply the CA bundle instead of disabling verification"),
-    ("VUL-SECRET-002", "CWE-489", "debug mode on", {"py", "js"},
-     r"(?:\bDEBUG\s*=\s*True\b|\.run\([^)]*debug\s*=\s*True|app\.debug\s*=\s*True)", "debug from the environment, off by default; never in production config"),
-    ("VUL-SECRET-002", "CWE-16", "wildcard hosts", {"py"},
-     r"ALLOWED_HOSTS\s*=\s*\[\s*['\"]\*['\"]", "list the real hostnames"),
-    # --- auth ----------------------------------------------------------------------------------------------------
-    ("VUL-AUTHN-001", "CWE-328", "weak hash for passwords / tokens", {"py"},
-     r"hashlib\.(?:md5|sha1)\(", "passwords: argon2/bcrypt/scrypt; integrity: sha256+; md5/sha1 only for non-security checksums (mark it)"),
-    ("VUL-AUTHN-001", "CWE-328", "weak hash", {"java"},
-     r"MessageDigest\.getInstance\(\s*\"(?:MD5|SHA-?1)\"", "PBKDF2/bcrypt/argon2 for passwords; SHA-256+ elsewhere"),
-    ("VUL-AUTHN-001", "CWE-328", "weak hash", {"js"},
-     r"createHash\(\s*['\"](?:md5|sha1)['\"]", "bcrypt/argon2 for passwords; sha256+ elsewhere"),
-    ("VUL-AUTHN-001", "CWE-338", "non-cryptographic randomness for a secret", {"py"},
-     r"\brandom\.(?:random|randint|choice|choices|getrandbits|randrange)\([^\n]*(?i:token|secret|password|salt|nonce|otp|session|key)|(?i:token|secret|password|salt|nonce|otp|session|key)[^\n]*=\s*[^\n]*\brandom\.(?:random|randint|choice|choices|getrandbits|randrange)\(",
-     "secrets.token_bytes / token_urlsafe / SystemRandom"),
-    ("VUL-AUTHN-001", "CWE-338", "non-cryptographic randomness for a secret", {"js"},
-     r"(?i:token|secret|password|salt|nonce|otp|session)[^\n]*Math\.random\(", "crypto.randomBytes / crypto.getRandomValues"),
-    ("VUL-AUTHN-001", "CWE-338", "non-cryptographic randomness for a secret", {"java"},
-     r"new\s+Random\(\)[^\n]*(?i:token|secret|password|salt|nonce|otp|session)|(?i:token|secret|password|salt|nonce|otp|session)[^\n]*new\s+Random\(\)", "SecureRandom"),
-    ("VUL-AUTHN-002", "CWE-347", "JWT signature not verified / alg none", {"*"},
-     r"(?:verify_signature['\"]?\s*:\s*False|verify\s*=\s*False[^\n]*jwt|jwt\.decode\([^)]*verify\s*=\s*False|algorithms?\s*[:=]\s*\[?\s*['\"]none['\"]|\.decode\([^)]*\)\s*#\s*noverify)",
-     "always verify with the expected algorithm list; reject alg=none"),
-    ("VUL-AUTHN-002", "CWE-614", "cookie without Secure / HttpOnly", {"py", "js"},
-     r"(?:set_cookie\([^)]*(?:secure\s*=\s*False|httponly\s*=\s*False)|cookie\([^)]*(?:secure\s*:\s*false|httpOnly\s*:\s*false)|SESSION_COOKIE_SECURE\s*=\s*False|SESSION_COOKIE_HTTPONLY\s*=\s*False)",
-     "Secure, HttpOnly and SameSite on session cookies"),
-    # --- web -----------------------------------------------------------------------------------------------------
-    ("VUL-WEB-001", "CWE-79", "HTML injected without escaping", {"js"},
-     r"(?:\.innerHTML\s*=|\.outerHTML\s*=|document\.write\(|dangerouslySetInnerHTML|v-html=|insertAdjacentHTML\()",
-     "textContent / framework bindings; if HTML is required, sanitise (DOMPurify) first"),
-    ("VUL-WEB-001", "CWE-79", "HTML marked safe", {"py"},
-     r"(?:\bmark_safe\(|\bMarkup\(|\|\s*safe\b|autoescape\s*=\s*False|render_template_string\()", "let the template engine escape; sanitise (bleach) before marking safe"),
-    ("VUL-WEB-002", "CWE-352", "CSRF protection disabled", {"py", "js"},
-     r"(?:@csrf_exempt|csrf_exempt\(|WTF_CSRF_ENABLED\s*=\s*False|CSRF_ENABLED\s*=\s*False|csrf\s*:\s*false|ignoreMethods\s*:\s*\[)",
-     "keep CSRF protection on state-changing routes; use SameSite cookies + tokens"),
-    ("VUL-WEB-003", "CWE-942", "CORS open to any origin", {"*"},
-     r"(?:allow_origins\s*=\s*\[\s*['\"]\*['\"]|Access-Control-Allow-Origin['\"]?\s*[:,]\s*['\"]\*|origin\s*:\s*['\"]\*['\"]|origins\s*=\s*['\"]\*['\"]|CORS_ORIGIN_ALLOW_ALL\s*=\s*True|allowedOrigins\(\s*\"\*\")",
-     "list the real origins; never * together with credentials"),
-    ("VUL-WEB-003", "CWE-601", "open redirect from input", {"py", "js"},
-     r"(?:redirect\(\s*(?:request\.(?:args|GET|params|form|query)|req\.(?:query|params|body)))", "allow-list redirect targets or use relative paths only"),
-    # --- logging -------------------------------------------------------------------------------------------------
-    ("VUL-LOG-001", "CWE-532", "secret in a log line", {"*"},
-     r"(?:log(?:ger|ging)?\.\w+|console\.\w+|print|System\.out\.print\w*)\([^\n]*(?i:password|passwd|secret|token|api_key|apikey|authorization|credit_card)",
-     "log identifiers, never credentials; redact before logging"),
-    # --- AI / LLM ------------------------------------------------------------------------------------------------
-    ("VUL-AI-001", "CWE-77", "prompt built by string interpolation", {"py", "js"},
-     r"(?i:prompt|system|instruction)\w*\s*[:=]\s*(?:f['\"]|['\"][^'\"]*['\"]\s*(?:\+|%|\.format\()|`[^`]*\$\{)",
-     "separate roles: untrusted text goes in a user/tool message, never in the system prompt; delimit and label it"),
-    ("VUL-AI-002", "CWE-770", "LLM call without an output limit", {"py", "js"},
-     r"\.(?:create|generate|complete|chat)\((?![^)]*max_?(?:tokens|output_tokens|completion_tokens))[^)]*(?:model\s*[:=]|messages\s*[:=])",
-     "set max_tokens / max_output_tokens and a timeout; budget per request"),
-    # --- infra -----------------------------------------------------------------------------------------------------
-    ("VUL-INFRA-001", "CWE-732", "world-writable permissions", {"*"},
-     r"(?:(?:^\s*|RUN\s+|&&\s*|;\s*|sudo\s+)chmod\s+(?:-R\s+)?[0-7]?777\b|os\.chmod\([^)]*0o777|\.chmod\(\s*0o777)", "least privilege: 0o640/0o750 and a dedicated user"),
-    ("VUL-INFRA-001", "CWE-250", "privileged container", {"*"},
-     r"(?:privileged\s*:\s*true|--privileged\b|network_mode\s*:\s*['\"]?host)", "drop privileges; add only the capabilities needed"),
-]
-DOCKER_RULES = [
-    ("VUL-INFRA-001", "CWE-250", "container runs as root (no USER)", "add a non-root USER before the entrypoint"),
-    ("VUL-DEP-001", "CWE-1104", "base image without a pinned tag", "pin FROM image:tag@sha256:... or at least a version tag, never :latest / untagged"),
-]
-LANG = {".py": "py", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs": "js", ".rs": "rust", ".java": "java", ".kt": "java"}
+from codefiles import ROOT, default_roots, SKIP, rel
+from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 
 
 # ---- scanning -----------------------------------------------------------------------------------------------------
@@ -151,29 +32,35 @@ def strip_comment(line: str, lang: str) -> str:
     return re.sub(r"//.*$|/\*.*?\*/", "", line)
 
 
+def _skip_marker(lines, f: Path):
+    for raw in lines[:MARKER_LINES]:
+        m = SKIP_FILE.search(raw)
+        if m:
+            return ("SKIPPED", "", "file skipped by marker", rel(f), 1, "aix: skip-security-scan " + m.group(1).strip(), "", "skip")
+    return None
+
+
+def _line_findings(f: Path, i: int, raw: str, lang, langs: set):
+    acc = ACCEPT.search(raw)
+    code = strip_comment(raw, lang)
+    for vul, cwe, title, rlangs, rx, advice in RULES:
+        if rlangs & langs and re.search(rx, code):
+            accepted = acc.group(1) + acc.group(2).strip() if acc and acc.group(1) == vul else None
+            yield (vul, cwe, title, rel(f), i, raw.strip()[:110], advice, accepted)
+
+
 def scan_file(f: Path):
     """[(vul, cwe, title, file, line_no, snippet, advice, accepted)]"""
     lang = LANG.get(f.suffix)
     langs = {lang, "*"} if lang else {"*"}
-    out = []
     try:
         lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
-        return out
-    for raw in lines[:MARKER_LINES]:
-        m = SKIP_FILE.search(raw)
-        if m:
-            return [("SKIPPED", "", "file skipped by marker", rel(f), 1, "aix: skip-security-scan " + m.group(1).strip(), "", "skip")]
-    for i, raw in enumerate(lines, 1):
-        acc = ACCEPT.search(raw)
-        code = strip_comment(raw, lang)
-        for vul, cwe, title, rlangs, rx, advice in RULES:
-            if not (rlangs & langs):
-                continue
-            if re.search(rx, code):
-                accepted = acc.group(1) + acc.group(2).strip() if acc and acc.group(1) == vul else None
-                out.append((vul, cwe, title, rel(f), i, raw.strip()[:110], advice, accepted))
-    return out
+        return []
+    skipped = _skip_marker(lines, f)
+    if skipped:
+        return [skipped]
+    return [fx for i, raw in enumerate(lines, 1) for fx in _line_findings(f, i, raw, lang, langs)]
 
 
 def scan_dockerfile(f: Path):
@@ -188,62 +75,90 @@ def scan_dockerfile(f: Path):
     return out
 
 
-def scan_dependencies(root: Path):
-    """Unpinned dependency declarations and missing lockfiles (VUL-DEP-001)."""
-    out = []
-    for f in root.rglob("requirements*.txt"):
-        if any(s in f.parts for s in SKIP):
-            continue
+DEP = ("VUL-DEP-001", "CWE-1104")
+PY_LOCKS = ("uv.lock", "poetry.lock", "pdm.lock", "requirements.txt", "requirements.lock")
+JS_LOCKS = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb")
+
+
+def _manifests(root: Path, pattern: str):
+    return [f for f in root.rglob(pattern) if not any(s in f.parts for s in SKIP)]
+
+
+def _has_lock(f: Path, locks) -> bool:
+    return any((f.parent / l).exists() for l in locks)
+
+
+def _unpinned_requirements(root: Path):
+    for f in _manifests(root, "requirements*.txt"):
         for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             s = line.split("#")[0].strip()
             if s and not s.startswith(("-", "git+", "http")) and "==" not in s and "@" not in s:
-                out.append(("VUL-DEP-001", "CWE-1104", "unpinned dependency", rel(f), i, s, "pin exact versions (==) or use a lockfile (uv/poetry/pip-tools)", None))
-    for f in root.rglob("package.json"):
-        if any(s in f.parts for s in SKIP):
-            continue
+                yield (*DEP, "unpinned dependency", rel(f), i, s, "pin exact versions (==) or use a lockfile (uv/poetry/pip-tools)", None)
+
+
+def _node_manifests(root: Path):
+    for f in _manifests(root, "package.json"):
         text = f.read_text(encoding="utf-8", errors="replace")
         for m in re.finditer(r'"([^"]+)"\s*:\s*"(\*|latest|>=?[^"]*|x)"', text):
-            out.append(("VUL-DEP-001", "CWE-1104", "unbounded dependency range", rel(f), text.count("\n", 0, m.start()) + 1, m.group(0), "use ^/~ ranges with a committed lockfile, or exact versions", None))
-        if not any((f.parent / l).exists() for l in ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb")):
-            out.append(("VUL-DEP-001", "CWE-1104", "no lockfile next to package.json", rel(f), 1, "package.json without lockfile", "commit package-lock.json / pnpm-lock.yaml so builds are reproducible", None))
-    for f in root.rglob("pyproject.toml"):
-        if any(s in f.parts for s in SKIP):
-            continue
-        if re.search(r"^\s*(?:dependencies|requires)\s*=", f.read_text(encoding="utf-8", errors="replace"), re.M) and \
-                not any((f.parent / l).exists() for l in ("uv.lock", "poetry.lock", "pdm.lock", "requirements.txt", "requirements.lock")):
-            out.append(("VUL-DEP-001", "CWE-1104", "no lockfile next to pyproject.toml", rel(f), 1, "pyproject without uv.lock/poetry.lock", "commit a lockfile so builds are reproducible", None))
-    for f in root.rglob("Cargo.toml"):
-        if any(s in f.parts for s in SKIP) or (f.parent / "Cargo.lock").exists() or not re.search(r"^\[dependencies\]", f.read_text(encoding="utf-8", errors="replace"), re.M):
-            continue
-        out.append(("VUL-DEP-001", "CWE-1104", "no Cargo.lock", rel(f), 1, "Cargo.toml without Cargo.lock", "commit Cargo.lock", None))
-    return out
+            yield (*DEP, "unbounded dependency range", rel(f), text.count("\n", 0, m.start()) + 1, m.group(0), "use ^/~ ranges with a committed lockfile, or exact versions", None)
+        if not _has_lock(f, JS_LOCKS):
+            yield (*DEP, "no lockfile next to package.json", rel(f), 1, "package.json without lockfile", "commit package-lock.json / pnpm-lock.yaml so builds are reproducible", None)
 
 
-def scan(paths):
-    findings = []
-    for root in paths:
-        base = (ROOT / root) if not Path(root).is_absolute() else Path(root)
-        if not base.exists():
-            continue
-        files = [base] if base.is_file() else base.rglob("*")
-        for f in files:
-            inner = f.relative_to(base).parts if base.is_dir() else ()
-            if not f.is_file() or any(s in inner for s in SKIP):
-                continue
-            if f.name.startswith("Dockerfile") or f.name.endswith(".dockerfile"):
-                findings += scan_dockerfile(f)
-            elif f.suffix in TEXT_EXT or f.name in (".env", ".env.local", ".env.production"):
-                if f.name == ".env.example":
-                    continue
-                findings += scan_file(f)
-    for root in {ROOT} | {(ROOT / r) for r in paths if (ROOT / r).is_dir()}:
-        findings += scan_dependencies(root)
+def _python_and_rust_manifests(root: Path):
+    for f in _manifests(root, "pyproject.toml"):
+        declares = re.search(r"^\s*(?:dependencies|requires)\s*=", f.read_text(encoding="utf-8", errors="replace"), re.M)
+        if declares and not _has_lock(f, PY_LOCKS):
+            yield (*DEP, "no lockfile next to pyproject.toml", rel(f), 1, "pyproject without uv.lock/poetry.lock", "commit a lockfile so builds are reproducible", None)
+    for f in _manifests(root, "Cargo.toml"):
+        has_deps = re.search(r"^\[dependencies\]", f.read_text(encoding="utf-8", errors="replace"), re.M)
+        if has_deps and not (f.parent / "Cargo.lock").exists():
+            yield (*DEP, "no Cargo.lock", rel(f), 1, "Cargo.toml without Cargo.lock", "commit Cargo.lock", None)
+
+
+def scan_dependencies(root: Path):
+    """Unpinned dependency declarations and missing lockfiles (VUL-DEP-001)."""
+    return [*_unpinned_requirements(root), *_node_manifests(root), *_python_and_rust_manifests(root)]
+
+
+ENV_FILES = (".env", ".env.local", ".env.production")
+
+
+def _scan_target(f: Path):
+    """The findings of one file, by its kind: a Dockerfile, a text file with rules, or nothing."""
+    if f.name.startswith("Dockerfile") or f.name.endswith(".dockerfile"):
+        return scan_dockerfile(f)
+    if f.name != ".env.example" and (f.suffix in TEXT_EXT or f.name in ENV_FILES):
+        return scan_file(f)
+    return []
+
+
+def _files_of(root: str):
+    base = (ROOT / root) if not Path(root).is_absolute() else Path(root)
+    if not base.exists():
+        return
+    if base.is_file():
+        yield base
+        return
+    for f in base.rglob("*"):
+        if f.is_file() and not any(s in f.relative_to(base).parts for s in SKIP):
+            yield f
+
+
+def _dedupe(findings):
     seen, out = set(), []
     for fx in findings:
         key = (fx[0], fx[3], fx[4], fx[2])
         if key not in seen:
             seen.add(key); out.append(fx)
     return out
+
+
+def scan(paths):
+    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)]
+    for root in {ROOT} | {(ROOT / r) for r in paths if (ROOT / r).is_dir()}:
+        findings += scan_dependencies(root)
+    return _dedupe(findings)
 
 
 # ---- reporting ----------------------------------------------------------------------------------------------------
@@ -259,43 +174,88 @@ def register_rows():
     return rows
 
 
-def render(findings, paths, strict):
-    rows = register_rows()
+def _group(findings):
     by_vul = defaultdict(list)
     for fx in findings:
         by_vul[fx[0]].append(fx)
-    covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES})
-    skipped = [fx for fx in findings if fx[0] == "SKIPPED"]
-    findings = [fx for fx in findings if fx[0] != "SKIPPED"]
-    by_vul = defaultdict(list)
-    for fx in findings:
-        by_vul[fx[0]].append(fx)
+    return by_vul
+
+
+def _vul_lines(vul: str, fxs: list, rows: dict) -> list:
+    desc, status = rows.get(vul, ("(not in register)", "?"))
+    lines = [f"  {vul}  {desc[:70]}  [register: {status}]"]
+    for _, cwe, title, file, ln, snippet, advice, acc in sorted(fxs, key=lambda x: (x[3], x[4]))[:25]:
+        tag = "accepted: " + acc if acc else ("test" if is_test(ROOT / file) else "REVIEW")
+        lines += [f"    {file}:{ln}  {title} ({cwe})  [{tag}]", f"      {snippet}"]
+        if not acc:
+            lines.append(f"      -> {advice}")
+    if len(fxs) > 25:
+        lines.append(f"    ... {len(fxs) - 25} more")
+    return lines + [""]
+
+
+def _summary_line(live, tests, accepted, covered, by_vul) -> str:
+    return (f"  findings to review {len(live)}" + (f"; in tests (not gated, --strict to gate) {len(tests)}" if tests else "")
+            + (f"; accepted in code {len(accepted)}" if accepted else "") + f"; register rows with rules {len(covered)}, with findings {len(by_vul)}")
+
+
+def _classify(findings, strict: bool):
+    """(to review, in tests, accepted) among the real findings."""
     live = [fx for fx in findings if not fx[7] and (strict or not is_test(ROOT / fx[3]))]
     tests = [fx for fx in findings if not fx[7] and is_test(ROOT / fx[3])]
     accepted = [fx for fx in findings if fx[7]]
-    lines = [f"Code security — {', '.join(paths)}", "",
-             f"  findings to review {len(live)}" + (f"; in tests (not gated, --strict to gate) {len(tests)}" if tests else "") + (f"; accepted in code {len(accepted)}" if accepted else "")
-             + f"; register rows with rules {len(covered)}, with findings {len(by_vul)}",
-             "  A match is a finding to review, not proof of exploitability; a clean row is not proof of absence.", ""]
-    for vul in sorted(by_vul, key=lambda v: (-len([f for f in by_vul[v] if not f[7]]), v)):
-        desc, status = rows.get(vul, ("(not in register)", "?"))
-        lines.append(f"  {vul}  {desc[:70]}  [register: {status}]")
-        for _, cwe, title, file, ln, snippet, advice, acc in sorted(by_vul[vul], key=lambda x: (x[3], x[4]))[:25]:
-            tag = "accepted: " + acc if acc else ("test" if is_test(ROOT / file) else "REVIEW")
-            lines.append(f"    {file}:{ln}  {title} ({cwe})  [{tag}]")
-            lines.append(f"      {snippet}")
-            if not acc:
-                lines.append(f"      -> {advice}")
-        if len(by_vul[vul]) > 25:
-            lines.append(f"    ... {len(by_vul[vul]) - 25} more")
-        lines.append("")
-    for fx in skipped:
-        lines.append(f"  skipped by marker: {fx[3]}  ({fx[5]})")
-    clean = [v for v in covered if v not in by_vul]
-    lines.append("  no pattern matched for: " + ", ".join(clean) + "  (rules ran; absence of a match is not evidence of absence)")
+    return live, tests, accepted
+
+
+def _closing_lines(covered, by_vul, skipped) -> list:
+    lines = [f"  skipped by marker: {fx[3]}  ({fx[5]})" for fx in skipped]
+    lines.append("  no pattern matched for: " + ", ".join(v for v in covered if v not in by_vul) + "  (rules ran; absence of a match is not evidence of absence)")
     lines.append("  next: review each REVIEW line; fix or mark `# aix: accepted VUL-… <why>`; `aix code security --audit` writes the audit report;")
     lines.append("        then `aix docs security` / the security-audit-* skills move register rows on that evidence.")
-    return "\n".join(lines), len(live)
+    return lines
+
+
+def _by_open_count(by_vul) -> list:
+    return sorted(by_vul, key=lambda v: (-len([f for f in by_vul[v] if not f[7]]), v))
+
+
+def render(findings, paths, strict):
+    """(report text, number of findings to review) for the scan of `paths`."""
+    rows = register_rows()
+    covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES})
+    skipped = [fx for fx in findings if fx[0] == "SKIPPED"]
+    findings = [fx for fx in findings if fx[0] != "SKIPPED"]
+    by_vul = _group(findings)
+    live, tests, accepted = _classify(findings, strict)
+    lines = [f"Code security — {', '.join(paths)}", "", _summary_line(live, tests, accepted, covered, by_vul),
+             "  A match is a finding to review, not proof of exploitability; a clean row is not proof of absence.", ""]
+    for vul in _by_open_count(by_vul):
+        lines += _vul_lines(vul, by_vul[vul], rows)
+    return "\n".join(lines + _closing_lines(covered, by_vul, skipped)), len(live)
+
+
+AUDIT_TABLE_HEAD = ("| VUL id | Asset / threat | Impact | Likelihood rationale | Control | Verification method | Evidence | Status before → after | Residual risk |",
+                    "|---|---|---|---|---|---|---|---|---|")
+
+
+def _audit_rows(by_vul, rows, covered) -> list:
+    body = []
+    for vul in sorted(by_vul):
+        desc, status = rows.get(vul, ("", "?"))
+        for _, cwe, title, file, ln, _snippet, advice, acc in sorted(by_vul[vul], key=lambda x: (x[3], x[4])):
+            after = "accepted (in code)" if acc else "confirmed? review"
+            body.append(f"| {vul} | {desc[:50]} | | static match | {advice[:60]} | code review | `{file}:{ln}` {title} ({cwe}) | {status} → {after} | |")
+    for vul in [v for v in covered if v not in by_vul]:
+        desc, status = rows.get(vul, ("", "?"))
+        body.append(f"| {vul} | {desc[:50]} | | no static match | | static scan | no pattern matched | {status} → {status} (unverified by scan alone) | |")
+    return body
+
+
+def _add_index_row(out: Path, n_findings: int, n_covered: int):
+    idx = out.parent / "INDEX.md"
+    if idx.exists() and out.name not in idx.read_text(encoding="utf-8"):
+        with idx.open("a", encoding="utf-8") as fh:
+            fh.write(f"| `{out.name}` | Deterministic code scan (`aix code security`), {n_findings} findings, {n_covered} rows checked | Verifying VUL statuses; release |\n")
 
 
 def write_audit(findings, paths):
@@ -303,34 +263,18 @@ def write_audit(findings, paths):
     rows = register_rows()
     today = date.today().isoformat()
     out = ROOT / "docs" / "security" / "audits" / f"AUDIT-{today}-code.md"
-    by_vul = defaultdict(list)
-    for fx in findings:
-        by_vul[fx[0]].append(fx)
+    by_vul = _group(findings)
     covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES})
-    body = [f"---\nid: AUDIT-{today}-code\nskill: aix code security (deterministic scan)\ndate: {today}\nscope: [{', '.join(paths)}]\nresult: {'findings' if any(not f[7] for f in findings) else 'pass'}\n---",
-            f"# Audit — code scan — {today}", "",
-            "## Method (what was checked, tools run)",
+    result = "findings" if any(not f[7] for f in findings) else "pass"
+    body = [f"---\nid: AUDIT-{today}-code\nskill: aix code security (deterministic scan)\ndate: {today}\nscope: [{', '.join(paths)}]\nresult: {result}\n---",
+            f"# Audit — code scan — {today}", "", "## Method (what was checked, tools run)",
             f"`aix code security` static rules ({len(RULES)} line rules + Dockerfile + dependency manifests) mapped to VUL rows and CWEs. "
             "A match is a finding to review; a clean row means no pattern matched, not absence. Human review recorded in the Status column.", "",
-            "## Findings",
-            "| VUL id | Asset / threat | Impact | Likelihood rationale | Control | Verification method | Evidence | Status before → after | Residual risk |",
-            "|---|---|---|---|---|---|---|---|---|"]
-    for vul in sorted(by_vul):
-        desc, status = rows.get(vul, ("", "?"))
-        for _, cwe, title, file, ln, snippet, advice, acc in sorted(by_vul[vul], key=lambda x: (x[3], x[4])):
-            ev = f"`{file}:{ln}` {title} ({cwe})"
-            after = "accepted (in code)" if acc else "confirmed? review"
-            body.append(f"| {vul} | {desc[:50]} | | static match | {advice[:60]} | code review | {ev} | {status} → {after} | |")
-    for vul in [v for v in covered if v not in by_vul]:
-        desc, status = rows.get(vul, ("", "?"))
-        body.append(f"| {vul} | {desc[:50]} | | no static match | | static scan | no pattern matched | {status} → {status} (unverified by scan alone) | |")
-    body += ["", "## New vulnerabilities discovered (added to register)", "- none by this scan (static rules only match seeded categories)", "",
-             "## Follow-ups (tasks created)", "- review every `confirmed? review` row; fix or accept with rationale", ""]
+            "## Findings", *AUDIT_TABLE_HEAD, *_audit_rows(by_vul, rows, covered),
+            "", "## New vulnerabilities discovered (added to register)", "- none by this scan (static rules only match seeded categories)", "",
+            "## Follow-ups (tasks created)", "- review every `confirmed? review` row; fix or accept with rationale", ""]
     out.write_text("\n".join(body), encoding="utf-8")
-    idx = out.parent / "INDEX.md"
-    if idx.exists() and out.name not in idx.read_text(encoding="utf-8"):
-        with idx.open("a", encoding="utf-8") as fh:
-            fh.write(f"| `{out.name}` | Deterministic code scan (`aix code security`), {len(findings)} findings, {len(covered)} rows checked | Verifying VUL statuses; release |\n")
+    _add_index_row(out, len(findings), len(covered))
     return out
 
 
@@ -359,7 +303,15 @@ fetch(u, { rejectUnauthorized: false });
 }
 
 
-def selftest():
+SELFTEST_WANT = [("VUL-INJ-002", "bad.py", "open", 1), ("VUL-INPUT-002", "bad.py", "open", 2), ("VUL-INJ-001", "bad.py", "open", 1),
+                 ("VUL-SECRET-001", "bad.py", "open", 1), ("VUL-AUTHN-001", "bad.py", "open", 1), ("VUL-AUTHN-001", "bad.py", "acc", 1),
+                 ("VUL-SECRET-002", "bad.py", "open", 1), ("VUL-INJ-001", "bad.ts", "open", 1), ("VUL-WEB-001", "bad.ts", "open", 1),
+                 ("VUL-AUTHN-001", "bad.ts", "open", 1), ("VUL-SECRET-002", "bad.ts", "open", 1), ("VUL-INFRA-001", "Dockerfile", "open", 1),
+                 ("VUL-DEP-001", "Dockerfile", "open", 1), ("VUL-DEP-001", "requirements.txt", "open", 1)]
+
+
+def _scan_snippets():
+    """Scan the known-bad snippets in a temporary project; ROOT is swapped for the duration."""
     import tempfile
     global ROOT
     with tempfile.TemporaryDirectory() as d:
@@ -368,24 +320,33 @@ def selftest():
             (base / name).write_text(text, encoding="utf-8")
         saved, ROOT = ROOT, base
         try:
-            found = scan([str(base)])
+            return scan([str(base)])
         finally:
             ROOT = saved
+
+
+def _count_found(found) -> dict:
     got = defaultdict(int)
-    for vul, cwe, title, file, ln, snippet, advice, acc in found:
+    for vul, _cwe, _title, file, _ln, _snippet, _advice, acc in found:
         got[(vul, Path(file).name, "acc" if acc else "open")] += 1
-    want = [("VUL-INJ-002", "bad.py", "open", 1), ("VUL-INPUT-002", "bad.py", "open", 2), ("VUL-INJ-001", "bad.py", "open", 1),
-            ("VUL-SECRET-001", "bad.py", "open", 1), ("VUL-AUTHN-001", "bad.py", "open", 1), ("VUL-AUTHN-001", "bad.py", "acc", 1),
-            ("VUL-SECRET-002", "bad.py", "open", 1), ("VUL-INJ-001", "bad.ts", "open", 1), ("VUL-WEB-001", "bad.ts", "open", 1),
-            ("VUL-AUTHN-001", "bad.ts", "open", 1), ("VUL-SECRET-002", "bad.ts", "open", 1), ("VUL-INFRA-001", "Dockerfile", "open", 1),
-            ("VUL-DEP-001", "Dockerfile", "open", 1), ("VUL-DEP-001", "requirements.txt", "open", 1)]
+    return got
+
+
+def _check_wanted(got: dict) -> int:
     failed = 0
-    for vul, file, state, n in want:
+    for vul, file, state, n in SELFTEST_WANT:
         ok = got[(vul, file, state)] == n; failed += not ok
         print(f"  {'PASS' if ok else 'FAIL'}  {vul} in {file} ({state}): {got[(vul, file, state)]} (expected {n})")
+    return failed
+
+
+def selftest():
+    """Scan the built-in snippets and compare with SELFTEST_WANT; exit 1 on any mismatch."""
+    found = _scan_snippets()
+    failed = _check_wanted(_count_found(found))
     safe_hits = [f for f in found if f[4] in (5, 7) and Path(f[3]).name == "bad.py"]
-    ok = not safe_hits; failed += not ok
-    print(f"  {'PASS' if ok else 'FAIL'}  safe yaml.load(Loader=SafeLoader) and parameterised execute not flagged")
+    failed += bool(safe_hits)
+    print(f"  {'FAIL' if safe_hits else 'PASS'}  safe yaml.load(Loader=SafeLoader) and parameterised execute not flagged")
     print("selftest: " + ("all passed" if not failed else f"{failed} FAILED"))
     sys.exit(1 if failed else 0)
 
@@ -393,24 +354,26 @@ def selftest():
 USAGE = "usage: aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]"
 
 
+def _write_report(text: str):
+    out = ROOT / "docs" / "tests" / "code-security.md"
+    out.write_text("# Code security (generated — do not edit)\n\n```\n" + text + "\n```\n", encoding="utf-8")
+    print(f"\n  wrote {out.relative_to(ROOT)}")
+
+
 def main(args):
     if "--selftest" in args:
         return selftest()
-    strict, gate, audit, report = "--strict" in args, "--gate" in args, "--audit" in args, "--report" in args
     paths = [a for a in args if not a.startswith("--")] or default_roots()
     findings = scan(paths)
-    text, n_live = render(findings, paths, strict)
+    text, n_live = render(findings, paths, "--strict" in args)
     print(text)
-    if report:
-        out = ROOT / "docs" / "tests" / "code-security.md"
-        out.write_text("# Code security (generated — do not edit)\n\n```\n" + text + "\n```\n", encoding="utf-8")
-        print(f"\n  wrote {out.relative_to(ROOT)}")
-    if audit:
+    if "--report" in args:
+        _write_report(text)
+    if "--audit" in args:
         print(f"\n  wrote {write_audit(findings, paths).relative_to(ROOT)}  (fill Status per row after review; aix docs security reads it)")
-    if gate and n_live:
-        sys.exit(f"GATE FAILED: {n_live} security finding(s) to review")
-    findings = [fx for fx in findings if fx[0] != "SKIPPED"]
-    if gate:
+    if "--gate" in args:
+        if n_live:
+            sys.exit(f"GATE FAILED: {n_live} security finding(s) to review")
         print("GATE PASSED")
 
 

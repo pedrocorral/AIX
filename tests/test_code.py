@@ -62,30 +62,14 @@ class MultiProjectFolder(unittest.TestCase):
     @unittest.skipIf(os.name == "nt", "curses checklist: Linux/macOS only")
     def test_checklist_through_a_pseudo_terminal(self):
         """Move to the second row (beta), untick it, apply: code_roots = [alpha, gamma]."""
-        import pty, select, time
-        from helpers import LAUNCHER, env
-        pid, fd = pty.fork()
-        if pid == 0:  # child: the real launcher on a real tty
-            os.chdir(self.project)
-            e = env(self.home); e.pop("CI", None); e.update({"LINES": "24", "COLUMNS": "100"})
-            os.execve(str(LAUNCHER), [str(LAUNCHER), "code", "find"], e)
-        out = b""
-        def read(seconds):
-            nonlocal out
-            end = time.time() + seconds
-            while time.time() < end:
-                r, _, _ = select.select([fd], [], [], 0.1)
-                if r:
-                    try:
-                        out += os.read(fd, 65536)
-                    except OSError:
-                        return
-        read(1.5)
+        from helpers import Terminal
+        term = Terminal(self.project, self.home, ["code", "find"], {"LINES": "24", "COLUMNS": "100"})
+        term.read(1.5)
         for key in (b"j", b" ", b"\r"):
-            os.write(fd, key); read(0.5)
-        read(1.0)
-        os.waitpid(pid, 0)
-        plain = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b"", out).decode(errors="replace")
+            term.send(key)
+        term.read(1.0)
+        term.wait()
+        plain = term.plain()
         self.assertIn("space toggle", plain, "the checklist legend must have been drawn")
         for name in ("alpha", "beta", "gamma"):
             self.assertIn(name, plain)

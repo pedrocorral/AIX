@@ -91,21 +91,24 @@ def active(project: Path = ROOT, task_policy: str = None):
     return pol, name, source
 
 
-def steps_of(pol: dict) -> list:
-    """[(id, kind, what, label, level)] in the policy's order."""
+def _step_def(pol: dict, sid: str):
+    """(kind, what, label) of a step id: the policy's own check, or a known step."""
     extra = pol.get("checks") or {}
+    if sid in extra:
+        return "check", str(extra[sid]), f"`{extra[sid]}` passes"
+    if sid in STEPS:
+        return STEPS[sid]
+    sys.exit(f"aix: policy {pol['name']}: unknown step '{sid}' (known: {', '.join(STEPS)}; or define it under checks:)")
+
+
+def steps_of(pol: dict) -> list:
+    """[(id, kind, what, label, level)] in the policy's order; steps at level off are left out."""
     required, advised = set(pol.get("required") or []), set(pol.get("advised") or [])
     out = []
     for sid in pol.get("order") or []:
-        if sid in extra:
-            kind, what, label = "check", str(extra[sid]), f"`{extra[sid]}` passes"
-        elif sid in STEPS:
-            kind, what, label = STEPS[sid]
-        else:
-            sys.exit(f"aix: policy {pol['name']}: unknown step '{sid}' (known: {', '.join(STEPS)}; or define it under checks:)")
-        level = "required" if sid in required else "advised" if sid in advised else "off"
-        if level != "off":
-            out.append((sid, kind, what, label, level))
+        level = "required" if sid in required else "advised" if sid in advised else None
+        if level:
+            out.append((sid, *_step_def(pol, sid), level))
     return out
 
 
@@ -121,6 +124,20 @@ def run_check(project: Path, command: str) -> int:
         return 1
 
 
+def _run_step(project: Path, step, quiet: bool) -> bool:
+    """Run one step; print its line; True unless a required check failed."""
+    sid, kind, what, label, level = step
+    if kind == "skill":
+        if not quiet:
+            print(f"  {sid:16s} {level:9s} skill {what}: {label} (the agent does this; not checked here)")
+        return True
+    rc = run_check(project, what)
+    verdict = "pass" if rc == 0 else ("FAIL" if level == "required" else "advice")
+    if not quiet or verdict == "FAIL":
+        print(f"  {sid:16s} {level:9s} {verdict:7s} {what}")
+    return verdict != "FAIL"
+
+
 def check(project: Path = ROOT, task_policy: str = None, only: str = None, quiet: bool = False) -> bool:
     """Run the checks of the active policy in order; print one line per step. False when a required check failed."""
     pol, name, source = active(project, task_policy)
@@ -130,20 +147,8 @@ def check(project: Path = ROOT, task_policy: str = None, only: str = None, quiet
         return True
     if not quiet:
         print(f"policy: {name} ({source}, {pol['layer']} layer) — {pol.get('description', '')}")
-    ok = True
-    for sid, kind, what, label, level in steps_of(pol):
-        if only and sid != only:
-            continue
-        if kind == "skill":
-            if not quiet:
-                print(f"  {sid:16s} {level:9s} skill {what}: {label} (the agent does this; not checked here)")
-            continue
-        rc = run_check(project, what)
-        verdict = "pass" if rc == 0 else ("FAIL" if level == "required" else "advice")
-        if not quiet or verdict == "FAIL":
-            print(f"  {sid:16s} {level:9s} {verdict:7s} {what}")
-        if rc != 0 and level == "required":
-            ok = False
+    results = [_run_step(project, step, quiet) for step in steps_of(pol) if not only or step[0] == only]
+    ok = all(results)
     if not quiet:
         print("cycle complete: every required check passed" if ok else "cycle NOT complete: a required check failed (fix it, or `aix task block`)")
     return ok

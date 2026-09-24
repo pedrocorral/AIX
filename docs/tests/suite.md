@@ -21,6 +21,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_gitignore.py` | the .gitignore lines and the `-bak` backups |
 | `test_selfinstall.py` | link, shell profiles, idempotence, dry run, refusal, `aix version` |
 | `test_selfcommands.py` | `self-update` units and command, `self-test`, `install.sh`, doctor leftovers |
+| `test_help.py` | the help pages: Markdown per topic, aliases, unknown topic, usage/about, a layer replacing a page |
 | `test_registry.py` | registry downloads (network) |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on

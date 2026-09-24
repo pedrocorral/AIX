@@ -52,7 +52,10 @@ AIX/
 ├── .aix/templates/docs/     # the documentation seed projects receive (EXAMPLE domain); .aix/templates/pointers/ the pointer texts; both overlayable by org/ and custom/
 ├── .aix/bin/aix, aix.cmd    # launchers (bash / Windows batch) → .aix/scripts/aix.py; `aix install` links the bash one into ~/.local/bin
 ├── scripts/
-│   ├── aix.py               # the CLI: install / validate / coverage / task / version (dispatches to the modules below)
+│   ├── aix.py               # the CLI: parse, find the project, hand off (thin; every file here stays under 400 lines, every function under the readability limits)
+│   ├── helptext.py          # leaf: the usage screen, `aix about` and `aix help <topic>` read from .aix/meta-docs/help/*.md (a layer's copy wins)
+│   ├── cli_install.py       # `aix install`: links here, or --into DIR: payload, layers, seeded docs, agents, .gitignore, code folders
+│   ├── cli_guide.py, cli_agent.py, cli_instructions.py, cli_policy.py   # `aix guide`, `aix agent|agents`, `aix instructions`, `aix policy|check|profile`
 │   ├── doctor.py            # `aix doctor`: installation health checks with fixes
 │   ├── extern.py            # third-party skills: registry.json, tarball fetch into .aix/skills/extern/<name>, always-on sections in AGENTS.md + pointers
 │   ├── security.py          # `aix docs security`: register state, evidence check, release gate
@@ -64,10 +67,22 @@ AIX/
 │   ├── catalog.py           # leaf: skill catalogue data (used by skills.py, extern.py, doctor.py)
 │   ├── project.py           # leaf: find_project (used by aix.py, upgrade.py)
 │   ├── runtime.py           # leaf: detect target runtimes (Python/JS/Rust/Java) and where they are declared
-│   ├── style.py             # `aix code style`: readability metrics, line-numbered advice, modernise tier
-│   ├── graph.py             # `aix code graph`: dependency graph metrics (complexity vs ideal complexity = reducible %, cycles, shortcuts, hubs, propagation cost)
+│   ├── codefiles.py         # leaf: code roots (`aix code find`), source extensions, the file walk every code tool shares
+│   ├── depedges.py          # leaf: import edges per language and Python call edges (module_graph, function_graph)
+│   ├── graphmetrics.py      # leaf: stability, facades, SCCs, transitive reduction, upward edges, NCCD, modularity (measure)
+│   ├── deadcode.py, clones.py   # `aix code dead` (unreachable modules and functions), `aix code clones` (exact and near clones)
+│   ├── graph.py             # `aix code graph|dead|clones`: the report, the gate, the selftest over the leaves above
+│   ├── stylemetrics.py      # leaf: cyclomatic, cognitive, nesting, params, names, magic numbers per function (Python by AST; JS/TS, Rust, Java by tokens)
+│   ├── modernise.py         # leaf: modernisation advice bounded by the detected runtime
+│   ├── style.py             # `aix code style`: findings, card, table, gate over stylemetrics + modernise
+│   ├── securityrules.py     # leaf: the static security rules (regex per line) mapped to VUL rows and CWEs
+│   ├── codesecurity.py      # `aix code security`: scan, report, audit evidence
+│   ├── taint.py, cvecheck.py, secrethistory.py   # leaves: taint paths, OSV lookups, secrets in git history
+│   ├── vulnerabilities.py   # `aix code vulnerabilities`: the three leaves above, report, audit, gate
 │   ├── skills.py            # `aix skills`: catalogue, levels (always = named in AGENTS.md), enable/disable via .aix/config.yaml
-│   ├── install_skills.py    # links/copies .aix/skills/<cat>/<name> → <target>/<cat>-<name>; --into copies kit payload; writes pointer files
+│   ├── install_skills.py    # links/copies .aix/skills/<cat>/<name> → <target>/<cat>-<name>; renders AGENTS.md sections and scoped instructions
+│   ├── seed.py              # leaf: `--into` copies the payload (collision dialogue, .bak), seeds docs/ layer by layer, pointer texts
+│   ├── layers.py, yamlmini.py   # leaves: the layer resolution (skills, instructions, profiles, orphans) and the YAML subset it reads
 │   ├── validate.py          # front-matter, skill name==path, INDEX completeness, links, TS covers, VUL statuses, field dictionary
 │   ├── coverage_matrix.py   # FR/NFR/API → TS → @implements/@tests/@mitigates markers → gaps; writes docs/tests/coverage-matrix.md
 │   └── roadmap.py           # new | start | block | done | list ; keeps STATE.md in sync

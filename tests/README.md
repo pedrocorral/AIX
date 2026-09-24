@@ -31,7 +31,7 @@ skipped when git or a tag is missing).
 
 | File | Covers |
 |---|---|
-| `helpers.py` | `run`, `install`, `upgrade`, `project_cmd`, `assert_healthy`, `make_fork`, `previous_kit`, `fixture` |
+| `helpers.py` | `run`, `install`, `upgrade`, `project_cmd`, `assert_healthy`, `make_fork`, `previous_kit`, `fixture`, `Terminal` (the launcher in a pseudo terminal) |
 | `fixtures/` | small template folders: a flat project, a three-project folder, a bare custom layer ([README](fixtures/README.md)) |
 | `test_kit.py` | the checkout: install, doctor, validate, graph gate on the scripts, selftests, help, the guide |
 | `test_install.py` | a fresh install: exactly the payload, manifest, links and pointers, idempotent, `--copy`, collisions |
@@ -46,6 +46,7 @@ skipped when git or a tag is missing).
 | `test_selfinstall.py` | link, profile lines per shell, idempotence, foreign file kept, stale link replaced, dry run, refusal from a project, `aix version` naming both copies |
 | `test_docs_split.py` | projects seeded from `.aix/templates/docs`, the kit's own `docs/` never travels, upgrade leaves docs alone, org/custom overlay the seed and the pointer texts |
 | `test_selfcommands.py` | `aix self-update`: its units (`is_git_clone`, `version_of`, `git_pull` ok and failing, `update_message`) and the command against a local origin, `aix self-test` on one file and refused from a project, `install.sh` end to end with a local repository, doctor's leftover warning |
+| `test_help.py` | `aix help <topic>` is the Markdown page, aliases and sub-commands, the unknown-topic list, usage and about from the pages, a custom layer replacing a page |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 
 ## Not covered

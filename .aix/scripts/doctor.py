@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """aix doctor — installation health (not document content; that is `aix docs validate`).
 Each finding comes with the fix. Exit 1 if anything is broken."""
-import json, os, re, shutil, sys
+import os, re, shutil, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +27,13 @@ def check_path():
         problem("`aix` is not on PATH", "run `aix self-install` from the kit clone (link + shell profile), then open a new terminal")
 
 
+def _leftovers_of(agents, name: str, a: dict) -> list:
+    left = [rel for rel in a["pointers"] if agents.is_aix_pointer(ROOT / rel)]
+    if a["skills"] and (ROOT / a["skills"]).is_dir():
+        left.append(a["skills"])
+    return left
+
+
 def check_pointers():
     import agents
     chosen = agents.selected(ROOT)
@@ -36,28 +43,29 @@ def check_pointers():
         if not f.exists() or "AGENTS.md" not in f.read_text(encoding="utf-8"):
             problem(f"{rel} missing or not pointing at AGENTS.md", "run `aix install`")
     for n, a in agents.AGENTS.items():
-        if n in chosen:
-            continue
-        left = [rel for rel in a["pointers"] if agents.is_aix_pointer(ROOT / rel)] + ([a["skills"]] if a["skills"] and (ROOT / a["skills"]).is_dir() else [])
+        left = [] if n in chosen else _leftovers_of(agents, n, a)
         if left:
             problem(f"{n} is not selected but AIX files remain: {', '.join(left)}", "run `aix agents` (removes them) or select it")
+
+
+def _dangling(agents_dirs):
+    for t in agents_dirs:
+        d = ROOT / t
+        for p in (d.iterdir() if d.is_dir() else []):
+            if p.is_symlink() and not p.exists():
+                yield p
 
 
 def check_links():
     import agents
     agents_dirs = agents.skill_dirs(ROOT)
     cat, off = sk.catalogue(), sk.disabled()
-    for flat, info in cat.items():
-        if flat in off:
-            continue
+    for flat in (f for f in cat if f not in off):
         missing = [t for t in agents_dirs if not (ROOT / t / flat / "SKILL.md").exists()]
         if missing:
             problem(f"skill {flat} not linked in {', '.join(missing)}", "run `aix install`")
-    for t in agents_dirs:
-        d = ROOT / t
-        for p in d.iterdir() if d.is_dir() else []:
-            if p.is_symlink() and not p.exists():
-                problem(f"dangling link {p.relative_to(ROOT)}", "run `aix install` (prunes it)")
+    for p in _dangling(agents_dirs):
+        problem(f"dangling link {p.relative_to(ROOT)}", "run `aix install` (prunes it)")
     for name in off - set(cat):
         problem(f"disabled_skills names unknown skill {name}", "edit .aix/config.yaml")
 
@@ -100,6 +108,31 @@ def check_kit_edits():
         problem(f"{f} was edited locally; the next `aix upgrade` overwrites it", "make the change in the kit repository (or a skill under .aix/skills/extern), then `aix upgrade`")
 
 
+def _report_instructions(ins: dict):
+    blocks = sorted(k for k, v in ins.items() if (v["block"] if "block" in v else not (v.get("applyTo") or v.get("always"))))
+    scoped = sorted(k for k in ins if k not in blocks)
+    print(f"instructions: {len(blocks)} AGENTS.md blocks ({', '.join(blocks)})")
+    if scoped:
+        print(f"instructions: {len(scoped)} scoped ({', '.join(scoped)})")
+
+
+def _report_orphans(layers):
+    typos, additions = layers.orphan_report(ROOT)
+    for kind, name, layer, shown, near in typos:
+        problem(f"{kind} {name} ({layer} layer, {shown}) overrides nothing; did you mean {near}?", f"rename it to {near} (a class or id must match character by character to replace the kit's)")
+    for (kind, layer), names in sorted(additions.items()):
+        print("note: " + layers.additions_line(kind, layer, names))
+
+
+def _report_overrides(idx: dict):
+    over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit" or r.get("chosen_by", "").startswith("config")]
+    if not over and not idx["disabled"]:
+        return
+    disabled = ";  disabled by layers: " + ", ".join(idx["disabled"]) if idx["disabled"] else ""
+    user = "" if idx.get("user_layer") else "  (user layer not applied: no terminal / AIX_NO_USER)"
+    print("layers: " + (", ".join(over) if over else "no overrides") + disabled + user)
+
+
 def check_layers():
     """Overrides are fine; a linked implementation whose content changed since `aix install` is not (the index lies)."""
     import layers
@@ -111,59 +144,64 @@ def check_layers():
     idx = layers.read_index(ROOT)
     if idx.get("profile"):
         print(f"profile: {idx['profile']}")
-    ins = idx.get("instructions", {})
-    if ins:
-        blocks = sorted(k for k, v in ins.items() if (v["block"] if "block" in v else not (v.get("applyTo") or v.get("always"))))
-        scoped = sorted(k for k in ins if k not in blocks)
-        print(f"instructions: {len(blocks)} AGENTS.md blocks ({', '.join(blocks)})")
-        if scoped:
-            print(f"instructions: {len(scoped)} scoped ({', '.join(scoped)})")
-    new = {}
-    for kind, name, layer, path, near in layers.orphans(ROOT):
-        shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
-        if near:
-            problem(f"{kind} {name} ({layer} layer, {shown}) overrides nothing; did you mean {near}?", f"rename it to {near} (a class or id must match character by character to replace the kit's)")
-        else:
-            new.setdefault((kind, layer), []).append(name)
-    for (kind, layer), names in sorted(new.items()):
-        print(f"note: {len(names)} new {kind}{'s' if len(names) > 1 else ''} from the {layer} layer (override nothing in the kit): {', '.join(names)}")
-    over = [f"{c} ({r['layer']})" for c, r in idx["skills"].items() if r["layer"] != "kit" or r.get("chosen_by", "").startswith("config")]
-    if over or idx["disabled"]:
-        print("layers: " + (", ".join(over) if over else "no overrides") + (";  disabled by layers: " + ", ".join(idx["disabled"]) if idx["disabled"] else "")
-              + ("" if idx.get("user_layer") else "  (user layer not applied: no terminal / AIX_NO_USER)"))
+    if idx.get("instructions"):
+        _report_instructions(idx["instructions"])
+    _report_orphans(layers)
+    _report_overrides(idx)
+
+
+def _owner_of(task_file) -> str:
+    import re
+    m = re.search(r"^owner:\s*(agent-\d+)", task_file.read_text(encoding="utf-8"), re.M)
+    return m.group(1) if m else ""
+
+
+def _report_stale_seats(seats):
+    for name, s in seats.stale(ROOT):
+        problem(f"seat {name} is {s['state']}: {s.get('tool')} {s.get('user')}@{s.get('host')} left without `aix agent release`",
+                "the next `aix agent claim` takes it over (a seat expired on another machine needs --force)")
+
+
+def _report_orphan_tasks(going, all_seats: dict):
+    for f in sorted(going.glob("TASK-*.md")):
+        owner = _owner_of(f)
+        holder = all_seats.get(owner) if owner else None
+        if owner and (holder is None or holder["state"] not in ("live", "remote")):
+            problem(f"{f.name[:9]} is going-on but its owner {owner} is not a live seat", "`aix task start` it from a live session (--force if held), or `aix task block` it")
 
 
 def check_seats():
     """Seats nobody is sitting on any more, and going-on tasks whose owner is not a live seat."""
-    import seats, re
-    if not (ROOT / "docs" / "road-map" / "going-on").is_dir():
+    import seats
+    going = ROOT / "docs" / "road-map" / "going-on"
+    if not going.is_dir():
         return
     all_ = seats.all_seats(ROOT)
-    for name, s in seats.stale(ROOT):
-        problem(f"seat {name} is {s['state']}: {s.get('tool')} {s.get('user')}@{s.get('host')} left without `aix agent release`",
-                "the next `aix agent claim` takes it over (a seat expired on another machine needs --force)")
-    for f in sorted((ROOT / "docs" / "road-map" / "going-on").glob("TASK-*.md")):
-        m = re.search(r"^owner:\s*(agent-\d+)", f.read_text(encoding="utf-8"), re.M)
-        if m and (all_.get(m.group(1)) is None or all_[m.group(1)]["state"] not in ("live", "remote")):
-            problem(f"{f.name[:9]} is going-on but its owner {m.group(1)} is not a live seat", "`aix task start` it from a live session (--force if held), or `aix task block` it")
-    live = [n for n, s in all_.items() if s and s["state"] == "live"]
+    _report_stale_seats(seats)
+    _report_orphan_tasks(going, all_)
     if seats.total(ROOT) > 1:
-        print(f"seats: {seats.total(ROOT)} total, {sum(1 for s in all_.values() if s)} taken, {len(live)} live here")
+        taken = sum(1 for s in all_.values() if s)
+        live = sum(1 for s in all_.values() if s and s["state"] == "live")
+        print(f"seats: {seats.total(ROOT)} total, {taken} taken, {live} live here")
+
+
+def _missing_block_sections(blocks, text: str):
+    for b in sorted(blocks, key=lambda v: v["order"]):
+        if b["section"] and f"## {b['section']}" not in text:
+            problem(f"AGENTS.md lacks the block section '{b['section']}' ({b['layer']} layer)", "run `aix install` (AGENTS.md is assembled from .aix/instructions blocks)")
 
 
 def check_agents_blocks():
     """AGENTS.md is assembled from .aix/instructions blocks; a hand edit outside the managed sections is lost on install."""
-    import layers, tempfile, shutil
+    import layers
     blocks = [v for v in layers.instructions(ROOT, layers.active_profile(ROOT)).values() if v["block"]]
     if not blocks or not (ROOT / "AGENTS.md").exists():
         return
-    expected_ids = {b["id"] if "id" in b else None for b in blocks}
     text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    for b in sorted(blocks, key=lambda v: v["order"]):
-        if b["section"] and f"## {b['section']}" not in text:
-            problem(f"AGENTS.md lacks the block section '{b['section']}' ({b['layer']} layer)", "run `aix install` (AGENTS.md is assembled from .aix/instructions blocks)")
+    _missing_block_sections(blocks, text)
+    known = inst_headers(blocks)
     for line in text.splitlines():
-        if line.startswith("## ") and line.strip() not in inst_headers(blocks):
+        if line.startswith("## ") and line.strip() not in known:
             problem(f"AGENTS.md has a section not produced by any block or managed by aix: '{line.strip()}'", "move its text into a block under .aix/custom/instructions/ (block: true, section, order) and run `aix install`")
 
 
