@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.5 — 2026-09-24
+
+- `aix code vulnerabilities --taint` follows input in JavaScript and TypeScript: Express, Koa, Fastify and Next request objects, `process.env`/`argv`, `location`, `URLSearchParams` and form data, through assignments, destructuring, template literals and concatenation, to shell, eval, file, SQL, redirect, HTML and outbound-request sinks, one call deep into the file's own functions. Sanitisers (`Number`, `parseInt`, `encodeURIComponent`, `path.basename`, `validator.escape`, `DOMPurify.sanitize`, shell-quote) clear it; parameterised queries and argument lists are not findings. XSS sinks map to VUL-WEB-001. Same report, gate, `--audit` and `# aix: accepted` marker as Python. `tests/test_js_taint.py`: 40 marked sinks across five frameworks and the negatives around them.
+- A register row in the vulnerabilities report shows 20 findings and says how many more there are.
+
 ## 2.21.4 — 2026-09-24
 
 - `aix code style` gates pass-through wrappers: a function whose only statement forwards its own parameters to one call (`def f(x): return g(x)`), in Python, JavaScript/TypeScript, Rust and Java. Agents write them to satisfy the limits; the caller gets a hop and no meaning. Not flagged: a named expression, a factory over a constructor, a decorated function, a trait or interface method, an adapter that adds, drops, reorders or transforms an argument. The readability convention and the refactor-readability skill say so; `tests/test_wrappers.py` holds 55 shapes across the five languages.

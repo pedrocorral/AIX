@@ -77,7 +77,7 @@ AIX/
 │   ├── style.py             # `aix code style`: findings, card, table, gate over stylemetrics + modernise
 │   ├── securityrules.py, depscan.py   # leaves: the static security rules (regex per line, VUL rows, CWEs) and the dependency hygiene scan
 │   ├── codesecurity.py      # `aix code security`: scan, report, audit evidence
-│   ├── taint.py, cvecheck.py, secrethistory.py   # leaves: taint paths, OSV lookups, secrets in git history
+│   ├── taint.py, jstaint.py, cvecheck.py, secrethistory.py   # leaves: taint paths (Python by AST; JS/TS by statements), OSV lookups, secrets in git history
 │   ├── vulnerabilities.py   # `aix code vulnerabilities`: the three leaves above, report, audit, gate
 │   ├── skills.py            # `aix skills`: catalogue, levels (always = named in AGENTS.md), enable/disable via .aix/config.yaml
 │   ├── install_skills.py    # links/copies .aix/skills/<cat>/<name> → <target>/<cat>-<name>; renders AGENTS.md sections and scoped instructions

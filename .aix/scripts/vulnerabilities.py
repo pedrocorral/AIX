@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots
 from codesecurity import is_test, register_rows
 from taint import taint
+import jstaint
 from cvecheck import cve, dependencies
 from secrethistory import history
 
@@ -29,6 +30,16 @@ from secrethistory import history
 
 
 # ---- report -------------------------------------------------------------------------------------------------------
+
+SHOWN_PER_ROW = 20
+
+
+def _finding_line(f) -> str:
+    _, cwe, what, file, ln, snippet, advice, acc = f
+    where = f"{file}:{ln}" if ln else file
+    tag = f"accepted: {acc}" if acc else "test" if is_test(ROOT / file) else "REVIEW"
+    return f"      {where}  {what} ({cwe})  [{tag}]\n        {snippet}\n        -> {advice}"
+
 
 def _finding_lines(findings, rows) -> list:
     by_vul = defaultdict(list)
@@ -38,10 +49,9 @@ def _finding_lines(findings, rows) -> list:
     for vul in sorted(by_vul):
         desc, status = rows.get(vul, ("", "?"))
         lines.append(f"    {vul}  {desc[:60]}  [register: {status}]")
-        for _, cwe, what, file, ln, snippet, advice, acc in by_vul[vul][:20]:
-            where = f"{file}:{ln}" if ln else file
-            tag = f"accepted: {acc}" if acc else "test" if is_test(ROOT / file) else "REVIEW"
-            lines.append(f"      {where}  {what} ({cwe})  [{tag}]\n        {snippet}\n        -> {advice}")
+        lines += [_finding_line(f) for f in by_vul[vul][:SHOWN_PER_ROW]]
+        if len(by_vul[vul]) > SHOWN_PER_ROW:
+            lines.append(f"      ... {len(by_vul[vul]) - SHOWN_PER_ROW} more (narrow the path to see them)")
     return lines
 
 
@@ -114,10 +124,22 @@ def reviewed():
 '''
 
 
+SELFTEST_JS = '''
+const { exec } = require("child_process");
+app.get("/x", (req, res) => {
+  const { cmd } = req.query;
+  exec("ls " + cmd);
+  exec("sleep " + Number(cmd));
+  res.redirect(req.query.next);
+});
+'''
+
+
 def _selftest_project(base: Path):
     """A throwaway project with a taint sample, a pinned requirement and a leaked password in history."""
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
     (base / "app.py").write_text(SELFTEST_APP, encoding="utf-8")
+    (base / "app.js").write_text(SELFTEST_JS, encoding="utf-8")
     (base / "requirements.txt").write_text("requests==2.19.0\nflask\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=base); subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "init"], cwd=base)
     (base / "cfg.py").write_text('password = "hunter2xyz"\n', encoding="utf-8")
@@ -129,21 +151,24 @@ def _selftest_run():
     with tempfile.TemporaryDirectory() as d:
         base = Path(d)
         _selftest_project(base)
-        return taint([str(base)]), dependencies(base), history(50, base)
+        return taint([str(base)]) + jstaint.taint([str(base)]), dependencies(base), history(50, base)
 
 
 def _selftest_checks(taints, deps, history) -> list:
     """(name, passed) for every expectation on the built-in snippets."""
-    kinds = sorted(f[2] + "@" + str(f[4]) for f in taints)
+    kinds = sorted(f"{Path(f[3]).name}:{f[2]}@{f[4]}" for f in taints)
     hit = lambda k: k in kinds
-    return [("taint: helper() shell via argument", hit("input reaches shell command@6")),
-            ("taint: open(path) from request", hit("input reaches file path@18")),
-            ("taint: redirect(target) from route param", hit("input reaches redirect target@21")),
-            ("taint: int() sanitises", not hit("input reaches shell command@13")),
-            ("taint: shlex.quote sanitises", not hit("input reaches shell command@15")),
-            ("taint: argument list, no shell", not hit("input reaches shell command@8")),
+    return [("taint: helper() shell via argument", hit("app.py:input reaches shell command@6")),
+            ("taint: open(path) from request", hit("app.py:input reaches file path@18")),
+            ("taint: redirect(target) from route param", hit("app.py:input reaches redirect target@21")),
+            ("taint: int() sanitises", not hit("app.py:input reaches shell command@13")),
+            ("taint: shlex.quote sanitises", not hit("app.py:input reaches shell command@15")),
+            ("taint: argument list, no shell", not hit("app.py:input reaches shell command@8")),
             ("taint: parameterised SQL not flagged", not any("SQL" in k for k in kinds)),
             ("taint: accepted marker kept with its reason", any(f[4] == 25 and f[7] == "demo" for f in taints)),
+            ("taint JS: destructured query reaches exec", hit("app.js:input reaches shell command@5")),
+            ("taint JS: Number() sanitises", not hit("app.js:input reaches shell command@6")),
+            ("taint JS: redirect target", hit("app.js:input reaches redirect target@7")),
             ("deps: pinned requests parsed, unpinned flask ignored", [(e, n, v) for e, n, v, _ in deps] == [("PyPI", "requests", "2.19.0")]),
             ("history: hard-coded password in a past commit", history is not None and len(history) == 1 and "cfg.py" in history[0][3])], kinds
 
@@ -167,7 +192,7 @@ def _sections(modes, paths, commits):
     """The report sections for the chosen modes; unreachable = OSV could not be queried."""
     sections, unreachable = [], False
     if "--taint" in modes:
-        sections.append(("taint paths (Python)", taint(paths), "input sources followed to sinks, one call deep, per file"))
+        sections.append(("taint paths (Python, JS/TS)", taint(paths) + jstaint.taint(paths), "input sources followed to sinks, one call deep, per file"))
     if "--cve" in modes:
         found, n = cve(paths)
         unreachable = found is None

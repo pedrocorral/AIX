@@ -3,7 +3,7 @@
 ```
 Code vulnerabilities — .aix/scripts, tests
 
-  taint paths (Python): 4 finding(s)  (input sources followed to sinks, one call deep, per file)
+  taint paths (Python, JS/TS): 4 finding(s)  (input sources followed to sinks, one call deep, per file)
     VUL-INJ-002    [register: ?]
       .aix/scripts/selfinstall.py:24  input reaches file path (CWE-22)  [accepted: the person's own HOME, SHELL and PATH decide where their link goes; nothing crosses a trust boundary]
         Path(...) <- os.environ.get()

@@ -123,3 +123,11 @@ DOCKER_RULES = [
     ("VUL-DEP-001", "CWE-1104", "base image without a pinned tag", "pin FROM image:tag@sha256:... or at least a version tag, never :latest / untagged"),
 ]
 LANG = {".py": "py", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs": "js", ".rs": "rust", ".java": "java", ".kt": "java"}
+
+
+# taint advice per CWE, shared by the Python and JS/TS taint leaves
+ADVICE = {"CWE-78": "argument list without a shell; validate each argument", "CWE-95": "never eval input; a dispatch table or ast.literal_eval",
+          "CWE-89": "parameterised query: execute(sql, params)", "CWE-22": "resolve against a base directory and reject anything outside it",
+          "CWE-601": "allow-list targets or relative paths only", "CWE-1336": "render a file template with a context",
+          "CWE-502": "json / yaml.safe_load; never deserialise input", "CWE-918": "allow-list hosts; block private ranges and redirects",
+          "CWE-79": "escape on output (textContent, the template engine's auto-escape); never build HTML from input"}

@@ -23,6 +23,20 @@ Three analyses, all on by default, each selectable:
               until rotated, even if the file was cleaned. Files carrying `aix: skip-security-scan` are skipped at
               the commit where they carried it.
 
+JavaScript/TypeScript (.js .jsx .ts .tsx .mjs) is followed without a parser, statement by statement, scoped by braces:
+  sources     req/request.query|params|body|headers|cookies (Express, Fastify), ctx.query|request.body (Koa),
+              request.nextUrl / searchParams.get (Next), await request.json()|formData(), process.env|argv,
+              location.*, new URLSearchParams, formData.get, document.cookie|referrer; destructuring counts
+  carries     assignment, template literals, `+`, await, a method call on a tainted value (.trim())
+  cleans      Number, parseInt, parseFloat, Boolean, encodeURIComponent, path.basename, validator.escape,
+              DOMPurify.sanitize, shell-quote's quote
+  sinks       exec/execSync, spawn with shell: true (CWE-78); eval, new Function, setTimeout(string) (CWE-95);
+              fs.*, readFile.., res.sendFile (CWE-22); .query/.raw/.execute/$queryRawUnsafe with a template
+              literal or `+` (CWE-89; a parameter array is not a finding); res.redirect, redirect, location.href =,
+              window.open (CWE-601); innerHTML =, insertAdjacentHTML, document.write, dangerouslySetInnerHTML,
+              res.send of assembled HTML (CWE-79); fetch, axios, http.get with an input URL (CWE-918)
+  What it is not: no types, no middleware (a validator in a middleware is invisible: the finding stays), no cross-file.
+
 Every finding names the VUL row and the CWE. Test code is listed, not gated (--strict gates it). A taint sink reviewed
 and accepted carries `# aix: accepted VUL-… <why>` on its line, as for aix code security: listed with the reason, never gated.
 --audit writes docs/security/audits/AUDIT-<date>-vulnerabilities.md with the evidence table filled: the input

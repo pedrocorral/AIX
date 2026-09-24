@@ -6,7 +6,7 @@ from pathlib import Path
 
 from codefiles import ROOT, rel, source_files
 from depedges import iter_functions
-from securityrules import ACCEPT, SKIP_FILE, MARKER_LINES
+from securityrules import ACCEPT, ADVICE, SKIP_FILE, MARKER_LINES
 
 
 REQUEST_ATTRS = {"args", "form", "json", "values", "data", "files", "GET", "POST", "query_params", "path_params",
@@ -33,11 +33,6 @@ SINKS = {  # dotted call name (suffix match) -> (VUL row, CWE, kind, which args 
     "requests.get": ("VUL-INPUT-001", "CWE-918", "outbound request URL", "first"), "requests.post": ("VUL-INPUT-001", "CWE-918", "outbound request URL", "first"),
     "urllib.request.urlopen": ("VUL-INPUT-001", "CWE-918", "outbound request URL", "first"), "httpx.get": ("VUL-INPUT-001", "CWE-918", "outbound request URL", "first"),
 }
-ADVICE = {"CWE-78": "argument list without a shell; validate each argument", "CWE-95": "never eval input; a dispatch table or ast.literal_eval",
-          "CWE-89": "parameterised query: execute(sql, params)", "CWE-22": "resolve against a base directory and reject anything outside it",
-          "CWE-601": "allow-list targets or relative paths only", "CWE-1336": "render a file template with a context",
-          "CWE-502": "json / yaml.safe_load; never deserialise input", "CWE-918": "allow-list hosts; block private ranges and redirects"}
-
 
 # ---- taint: Python, per file --------------------------------------------------------------------------------------
 
