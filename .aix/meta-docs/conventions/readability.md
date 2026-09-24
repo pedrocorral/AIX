@@ -18,10 +18,14 @@ The rules below have measurements behind them; the limits are in `.aix/config.ya
 | Parameters | 5 | pylint default; McConnell's hard limit is 7; *Clean Code*: three is already many. |
 | Lines | 60 | NASA/JPL *Power of 10*: one printed page. McConnell's survey: defects rise in very long routines; below ~50 lines shorter is not automatically better, so this is a ceiling, not a target. |
 | File lines | 400 | one responsibility per file; longer files are usually two modules. |
+| Pass-through wrappers | none | a function whose only statement forwards its own parameters to one call adds a name and a hop, nothing else: the caller reads worse, not better. Extract for a reader, never for the metric. |
 
 ## Context the limits respect
 - **Tests** are sequential stories: twice the line limit; `assert` does not count as a branch; no magic-number or
   docstring advice (`assert status == 200` needs no constant).
+- **Pass-through exceptions**: a decorated function (a route, a command, a fixture: the framework calls it), a factory
+  that names a constructor (`Thing(x)`, `new Thing(x)`), a trait or interface method (`impl Trait for`, `@Override`), and
+  any adapter that adds, drops, reorders or transforms an argument.
 - **Framework-mapped parameters**: a decorated function (FastAPI route, Click command, pytest fixture) has its
   parameters dictated by the framework; the parameter limit does not apply.
 - **React components** must be PascalCase (`<NoteCard />`; camelCase would compile to an HTML tag): in `.jsx`/`.tsx`

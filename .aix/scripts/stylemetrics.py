@@ -170,6 +170,62 @@ def magic_py(fn):
     return sorted(set(out))
 
 
+def _forwarded_names(call) -> list:
+    """The argument names of a call when every argument is a bare name (or a starred bare name); else None."""
+    names = []
+    for a in call.args:
+        inner = a.value if isinstance(a, ast.Starred) else a
+        if not isinstance(inner, ast.Name):
+            return None
+        names.append(inner.id)
+    for k in call.keywords:
+        if not isinstance(k.value, ast.Name):
+            return None
+        names.append(k.value.id)
+    return names
+
+
+def _callee_name(func) -> str:
+    """`target`, `mod.target`, `self.other`: a function or method named directly; None for a computed expression."""
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+        return f"{func.value.id}.{func.attr}"
+    return None
+
+
+def _single_call(fn):
+    """The one call a function's body consists of (docstring aside), else None."""
+    body = [s for s in fn.body if not (isinstance(s, ast.Expr) and isinstance(getattr(s, "value", None), ast.Constant))]
+    if len(body) != 1 or not isinstance(body[0], (ast.Return, ast.Expr)):
+        return None
+    return body[0].value if isinstance(body[0].value, ast.Call) else None
+
+
+def _own_params(fn) -> list:
+    params = [a.arg for a in fn.args.args + fn.args.kwonlyargs if a.arg not in ("self", "cls")]
+    return params + [a.arg for a in (fn.args.vararg, fn.args.kwarg) if a]
+
+
+def _forwards_exactly(call, params: list) -> bool:
+    """Positional arguments are the parameters in order; keyword arguments are the remaining ones in any order."""
+    names = _forwarded_names(call)
+    if names is None:
+        return False
+    positional, keywords = names[:len(call.args)], sorted(names[len(call.args):])
+    return positional == params[:len(positional)] and keywords == sorted(params[len(positional):])
+
+
+def passthrough_py(fn):
+    """The callee when the function only forwards its own parameters to one call (a pass-through wrapper), else None.
+    Not a wrapper: a decorated function (the framework calls it), a factory naming a constructor (`Thing(x)`), `super()`."""
+    call = None if fn.decorator_list else _single_call(fn)
+    callee = _callee_name(call.func) if call else None
+    if not callee or callee.split(".")[-1][:1].isupper():
+        return None
+    return callee if _forwards_exactly(call, _own_params(fn)) else None
+
+
 def is_test(file: Path, name: str) -> bool:
     p = file.resolve()
     return "tests" in p.parts or "test" in p.parts or "__tests__" in p.parts or p.name.startswith("test_") \
@@ -183,7 +239,7 @@ def analyse_py(file: Path, cls, fn, lang="python"):
     doc = ast.get_docstring(fn) is not None
     return dict(name=f"{cls + '.' if cls else ''}{fn.name}", file=rel(file), line=fn.lineno, lang=lang,
                 lines=(fn.end_lineno or fn.lineno) - fn.lineno + 1, params=len(params), cyclomatic=cyclomatic_py(fn),
-                cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc,
+                cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc, passthrough=passthrough_py(fn),
                 public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name, node=fn, cls=cls,
                 test=is_test(file, fn.name), decorated=bool(fn.decorator_list), jsx=False)
 
@@ -216,6 +272,40 @@ class _TokenWalk:
             self.items.append((line, 1, {"else": "else (+1)", "?": "ternary (+1)"}.get(tok, "boolean operator (+1)")))
 
 
+def _param_names(head: str, name: str, lang: str) -> list:
+    """Parameter names in order: `x: T` (TS, Rust), `T x` (Java), `x` (JS); receivers (`self`, `this`) left out.
+    The parameters are the parentheses after the function's name (`pub(crate) fn f(` has other parentheses first)."""
+    m = re.search(rf"\b{re.escape(name)}\b[^(]*\(((?:[^()]|\([^()]*\))*)\)", head)
+    names = []
+    for p in (re.split(r",(?![^<(\[]*[>)\]])", m.group(1)) if m else []):
+        p = re.sub(r"=.*$", "", p.strip())
+        if not p or p in ("self", "&self", "&mut self", "mut self", "this"):
+            continue
+        names.append(p.split(" ")[-1] if lang == "java" else p.split(":")[0].strip().lstrip("&").replace("mut ", "").strip("."))
+    return names
+
+
+PASS_RX = re.compile(r"^\s*(?:return\s+)?(?:await\s+)?([A-Za-z_][\w.:]*)\s*\((.*)\)\s*;?\s*$", re.S)
+KEEP_CALLEES = ("super", "this", "new")
+
+
+def _trait_impl(text: str, header_end: int) -> bool:
+    """Rust: the nearest `impl` line above is `impl Trait for Type`, whose methods the trait dictates."""
+    heads = re.findall(r"^\s*impl\b[^{\n]*", text[:header_end], re.M)
+    return bool(heads) and " for " in heads[-1]
+
+
+def passthrough_tokens(cleaned: str, head: str, name: str, lang: str, exempt: bool):
+    """The callee when the body is one `[return] callee(params)` forwarding the parameters unchanged; see passthrough_py."""
+    inner = cleaned.strip()[1:-1] if cleaned.strip().startswith("{") else cleaned
+    m = PASS_RX.match(inner.strip())
+    last = m.group(1).split(".")[-1].split("::")[-1] if m else ""
+    if exempt or not m or last in KEEP_CALLEES or last[:1].isupper():
+        return None
+    args = [a.strip() for a in re.split(r",(?![^<(\[]*[>)\]])", m.group(2)) if a.strip()]
+    return m.group(1) if args == _param_names(head, name, lang) else None
+
+
 def _params_of(head: str) -> int:
     m = re.search(r"\(([^)]*)\)", head)
     return len([p for p in (m.group(1).split(",") if m else []) if p.strip() and p.strip() not in ("self", "&self", "&mut self", "this")])
@@ -232,17 +322,19 @@ def _advice_tokens(cleaned: str, start_line: int):
 def analyse_tokens(file: Path, name: str, header_end: int, text: str, lang: str):
     start_line = text.count("\n", 0, header_end) + 1
     body = brace_block(text, header_end)
-    head = text[text.rfind("\n", 0, header_end) + 1:header_end]
+    head = text[text.rfind("\n", 0, header_end) + 1:text.find("{", header_end)]  # name line up to the body's brace: the parameters
     cleaned = re.sub(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", " ", body, flags=re.S)
     walk = _TokenWalk(start_line)
     for m in TOKEN_RX.finditer(cleaned):
         walk.feed(m.group(0), start_line + cleaned.count("\n", 0, m.start()))
     before = text[max(0, text.rfind("\n", 0, text.rfind("\n", 0, header_end))):header_end]
     magic, short = _advice_tokens(cleaned, start_line)
+    decorated = bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*", before)) or (lang == "rust" and _trait_impl(text, header_end))
+    forwards = passthrough_tokens(re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S), head, name, lang, decorated)
     return dict(name=name, file=rel(file), line=start_line, lang=lang, lines=body.count("\n") + 1, params=_params_of(head), cyclomatic=walk.cyc,
                 cognitive=walk.cog, cognitive_items=walk.items, nesting=max(walk.depth - 1, 0), deepest=(walk.deepest_line, walk.deepest_line),
                 docstring=any(x in before for x in ("///", "/**", "*/", "//")), public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body,
-                test=is_test(file, name), decorated=bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*$", before)), jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))
+                test=is_test(file, name), decorated=decorated, passthrough=forwards, jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))
 
 
 # ---- targets ----------------------------------------------------------------------------------------------------

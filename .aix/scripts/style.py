@@ -33,6 +33,9 @@ def limit(fx, th, key):
 def _over_findings(fx, th) -> list:
     out = []
     a, b = fx["deepest"]
+    if fx.get("passthrough"):
+        out.append(("over", fx["line"], f"pass-through: forwards its arguments to `{fx['passthrough']}`",
+                    "inline the call at the callers, or give the function a job (validate, convert, decide); a wrapper that only forwards is an envelope inside an envelope"))
     if fx["lines"] > limit(fx, th, "lines"):
         out.append(("over", fx["line"], f"{fx['lines']} lines (limit {limit(fx, th, 'lines')})",
                     f"split: one job per function; the deepest block is lines {a}-{b}, extract it into a named function"))
@@ -85,7 +88,7 @@ def findings(fx, th):
 
 def score(fx, th):
     """How far over the limits, summed; 0 = all metrics inside."""
-    return sum(max(0.0, fx[k] / limit(fx, th, k) - 1) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params"))
+    return sum(max(0.0, fx[k] / limit(fx, th, k) - 1) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params")) + (1.0 if fx.get("passthrough") else 0.0)
 
 
 # ---- rendering --------------------------------------------------------------------------------------------------
@@ -105,6 +108,7 @@ def _metric_rows(fx, th) -> list:
 def card(fx, th, rt=None):
     lines = [f"{fx['file']}:{fx['name']}  (line {fx['line']}, {fx['lang']})", "", *_metric_rows(fx, th)]
     lines.append(f"  {'docstring':22s} {'yes' if fx['docstring'] else 'no':>4}")
+    lines.append(f"  {'pass-through':22s} {'yes' if fx.get('passthrough') else 'no':>4}   limit no    {'OVER' if fx.get('passthrough') else 'ok'}")
     fs = findings(fx, th)
     lines.append("")
     if not fs:
@@ -149,6 +153,7 @@ def _table_stats(fxs, th, files) -> dict:
     """What the table header reports: the rows with findings, counts per metric, the long files, the gated count."""
     over = _rows_with_findings(fxs, th)
     counts = {k: sum(1 for fx in fxs if fx[k] > limit(fx, th, k)) for k in GATED}
+    counts["pass-through"] = sum(1 for fx in fxs if fx.get("passthrough"))
     long_files = [(rel(f), n) for f, n in files if n > th["max_file_lines"]]
     n_over = sum(1 for fx in fxs if score(fx, th) > 0)
     return dict(over=over, counts=counts, long_files=long_files, n_over=n_over)

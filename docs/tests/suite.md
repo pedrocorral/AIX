@@ -23,6 +23,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_selfcommands.py` | `self-update` units and command, `self-test`, `install.sh`, doctor leftovers |
 | `test_help.py` | the help pages: Markdown per topic, aliases, unknown topic, usage/about, a layer replacing a page |
 | `test_java.py` | Java: references without an import are edges, entry classes live, SQL assembled then executed is found |
+| `test_wrappers.py` | pass-through wrappers found and legitimate shapes left alone, in five languages |
 | `test_registry.py` | registry downloads (network) |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on

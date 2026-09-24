@@ -48,6 +48,7 @@ skipped when git or a tag is missing).
 | `test_selfcommands.py` | `aix self-update`: its units (`is_git_clone`, `version_of`, `git_pull` ok and failing, `update_message`) and the command against a local origin, `aix self-test` on one file and refused from a project, `install.sh` end to end with a local repository, doctor's leftover warning |
 | `test_help.py` | `aix help <topic>` is the Markdown page, aliases and sub-commands, the unknown-topic list, usage and about from the pages, a custom layer replacing a page |
 | `test_java.py` | the code tools on a Maven project: same-package and wildcard references are edges, entry classes are not dead, the two-line SQL shape is a finding, runtime and modernise advice |
+| `test_wrappers.py` | pass-through wrappers in Python, JS, TS, Rust and Java: 25 flagged, 30 legitimate shapes (named expressions, factories, adapters, decorated, trait and overridden methods) not; gate, table count and card |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 
 ## Not covered

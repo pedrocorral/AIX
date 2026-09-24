@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.4 — 2026-09-24
+
+- `aix code style` gates pass-through wrappers: a function whose only statement forwards its own parameters to one call (`def f(x): return g(x)`), in Python, JavaScript/TypeScript, Rust and Java. Agents write them to satisfy the limits; the caller gets a hop and no meaning. Not flagged: a named expression, a factory over a constructor, a decorated function, a trait or interface method, an adapter that adds, drops, reorders or transforms an argument. The readability convention and the refactor-readability skill say so; `tests/test_wrappers.py` holds 55 shapes across the five languages.
+- Fix: the parameter count of JavaScript `function` declarations and of every Rust function was 0 (the parameters were read from the wrong slice of the header); the parameter limit now applies to them.
+
 ## 2.21.3 — 2026-09-24
 
 - Java: the dependency graph resolves references that need no `import` (classes of the same package) and wildcard imports (`import a.b.*`), so cycles, upward dependencies, hubs and dead modules mean something in a Java project; before, a Spring project showed almost no edges and every class as dead. A class with `public static void main` or a Spring Boot / JUnit annotation is an entry module. `aix code security` reports SQL assembled on one line (`q = "SELECT ... " + id`) and executed within the next 40 lines, in every language, at the executing line; the single-line rule missed the ordinary shape. Fixture `tests/fixtures/java-app`, `tests/test_java.py`.

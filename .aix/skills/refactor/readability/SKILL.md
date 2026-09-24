@@ -17,6 +17,10 @@ The card shows every metric `ok` (names/docstrings/magic numbers are advice: fix
 After each step: `aix code style FILE:FUNCTION` again; stop when all metrics are `ok`; every extracted function gets a name, a docstring and stays a leaf (no new upward dependency: `aix code graph --gate`).
 Tests: run the domain's tests after every step; if a step needs a test change other than renaming, revert it.
 
+## Never
+- Split a function into a wrapper that only forwards its arguments to the rest. The numbers drop, the code gets an
+  extra hop, and `aix code style` reports it as `pass-through` (gated). Extract a piece a reader would name, or leave it.
+
 ## Outputs
 The card all `ok`, extracted functions named and documented, tests green.
 

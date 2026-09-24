@@ -3,13 +3,13 @@
 ```
 Dependency graph (modules) — .aix/scripts, tests
 
-  nodes 77, edges 135, components 7; 0 re-export facades collapsed
-  stable nodes (instability <= 0.25) 23; edges into them, free reuse, not counted: 89
+  nodes 78, edges 136, components 7; 0 re-export facades collapsed
+  stable nodes (instability <= 0.25) 23; edges into them, free reuse, not counted: 90
   complexity        46 edges (into non-stable nodes)
   ideal complexity  34 edges (transitive reduction: every dependency kept; cycles at their acyclic minimum)
   reducible         35.3 %  (12 edges: 12 shortcuts, 0 cycle edges; wiring from roots/tests exempt: 2)
   cycles 0   upward dependencies 0   hubs 2 (fan-in and fan-out both >= 3)
-  propagation cost 4.2 %   NCCD 0.79 (1.0 = balanced binary tree, Lakos)   modularity Q by folder depth 1: 0.28 (2 folders)  depth 2: 0.16 (21 folders)  depth 3: 0.00 (69 folders)
+  propagation cost 4.1 %   NCCD 0.78 (1.0 = balanced binary tree, Lakos)   modularity Q by folder depth 1: 0.29 (2 folders)  depth 2: 0.17 (22 folders)  depth 3: 0.00 (70 folders)
 
   SHORTCUT  .aix/scripts/aix.py -> .aix/scripts/cli_install.py  also reached via .aix/scripts/cli_instructions.py
   SHORTCUT  .aix/scripts/aix.py -> .aix/scripts/roadmap.py  also reached via .aix/scripts/cli_policy.py

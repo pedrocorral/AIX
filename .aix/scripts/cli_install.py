@@ -42,10 +42,6 @@ def _into_dir(args):
     return Path(args[i + 1]).resolve()
 
 
-def _parse_install(args) -> "InstallArgs":
-    return InstallArgs(args)
-
-
 def _origin_of(src, layer_src):
     """The origin checkout: this one, or the kit named by --from; a bare --from folder becomes the org source."""
     import source as srcmod
@@ -81,7 +77,7 @@ def cmd_install(args):
         import selfinstall
         return selfinstall.main(args[1:])
     import install_skills as inst, gitignore
-    a = _parse_install(args)
+    a = InstallArgs(args)
     if a.into:
         return _install_new_project(a)
     inst.install_into(inst.KIT_ROOT, a.copy)  # PATH link is handled in reexec_in_project, by the kit only

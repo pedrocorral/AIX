@@ -2,7 +2,7 @@
 
 ```
   runtime: Python 3.13 (python on PATH (assumed: nothing in the project declares a version)); Java: version unknown (no pom.xml / build.gradle)
-  functions analysed 878; over a limit 0 (lines 0, cognitive 0, cyclomatic 0, nesting 0, params 0); with any finding 399; files over 400 lines: 0
+  functions analysed 894; over a limit 0 (lines 0, cognitive 0, cyclomatic 0, nesting 0, params 0, pass-through 0); with any finding 403; files over 400 lines: 0
 
   FUNCTION                                                     lines  cogn  cycl  nest  prm  findings
   .aix/scripts/stats.py:selftest                                  12     5     5     1    0   single-letter name `d`; public function without a docstring / doc comment
@@ -35,7 +35,7 @@
   .aix/scripts/roadmap.py:cmd_block                                6     0     1     0    2   single-letter name `p`; single-letter name `t`
   .aix/scripts/seats.py:parse_duration                             5     1     2     1    1   single-letter name `m`; magic number 60
   .aix/scripts/seats.py:read_seat                                 10     6     4     3    1   single-letter name `k`; single-letter name `v`
-  ... 369 more; narrow the target or use --all
+  ... 373 more; narrow the target or use --all
   modernise (2, advice for the detected runtime):
     .aix/scripts/install_skills.py:link_or_copy line 43: `os.path.relpath` -> `pathlib.Path` reads as objects, not string plumbing
     .aix/scripts/selfinstall.py:on_path line 35: `os.path.expanduser` -> `pathlib.Path` reads as objects, not string plumbing

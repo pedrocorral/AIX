@@ -11,6 +11,9 @@ Metrics and limits (.aix/config.yaml `style:` block; sources in .aix/meta-docs/c
   nesting depth           4   Kernighan & Plauger, McConnell
   parameters              5   pylint default; McConnell's hard limit 7
   file lines            400
+  pass-through          none  a function whose only statement forwards its own parameters to one call: an envelope inside
+                              an envelope (agents do it to satisfy the limits). Not one: a decorated function, a factory
+                              naming a constructor, a trait/interface method, an adapter that adds, drops or reorders
 Advice (not gated): naming (language casing, single-letter names outside loops), missing docstring on a public
 function, magic numbers. Evidence for names: Lawrie 2006, Butler 2010, Hofmeister 2017.
 
