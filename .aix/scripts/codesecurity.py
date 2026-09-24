@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots, SKIP, rel
+import assembled
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from depscan import scan_dependencies
 
@@ -27,10 +28,15 @@ def is_test(p: Path) -> bool:
         or ".test." in p.name or ".spec." in p.name
 
 
+LITERAL = r"(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)"
+
+
 def strip_comment(line: str, lang: str) -> str:
-    if lang == "py" or lang is None:
-        return re.sub(r"(?<!['\"])#.*$", "", line) if lang == "py" else line
-    return re.sub(r"//.*$|/\*.*?\*/", "", line)
+    """The line without its trailing comment; a `#` or `//` inside a string literal (a URL, a colour) is not one."""
+    if lang is None:
+        return line
+    marker = r"#.*$" if lang == "py" else r"//.*$|/\*.*?\*/"
+    return re.sub(LITERAL + "|" + marker, lambda m: m.group(1) or "", line)
 
 
 def _skip_marker(lines, f: Path):
@@ -46,31 +52,8 @@ def _line_findings(f: Path, i: int, raw: str, lang, langs: set):
     code = strip_comment(raw, lang)
     for vul, cwe, title, rlangs, rx, advice in RULES:
         if rlangs & langs and re.search(rx, code):
-            accepted = acc.group(1) + acc.group(2).strip() if acc and acc.group(1) == vul else None
+            accepted = f"{acc.group(1)} {acc.group(2).strip()}".strip() if acc and acc.group(1) == vul else None
             yield (vul, cwe, title, rel(f), i, raw.strip()[:110], advice, accepted)
-
-
-SQL_ASSIGN = re.compile(r"\b(\w+)\s*=\s*[\"'](?:SELECT|INSERT|UPDATE|DELETE|WITH)\b[^\"']*[\"']\s*\+", re.I)
-SQL_RUN = r"(?:createQuery|createNativeQuery|executeQuery|executeUpdate|execute|prepareStatement|query|raw|exec)\(\s*{name}\b"
-SQL_ADVICE = "PreparedStatement / parameters with ? placeholders; never concatenate values into the statement"
-SQL_REACH = 40   # lines between the assembled statement and its execution that are still one method
-
-
-def _assembled_sql(f: Path, lines: list, lang) -> list:
-    """`q = "SELECT ... " + value` executed within the next SQL_REACH lines: the ordinary two-line shape the
-    single-line rule cannot see. Reported at the executing line, with both lines in the snippet."""
-    out = []
-    for i, raw in enumerate(lines):
-        m = SQL_ASSIGN.search(strip_comment(raw, lang))
-        if not m:
-            continue
-        rx = re.compile(SQL_RUN.format(name=re.escape(m.group(1))))
-        j = next((j for j in range(i + 1, min(i + 1 + SQL_REACH, len(lines))) if rx.search(strip_comment(lines[j], lang))), None)
-        if j is not None:
-            acc = ACCEPT.search(lines[j])
-            accepted = acc.group(1) + acc.group(2).strip() if acc and acc.group(1) == "VUL-INJ-001" else None
-            out.append(("VUL-INJ-001", "CWE-89", "SQL built from strings, executed below", rel(f), j + 1, f"{raw.strip()[:70]}  ...  {lines[j].strip()[:40]}", SQL_ADVICE, accepted))
-    return out
 
 
 def scan_file(f: Path):
@@ -85,7 +68,7 @@ def scan_file(f: Path):
     if skipped:
         return [skipped]
     found = [fx for i, raw in enumerate(lines, 1) for fx in _line_findings(f, i, raw, lang, langs)]
-    return found + (_assembled_sql(f, lines, lang) if lang else [])
+    return found + (assembled.findings(f, lines, lang, lambda l: strip_comment(l, lang)) if lang else [])
 
 
 def scan_dockerfile(f: Path):

@@ -75,7 +75,7 @@ AIX/
 │   ├── stylemetrics.py      # leaf: cyclomatic, cognitive, nesting, params, names, magic numbers per function (Python by AST; JS/TS, Rust, Java by tokens)
 │   ├── modernise.py         # leaf: modernisation advice bounded by the detected runtime
 │   ├── style.py             # `aix code style`: findings, card, table, gate over stylemetrics + modernise
-│   ├── securityrules.py, depscan.py   # leaves: the static security rules (regex per line, VUL rows, CWEs) and the dependency hygiene scan
+│   ├── securityrules.py, depscan.py, assembled.py   # leaves: the per-line rules (VUL rows, CWEs), the dependency hygiene scan, the assembled-then-used rule
 │   ├── codesecurity.py      # `aix code security`: scan, report, audit evidence
 │   ├── taint.py, jstaint.py, cvecheck.py, secrethistory.py   # leaves: taint paths (Python by AST; JS/TS by statements), OSV lookups, secrets in git history
 │   ├── vulnerabilities.py   # `aix code vulnerabilities`: the three leaves above, report, audit, gate

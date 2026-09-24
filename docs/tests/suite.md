@@ -25,6 +25,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_java.py` | Java: references without an import are edges, entry classes live, SQL assembled then executed is found |
 | `test_wrappers.py` | pass-through wrappers found and legitimate shapes left alone, in five languages |
 | `test_js_taint.py` | JS/TS taint: 40 marked sinks found across five frameworks, the negatives clean, tags and gate |
+| `test_two_line.py` | a string assembled on one line and used by a dangerous call later is found, in four languages; the negatives stay clean |
 | `test_registry.py` | registry downloads (network) |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on

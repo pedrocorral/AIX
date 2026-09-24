@@ -19,6 +19,14 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   VUL-INFRA-001      chmod 777, privileged containers, Dockerfile without USER              CWE-732/250
   VUL-DEP-001        unpinned requirements, unbounded npm ranges, missing lockfiles, FROM without tag  CWE-1104
 
+  Assembled, then used (every language): a variable takes a string built from a literal plus a value (`+`, f-string,
+  .format, template literal, String.format, format!, %) and, within the next 40 lines, is the argument of a dangerous
+  call. What the literal looks like picks the sinks: an SQL keyword -> query/execute (CWE-89); a path or path.join ->
+  open/fs/File (CWE-22); HTML -> innerHTML/send/Markup (CWE-79); {{ }} -> Template (CWE-1336); http -> requests/fetch/
+  URL (CWE-918); any literal -> a shell (CWE-78) or eval (CWE-95). Reported at the call, both lines in the snippet.
+  Not a finding: no literal, a reassignment in between (`cmd = shlex.quote(cmd)`), an argument list, spawn without
+  shell: true, a callee that is no sink. Shape only, no input source: noisier than aix code vulnerabilities by design.
+
 How to read it
   A match is a FINDING TO REVIEW, never proof of exploitability; a row with no match is not proven clean. The
   report says both. Findings in test code are listed but not gated (--strict gates them too).

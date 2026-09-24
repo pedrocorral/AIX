@@ -50,6 +50,7 @@ skipped when git or a tag is missing).
 | `test_java.py` | the code tools on a Maven project: same-package and wildcard references are edges, entry classes are not dead, the two-line SQL shape is a finding, runtime and modernise advice |
 | `test_wrappers.py` | pass-through wrappers in Python, JS, TS, Rust and Java: 25 flagged, 30 legitimate shapes (named expressions, factories, adapters, decorated, trait and overridden methods) not; gate, table count and card |
 | `test_js_taint.py` | JS/TS taint on Express, Next, React/browser, Node CLI and Koa samples: every marked line found with its CWE, every other line clean (sanitisers, parameter arrays, argument lists, constants, callbacks, scopes); accepted marker, test tag, gate count, Python untouched |
+| `test_two_line.py` | assembled-then-used in Python, JS, Java and Rust: every sink kind once, the negatives (no literal, reassignment, argument list, no shell, no sink), the 40-line reach, the accepted marker, the two-line snippet |
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 
 ## Not covered

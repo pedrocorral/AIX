@@ -38,7 +38,7 @@ def fetch_repo(repo: str):
     for branch in ("main", "master"):
         url = f"https://codeload.github.com/{repo}/tar.gz/refs/heads/{branch}"
         try:
-            data = urllib.request.urlopen(url, timeout=60).read()
+            data = urllib.request.urlopen(url, timeout=60).read()  # aix: accepted VUL-INPUT-001 host fixed to codeload.github.com; repo and branch come from the kit's own registry.json (VUL-DEP-002)
         except Exception:
             continue
         tar = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz")

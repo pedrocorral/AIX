@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.6 — 2026-09-24
+
+- `aix code security` reports a string assembled from a literal plus a value on one line and passed to a dangerous call within the next 40 lines, in Python, JavaScript/TypeScript, Java and Rust. The literal picks the sinks: SQL keyword, path (or `path.join`/`Paths.get`), HTML, template, URL; a shell or eval sink takes any literal. Every use of the variable is reported until it is reassigned. The SQL two-line rule of 2.21.3 became one row of this table. `tests/test_two_line.py`. The rule found one case in the kit itself (the registry download URL in `extern.py`), accepted in code with its reason.
+- Fix: a `#` or `//` inside a string literal (a URL, a colour) was read as a comment start by every security rule, hiding the rest of the line. The accepted tag now reads `VUL-… reason` with a space.
+
 ## 2.21.5 — 2026-09-24
 
 - `aix code vulnerabilities --taint` follows input in JavaScript and TypeScript: Express, Koa, Fastify and Next request objects, `process.env`/`argv`, `location`, `URLSearchParams` and form data, through assignments, destructuring, template literals and concatenation, to shell, eval, file, SQL, redirect, HTML and outbound-request sinks, one call deep into the file's own functions. Sanitisers (`Number`, `parseInt`, `encodeURIComponent`, `path.basename`, `validator.escape`, `DOMPurify.sanitize`, shell-quote) clear it; parameterised queries and argument lists are not findings. XSS sinks map to VUL-WEB-001. Same report, gate, `--audit` and `# aix: accepted` marker as Python. `tests/test_js_taint.py`: 40 marked sinks across five frameworks and the negatives around them.
