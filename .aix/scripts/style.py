@@ -13,7 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, CODE_ROOTS, default_roots, rel, source_files
 from depedges import iter_functions
-from stylemetrics import CASE, DEFAULTS, TEST_LINES_FACTOR, analyse_py, file_lines, functions_in, parse_target, thresholds
+from stylemetrics import CASE, DEFAULTS, TEST_LINES_FACTOR, analyse_py, file_hygiene, file_lines, functions_in, parse_target, thresholds
+from hygiene import ADVICE as HYGIENE_ADVICE
 from modernise import modern_py, modernisations
 
 
@@ -36,6 +37,7 @@ def _over_findings(fx, th) -> list:
     if fx.get("passthrough"):
         out.append(("over", fx["line"], f"pass-through: forwards its arguments to `{fx['passthrough']}`",
                     "inline the call at the callers, or give the function a job (validate, convert, decide); a wrapper that only forwards is an envelope inside an envelope"))
+    out += [("over", line, msg, HYGIENE_ADVICE[msg.split(":")[0]]) for line, msg in fx.get("hygiene", [])]
     if fx["lines"] > limit(fx, th, "lines"):
         out.append(("over", fx["line"], f"{fx['lines']} lines (limit {limit(fx, th, 'lines')})",
                     f"split: one job per function; the deepest block is lines {a}-{b}, extract it into a named function"))
@@ -88,7 +90,7 @@ def findings(fx, th):
 
 def score(fx, th):
     """How far over the limits, summed; 0 = all metrics inside."""
-    return sum(max(0.0, fx[k] / limit(fx, th, k) - 1) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params")) + (1.0 if fx.get("passthrough") else 0.0)
+    return sum(max(0.0, fx[k] / limit(fx, th, k) - 1) for k in ("lines", "cognitive", "cyclomatic", "nesting", "params")) + (1.0 if fx.get("passthrough") else 0.0) + len(fx.get("hygiene", []))
 
 
 # ---- rendering --------------------------------------------------------------------------------------------------
@@ -149,14 +151,26 @@ def _rows_with_findings(fxs, th) -> list:
     return sorted([fx for fx in fxs if score(fx, th) > 0 or findings(fx, th)], key=lambda fx: (-score(fx, th), -len(findings(fx, th))))
 
 
-def _table_stats(fxs, th, files) -> dict:
-    """What the table header reports: the rows with findings, counts per metric, the long files, the gated count."""
-    over = _rows_with_findings(fxs, th)
+def _hygiene_counts(issues: list) -> dict:
+    return {label: sum(1 for _, _, msg in issues if msg.startswith(kind + ":")) for kind, label in (("leftover", "leftovers"), ("swallowed", "swallowed"), ("bug", "bugs"))}
+
+
+def _metric_counts(fxs, th) -> dict:
     counts = {k: sum(1 for fx in fxs if fx[k] > limit(fx, th, k)) for k in GATED}
     counts["pass-through"] = sum(1 for fx in fxs if fx.get("passthrough"))
+    return counts
+
+
+def _table_stats(fxs, th, files) -> dict:
+    """What the table header reports: the rows with findings, counts per metric, the long files, the gated count.
+    A function's hygiene findings are in its score; a file's unused imports are gated on their own."""
+    function_issues = [(fx["file"], line, msg) for fx in fxs for line, msg in fx.get("hygiene", [])]
+    file_issues = [(rel(f), line, msg) for f, _ in files for line, msg in file_hygiene(f)]
+    counts = _metric_counts(fxs, th)
+    counts.update(_hygiene_counts(function_issues + file_issues))
     long_files = [(rel(f), n) for f, n in files if n > th["max_file_lines"]]
-    n_over = sum(1 for fx in fxs if score(fx, th) > 0)
-    return dict(over=over, counts=counts, long_files=long_files, n_over=n_over)
+    n_over = sum(1 for fx in fxs if score(fx, th) > 0) + len(file_issues)
+    return dict(over=_rows_with_findings(fxs, th), counts=counts, long_files=long_files, n_over=n_over, issues=sorted(set(function_issues + file_issues)))
 
 
 def _table_head(n_fxs: int, s: dict, th) -> list:
@@ -176,6 +190,9 @@ def table(fxs, th, files, max_rows=30, rt=None):
     if len(s["over"]) > max_rows:
         lines.append(f"  ... {len(s['over']) - max_rows} more; narrow the target or use --all")
     lines += [f"  FILE  {f}: {n} lines (limit {th['max_file_lines']})  -> split by responsibility" for f, n in s["long_files"][:10]]
+    lines += [f"  LINE  {f}:{line}  {msg}  -> {HYGIENE_ADVICE[msg.split(':')[0]]}" for f, line, msg in s["issues"][:max_rows]]
+    if len(s["issues"]) > max_rows:
+        lines.append(f"  ... {len(s['issues']) - max_rows} more lines; narrow the target or use --all")
     lines += _modernise_lines(fxs, rt)
     lines.append("  * = over its limit (gated). Names, docstrings and magic numbers are advice.  Details: aix code style FILE:FUNCTION")
     lines.append("  fix with: OVER -> skill refactor-readability (one metric per change); modernise -> refactor-modernise")

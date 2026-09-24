@@ -133,7 +133,7 @@ def reach_sets(nodes, edges):
     return adj, reach
 
 
-def degrees(nodes, edges):
+def degrees(edges):
     fi, fo = defaultdict(int), defaultdict(int)
     for a, b in edges:
         fo[a] += 1; fi[b] += 1
@@ -142,7 +142,7 @@ def degrees(nodes, edges):
 
 def stable_nodes(nodes, edges):
     """Instability I = out / (in + out) (Martin 1994). I <= STABLE_MAX: stable; depending on it is free reuse."""
-    fi, fo = degrees(nodes, edges)
+    fi, fo = degrees(edges)
     return {n for n in nodes if (fi[n] + fo[n]) == 0 or fo[n] / (fi[n] + fo[n]) <= STABLE_MAX}
 
 
@@ -174,7 +174,7 @@ def transitive_reduction(nodes, edges):
     return redundant, cycle_edges, cycle_min
 
 
-def upward_edges(nodes, edges):
+def upward_edges(edges):
     """Dependencies that point the wrong way regardless of reachability: into a composition root, or from a
     lower layer into a higher one (controllers > services > adapters/ports > models)."""
     out = []
@@ -238,14 +238,14 @@ def measure(nodes, edges):
     counted, wiring, shortcuts, cyc_reducible = _complexity(nodes, edges, stable)
     complexity = len(counted)
     ideal = complexity - len(shortcuts) - cyc_reducible
-    fi, fo = degrees(nodes, edges)
+    fi, fo = degrees(edges)
     _, reach = reach_sets(nodes, edges)
     return dict(
         n=len(nodes), e=len(edges), p=components(nodes, edges), facades=facades,
         stable=len(stable), reuse=len(edges) - complexity, wiring=len(wiring),
         complexity=complexity, ideal=ideal, shortcuts=shortcuts, cyc_reducible=cyc_reducible,
         reducible=(complexity - ideal), reducible_pct=((complexity - ideal) / ideal * 100 if ideal else 0.0),
-        cycles=sccs(nodes, edges), upward=upward_edges(nodes, edges),
+        cycles=sccs(nodes, edges), upward=upward_edges(edges),
         hubs=sorted((x for x in nodes if fi[x] >= HUB_FAN and fo[x] >= HUB_FAN), key=lambda x: -(fi[x] + fo[x])),
         fi=fi, fo=fo,
         prop=(sum(len(r) for r in reach.values()) / (len(nodes) ** 2) * 100 if nodes else 0.0),

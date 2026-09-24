@@ -104,7 +104,7 @@ def install_into(project: Path, copy: bool):
         for rel, bak in agents.backup_foreign(project):
             print(f"  {rel} was not AIX's: kept as {bak}")
         prune_dangling(project)
-        n = _install_links(project, skills_dir, copy, disabled_skills(project))
+        n = _install_links(project, copy, disabled_skills(project))
         _pointer_files(project)
     except PermissionError as e:
         sys.exit(f"aix install: cannot write {e.filename}: {project} belongs to another user, whose skill links are already in place "
@@ -125,7 +125,7 @@ def _link_one(project: Path, targets, flat: str, info: dict, copy: bool):
     print(f"  {flat:40s} -> {', '.join(targets) or 'AGENTS.md only'} ({mode}){origin}")
 
 
-def _install_links(project: Path, skills_dir: Path, copy: bool, off) -> int:
+def _install_links(project: Path, copy: bool, off) -> int:
     import layers
     profile = layers.active_profile(project)
     active, layer_disabled = layers.resolve(project, profile)

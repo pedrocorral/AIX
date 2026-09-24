@@ -67,5 +67,5 @@ def page(text: str):
             _sp.run([pager, "-R", "-F", "-X"] if pager == "less" else [pager], input=text, text=True)
             return
         except OSError:
-            pass
+            pass   # no usable pager: fall through to a plain print
     print(text, end="")

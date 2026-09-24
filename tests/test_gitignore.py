@@ -1,6 +1,6 @@
 """12. .gitignore and backups: the missing AIX lines are printed without a terminal and touched only on a yes
 (`upgrade --yes`, or a y answer through a pseudo-terminal), added once; a person's file where AIX writes is kept as -bak."""
-import os, re, unittest
+import os, unittest
 from helpers import Terminal, install, project_cmd, temp_home, upgrade
 
 

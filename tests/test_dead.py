@@ -40,7 +40,7 @@ class LiveByConvention(unittest.TestCase):
         self.home = temp_home(self)
         self.project = self.home / "app"
 
-    def dead(self, files: dict, roots: str = "") -> set:
+    def dead(self, files: dict) -> set:
         write(self.project, files)
         install(self.home, self.project)
         project_cmd(self.project, self.home, "code", "find", "--yes")

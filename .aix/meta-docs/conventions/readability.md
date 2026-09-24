@@ -18,6 +18,9 @@ The rules below have measurements behind them; the limits are in `.aix/config.ya
 | Parameters | 5 | pylint default; McConnell's hard limit is 7; *Clean Code*: three is already many. |
 | Lines | 60 | NASA/JPL *Power of 10*: one printed page. McConnell's survey: defects rise in very long routines; below ~50 lines shorter is not automatically better, so this is a ceiling, not a target. |
 | File lines | 400 | one responsibility per file; longer files are usually two modules. |
+| Leftovers | none | an import, variable or parameter nothing reads is what an agent leaves after a mechanical edit; the next reader assumes it matters. `_name` says "on purpose". |
+| Swallowed exceptions | none | `except: pass` hides the failure from everyone, including the person debugging at 3 am. Handle, log, re-raise, or write inside the block why nothing is right. |
+| Known bugs | none | a mutable default argument, an assignment inside a condition, `==` on a Java String: never intended, always wrong. |
 | Pass-through wrappers | none | a function whose only statement forwards its own parameters to one call adds a name and a hop, nothing else: the caller reads worse, not better. Extract for a reader, never for the metric. |
 
 ## Context the limits respect

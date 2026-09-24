@@ -11,6 +11,15 @@ Metrics and limits (.aix/config.yaml `style:` block; sources in .aix/meta-docs/c
   nesting depth           4   Kernighan & Plauger, McConnell
   parameters              5   pylint default; McConnell's hard limit 7
   file lines            400
+  leftovers             none  an import nothing in the file uses (JS/TS, Java, Python; a Rust `use` may carry a trait, the
+                              compiler warns), a variable assigned and never read, a trailing parameter never read (one
+                              before a used parameter is positional: a callback's contract). Not: `_` names, re-export
+                              files and names other modules import from this one, decorated, overriding, public or
+                              dunder methods, stubs, tests (fixtures arrive by name), req/res/next/err/event callbacks
+  swallowed             none  a catch/except that does nothing and says nothing; a bare `except:` whatever it does
+                              (a statement or a comment inside the block is intent)
+  bugs                  none  a mutable default argument (Python), an assignment inside a condition (JS; wrap it in its
+                              own parentheses when you mean it), `==` on a String (Java)
   pass-through          none  a function whose only statement forwards its own parameters to one call: an envelope inside
                               an envelope (agents do it to satisfy the limits). Not one: a decorated function, a factory
                               naming a constructor, a trait/interface method, an adapter that adds, drops or reorders

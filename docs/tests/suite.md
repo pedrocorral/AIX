@@ -28,6 +28,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_two_line.py` | a string assembled on one line and used by a dangerous call later is found, in four languages; the negatives stay clean |
 | `test_registry.py` | registry downloads (network) |
 | `test_dead.py` | dead code and clones on the shapes real projects have: conventions, containers, nested roots, re-exports |
+| `test_hygiene.py` | leftovers, swallowed exceptions and known bugs found, the legitimate shapes left alone, in four languages |
 | `test_extended.py` | the code tools on twelve real projects from a cache outside the repo (`aix self-test --extended`): no crash, time limits, recorded numbers, documented vulnerabilities found |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on

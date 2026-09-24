@@ -4,9 +4,11 @@ Java by tokens and braces; plus the targets (`dir`, `file`, `file:func`) and the
 import ast, re
 from pathlib import Path
 
-from codefiles import ROOT, EXT, rel
+from codefiles import CODE_ROOTS, ROOT, EXT, rel, source_files
 from clones import FUNC_HEAD, KEYWORDS, brace_block
 from depedges import iter_functions
+import hygiene
+from passthrough import _param_names, _trait_impl, passthrough_py, passthrough_tokens
 
 
 DEFAULTS = dict(max_lines=60, max_cognitive=15, max_cyclomatic=10, max_nesting=4, max_params=5, max_file_lines=400)
@@ -170,76 +172,20 @@ def magic_py(fn):
     return sorted(set(out))
 
 
-def _forwarded_names(call) -> list:
-    """The argument names of a call when every argument is a bare name (or a starred bare name); else None."""
-    names = []
-    for a in call.args:
-        inner = a.value if isinstance(a, ast.Starred) else a
-        if not isinstance(inner, ast.Name):
-            return None
-        names.append(inner.id)
-    for k in call.keywords:
-        if not isinstance(k.value, ast.Name):
-            return None
-        names.append(k.value.id)
-    return names
-
-
-def _callee_name(func) -> str:
-    """`target`, `mod.target`, `self.other`: a function or method named directly; None for a computed expression."""
-    if isinstance(func, ast.Name):
-        return func.id
-    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
-        return f"{func.value.id}.{func.attr}"
-    return None
-
-
-def _single_call(fn):
-    """The one call a function's body consists of (docstring aside), else None."""
-    body = [s for s in fn.body if not (isinstance(s, ast.Expr) and isinstance(getattr(s, "value", None), ast.Constant))]
-    if len(body) != 1 or not isinstance(body[0], (ast.Return, ast.Expr)):
-        return None
-    return body[0].value if isinstance(body[0].value, ast.Call) else None
-
-
-def _own_params(fn) -> list:
-    params = [a.arg for a in fn.args.args + fn.args.kwonlyargs if a.arg not in ("self", "cls")]
-    return params + [a.arg for a in (fn.args.vararg, fn.args.kwarg) if a]
-
-
-def _forwards_exactly(call, params: list) -> bool:
-    """Positional arguments are the parameters in order; keyword arguments are the remaining ones in any order."""
-    names = _forwarded_names(call)
-    if names is None:
-        return False
-    positional, keywords = names[:len(call.args)], sorted(names[len(call.args):])
-    return positional == params[:len(positional)] and keywords == sorted(params[len(positional):])
-
-
-def passthrough_py(fn):
-    """The callee when the function only forwards its own parameters to one call (a pass-through wrapper), else None.
-    Not a wrapper: a decorated function (the framework calls it), a factory naming a constructor (`Thing(x)`), `super()`."""
-    call = None if fn.decorator_list else _single_call(fn)
-    callee = _callee_name(call.func) if call else None
-    if not callee or callee.split(".")[-1][:1].isupper():
-        return None
-    return callee if _forwards_exactly(call, _own_params(fn)) else None
-
-
 def is_test(file: Path, name: str) -> bool:
     p = file.resolve()
     return "tests" in p.parts or "test" in p.parts or "__tests__" in p.parts or p.name.startswith("test_") \
         or p.name.endswith(("_test.py", ".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.js")) or name.startswith("test")
 
 
-def analyse_py(file: Path, cls, fn, lang="python"):
+def analyse_py(file: Path, cls, fn, lang="python", lines: list = None):
     params = [a.arg for a in fn.args.args + fn.args.kwonlyargs if a.arg not in ("self", "cls")]
     cog, cog_items = cognitive_py(fn)
     depth, block = nesting_py(fn)
     doc = ast.get_docstring(fn) is not None
     return dict(name=f"{cls + '.' if cls else ''}{fn.name}", file=rel(file), line=fn.lineno, lang=lang,
                 lines=(fn.end_lineno or fn.lineno) - fn.lineno + 1, params=len(params), cyclomatic=cyclomatic_py(fn),
-                cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc, passthrough=passthrough_py(fn),
+                cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc, passthrough=passthrough_py(fn), hygiene=hygiene.function_py(fn, lines or [], cls),
                 public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name, node=fn, cls=cls,
                 test=is_test(file, fn.name), decorated=bool(fn.decorator_list), jsx=False)
 
@@ -272,40 +218,6 @@ class _TokenWalk:
             self.items.append((line, 1, {"else": "else (+1)", "?": "ternary (+1)"}.get(tok, "boolean operator (+1)")))
 
 
-def _param_names(head: str, name: str, lang: str) -> list:
-    """Parameter names in order: `x: T` (TS, Rust), `T x` (Java), `x` (JS); receivers (`self`, `this`) left out.
-    The parameters are the parentheses after the function's name (`pub(crate) fn f(` has other parentheses first)."""
-    m = re.search(rf"\b{re.escape(name)}\b[^(]*\(((?:[^()]|\([^()]*\))*)\)", head)
-    names = []
-    for p in (re.split(r",(?![^<(\[]*[>)\]])", m.group(1)) if m else []):
-        p = re.sub(r"=.*$", "", p.strip())
-        if not p or p in ("self", "&self", "&mut self", "mut self", "this"):
-            continue
-        names.append(p.split(" ")[-1] if lang == "java" else p.split(":")[0].strip().lstrip("&").replace("mut ", "").strip("."))
-    return names
-
-
-PASS_RX = re.compile(r"^\s*(?:return\s+)?(?:await\s+)?([A-Za-z_][\w.:]*)\s*\((.*)\)\s*;?\s*$", re.S)
-KEEP_CALLEES = ("super", "this", "new")
-
-
-def _trait_impl(text: str, header_end: int) -> bool:
-    """Rust: the nearest `impl` line above is `impl Trait for Type`, whose methods the trait dictates."""
-    heads = re.findall(r"^\s*impl\b[^{\n]*", text[:header_end], re.M)
-    return bool(heads) and " for " in heads[-1]
-
-
-def passthrough_tokens(cleaned: str, head: str, name: str, lang: str, exempt: bool):
-    """The callee when the body is one `[return] callee(params)` forwarding the parameters unchanged; see passthrough_py."""
-    inner = cleaned.strip()[1:-1] if cleaned.strip().startswith("{") else cleaned
-    m = PASS_RX.match(inner.strip())
-    last = m.group(1).split(".")[-1].split("::")[-1] if m else ""
-    if exempt or not m or last in KEEP_CALLEES or last[:1].isupper():
-        return None
-    args = [a.strip() for a in re.split(r",(?![^<(\[]*[>)\]])", m.group(2)) if a.strip()]
-    return m.group(1) if args == _param_names(head, name, lang) else None
-
-
 def _params_of(head: str) -> int:
     m = re.search(r"\(([^)]*)\)", head)
     return len([p for p in (m.group(1).split(",") if m else []) if p.strip() and p.strip() not in ("self", "&self", "&mut self", "this")])
@@ -331,10 +243,13 @@ def analyse_tokens(file: Path, name: str, header_end: int, text: str, lang: str)
     magic, short = _advice_tokens(cleaned, start_line)
     decorated = bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*", before)) or (lang == "rust" and _trait_impl(text, header_end))
     forwards = passthrough_tokens(re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S), head, name, lang, decorated)
-    return dict(name=name, file=rel(file), line=start_line, lang=lang, lines=body.count("\n") + 1, params=_params_of(head), cyclomatic=walk.cyc,
-                cognitive=walk.cog, cognitive_items=walk.items, nesting=max(walk.depth - 1, 0), deepest=(walk.deepest_line, walk.deepest_line),
-                docstring=any(x in before for x in ("///", "/**", "*/", "//")), public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body,
-                test=is_test(file, name), decorated=decorated, passthrough=forwards, jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))
+    fx = dict(name=name, file=rel(file), line=start_line, lang=lang, lines=body.count("\n") + 1, params=_params_of(head), cyclomatic=walk.cyc,
+              cognitive=walk.cog, cognitive_items=walk.items, nesting=max(walk.depth - 1, 0), deepest=(walk.deepest_line, walk.deepest_line),
+              docstring=any(x in before for x in ("///", "/**", "*/", "//")), public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body,
+              test=is_test(file, name), decorated=decorated, passthrough=forwards, jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))
+    fx["src_head"] = head
+    fx["hygiene"] = hygiene.function_tokens(fx, _param_names(head, name, lang))
+    return fx
 
 
 # ---- targets ----------------------------------------------------------------------------------------------------
@@ -382,13 +297,41 @@ def functions_in(file: Path):
             tree = ast.parse(text)
         except SyntaxError:
             return []
-        return [analyse_py(file, cls, fn) for cls, fn in iter_functions(tree)]
+        return [analyse_py(file, cls, fn, lines=text.splitlines()) for cls, fn in iter_functions(tree)]
     out = []
     for m in FUNC_HEAD[lang].finditer(text):
         name = next((g for g in m.groups() if g), None)
         if name and name not in KEYWORDS:
             out.append(analyse_tokens(file, name, m.end() - 1, text, lang))
     return out
+
+
+_REEXPORT_INDEX = None
+
+
+def reexported_from(file: Path) -> set:
+    """Names other Python files of the project import from this module (`from .compat import urlparse`): a
+    compatibility module re-exports on purpose. Built once per run over the code roots."""
+    global _REEXPORT_INDEX
+    if _REEXPORT_INDEX is None:
+        _REEXPORT_INDEX = {}
+        for f in source_files(CODE_ROOTS):
+            if f.suffix == ".py":
+                for mod, names in re.findall(r"^\s*from\s+([\w.]+)\s+import\s+\(?([^)\n]+)", f.read_text(encoding="utf-8", errors="replace"), re.M):
+                    _REEXPORT_INDEX.setdefault(mod.split(".")[-1], set()).update(n.strip().split(" as ")[0] for n in names.split(","))
+    return _REEXPORT_INDEX.get(file.stem, set())
+
+
+def file_hygiene(file: Path) -> list:
+    """(line, message) for the file-level leftovers: imports nothing in the file uses."""
+    lang = EXT.get(file.suffix)
+    text = file.read_text(encoding="utf-8", errors="replace")
+    if lang == "python":
+        try:
+            return hygiene.unused_imports_py(ast.parse(text), text, file.name, reexported_from(file))
+        except SyntaxError:
+            return []
+    return hygiene.unused_imports_tokens(text, lang, file.name) if lang else []
 
 
 def file_lines(file: Path) -> int:

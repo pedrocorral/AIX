@@ -153,7 +153,7 @@ def split_filters(rest):
 SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME]"
 
 
-def _extern(args):
+def _extern(_args):
     import extern
     return extern
 

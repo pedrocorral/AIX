@@ -153,7 +153,7 @@ def copy_content(src: Path, dst: Path):
         try:
             os.chmod(dst, os.stat(dst).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         except OSError:
-            pass
+            pass   # a filesystem without modes (some mounts): the copy is still complete
 
 
 def line_count(path: Path) -> int:
@@ -177,7 +177,7 @@ def line_delta(src: Path, dst: Path, new_text: str = None) -> str:
     return f"+{added} -{removed} lines"
 
 
-def _merge_note(project: Path, rel: Path, dst: Path) -> str:
+def _merge_note(rel: Path, dst: Path) -> str:
     if rel.name == "config.yaml":
         return ", keeping your disabled_skills, instructions, profile, use, source and style limits"
     kept = [h for h in KEEP_SECTIONS if section(dst.read_text(encoding="utf-8"), h)] if dst.exists() else []
@@ -194,7 +194,7 @@ def describe(project: Path, d: str, action: str, rel: Path, edited=()) -> str:
     if action == "remove":
         return f"  remove  {shown}  ({line_count(dst)} lines, no longer in kit)"
     if action == "merge":
-        return f"  merge   {shown}  (kit text{_merge_note(project, rel, dst)}; {line_delta(src, dst, merged_text(project, rel))})"
+        return f"  merge   {shown}  (kit text{_merge_note(rel, dst)}; {line_delta(src, dst, merged_text(project, rel))})"
     return f"  update  {shown}  ({line_delta(src, dst)}){warn}"
 
 

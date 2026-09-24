@@ -142,7 +142,7 @@ def _sink_applies(call, kind: str, which: str) -> bool:
     return which != "shell" or _shell_true(call)
 
 
-def sink_hits(call, tainted, fn_name):
+def sink_hits(call, tainted):
     """(vul, cwe, kind, source) when a tainted value reaches the sink this call names, else None."""
     name = call_name(call)
     for sink, (vul, cwe, kind, which) in SINKS.items():
@@ -201,7 +201,7 @@ class _Taint:
                 tainted[n.id] = f"{n.id} iterates {src} (line {node.lineno})"
 
     def _call(self, fn, node, tainted):
-        hit = sink_hits(node, tainted, fn.name)
+        hit = sink_hits(node, tainted)
         if hit:
             vul, cwe, kind, src = hit
             self.findings.append((vul, cwe, f"input reaches {kind}", rel(self.file), node.lineno, f"{call_name(node)}(...) <- {src}", ADVICE[cwe], self._accepted(node.lineno)))

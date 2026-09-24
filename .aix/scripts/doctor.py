@@ -27,7 +27,7 @@ def check_path():
         problem("`aix` is not on PATH", "run `aix self-install` from the kit clone (link + shell profile), then open a new terminal")
 
 
-def _leftovers_of(agents, name: str, a: dict) -> list:
+def _leftovers_of(agents, a: dict) -> list:
     left = [rel for rel in a["pointers"] if agents.is_aix_pointer(ROOT / rel)]
     if a["skills"] and (ROOT / a["skills"]).is_dir():
         left.append(a["skills"])
@@ -43,7 +43,7 @@ def check_pointers():
         if not f.exists() or "AGENTS.md" not in f.read_text(encoding="utf-8"):
             problem(f"{rel} missing or not pointing at AGENTS.md", "run `aix install`")
     for n, a in agents.AGENTS.items():
-        left = [] if n in chosen else _leftovers_of(agents, n, a)
+        left = [] if n in chosen else _leftovers_of(agents, a)
         if left:
             problem(f"{n} is not selected but AIX files remain: {', '.join(left)}", "run `aix agents` (removes them) or select it")
 

@@ -247,7 +247,7 @@ def update_message(kit: Path, before: str, after: str) -> str:
     return line + "\nrun `aix upgrade` inside each project to bring it to this version (`aix upgrade --dry-run` shows the plan)"
 
 
-def self_update(args):
+def self_update(_args):
     """aix self-update: git pull --ff-only in the kit clone, then remind about aix upgrade."""
     if not is_kit_clone():
         sys.exit("aix self-update: not a kit clone; run it from the clone on PATH (aix self-install sets it up)")

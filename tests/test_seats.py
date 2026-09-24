@@ -1,7 +1,7 @@
 """15. Seats for several agents: claim, release, whoami, list, total and lease; dead-process takeover; expired seats
 elsewhere only with --force; a full table refused; task claims, refusals, --force; scope overlaps; one STATE per seat."""
 import os, re, unittest
-from helpers import assert_healthy, config, install, project_cmd, run, temp_home, upgrade
+from helpers import assert_healthy, config, install, run, temp_home, upgrade
 
 HERE = str(os.getpid())   # the test runner: alive for the whole test, so its sessions are live
 

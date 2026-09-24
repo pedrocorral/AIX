@@ -1,7 +1,7 @@
 """16. Policies: anarchy and its synonyms, list/show/use/off, aix check verdicts, task done refused and --force,
 a task's own policy, a layer's defaults.yaml, a custom policy with its own check, the ## Cycle section in AGENTS.md."""
 import re, unittest
-from helpers import FIXTURES, KIT, assert_healthy, config, fixture, install, make_fork, project_cmd, temp_home, upgrade
+from helpers import KIT, assert_healthy, config, fixture, install, make_fork, project_cmd, temp_home, upgrade
 
 ACME = KIT / "examples" / "acme"
 

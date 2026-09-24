@@ -89,7 +89,7 @@ def osv_detail(vid, name, timeout=15):
     return v.get("summary", "")[:70], fixed[0] if fixed else ""
 
 
-def cve(paths):
+def cve():
     deps = dependencies(ROOT)
     hits = osv_query(deps)
     if hits is None:

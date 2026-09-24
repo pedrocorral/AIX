@@ -1,7 +1,7 @@
 """11. aix agents: the fixed list, names and aliases, only the selected agents' folders and pointer files, deselection
 removes AIX files and keeps a person's, --agents at install, upgrade keeps the line, the checklist through a pty."""
 import os, re, unittest
-from helpers import KIT, Terminal, assert_healthy, config, install, previous_kit, project_cmd, run, temp_home, upgrade
+from helpers import Terminal, assert_healthy, config, install, previous_kit, project_cmd, temp_home, upgrade
 
 FILES = {"claude": [".claude/skills/core-sdd-workflow", "CLAUDE.md"], "copilot": [".github/skills/core-sdd-workflow", ".github/copilot-instructions.md"],
          "cursor": [".cursor/skills/core-sdd-workflow", ".cursor/rules/aix.mdc"], "gemini": [".agents/skills/core-sdd-workflow", "GEMINI.md"],

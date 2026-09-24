@@ -194,7 +194,7 @@ def _sections(modes, paths, commits):
     if "--taint" in modes:
         sections.append(("taint paths (Python, JS/TS)", taint(paths) + jstaint.taint(paths), "input sources followed to sinks, one call deep, per file"))
     if "--cve" in modes:
-        found, n = cve(paths)
+        found, n = cve()
         unreachable = found is None
         note = f"OSV unreachable (network); {n} pinned dependencies not checked" if unreachable else f"{n} pinned dependencies queried"
         sections.append(("known CVEs (OSV)", found, note))

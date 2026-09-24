@@ -1,6 +1,6 @@
 """7. The code tools: `aix code find` (list, yes, the checklist through a pseudo-terminal), every tool on a project whose
 code is outside the conventional folders, hidden and dependency folders ignored."""
-import os, re, sys, unittest
+import os, unittest
 from helpers import config, fixture, install, project_cmd, temp_home
 
 TOOLS = (["code", "graph"], ["code", "complexity"], ["code", "dead"], ["code", "clones"], ["code", "style"], ["code", "stats"],

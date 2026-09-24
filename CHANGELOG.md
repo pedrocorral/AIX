@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.10 — 2026-09-24
+
+- `aix code style` gates three hygiene findings in Python, JavaScript/TypeScript, Rust and Java. Leftovers: an import nothing in the file uses, a variable assigned and never read, a trailing parameter never read (one before a used parameter is a callback's positional contract). Not: `_` names, re-export files and names other modules import from this one, decorated, overriding, public or dunder methods, stubs, tests, conventional callback names. Tuned on the twelve extended projects: each false positive found there (template literals, JSX apostrophes, Javadoc `{@link}`, Rust raw strings and `if let`, `@SuppressWarnings`, pytest fixtures, TypeScript optional parameters) is a test case now. Swallowed exceptions: a catch or except that does nothing and says nothing, and a bare `except:`. Known bugs: a mutable default argument, an assignment inside a condition, `==` on a Java String. They appear on the function card, as `LINE` rows in the table with the advice, and as three new counts in the summary. The kit itself had 21 leftovers and 2 silent excepts; all fixed. `tests/test_hygiene.py`.
+
 ## 2.21.9 — 2026-09-24
 
 - `aix code dead` resolves TypeScript imports through `tsconfig.json` / `jsconfig.json`: `baseUrl` (bare `src/app/x`), `paths` (`@/*`, exact aliases), `extends` and solution-style `references`, comments and trailing commas included. A folder a string in code names (`'data/static/codefixes'`, `Path('templates/')`) is loaded as data: its files are live and the report says so. Facades are no longer collapsed before the dead-code walk: an `index.ts` that is the entry of its folder kept its imports invisible and its siblings looked dead. Juice Shop's dead modules: 155 to a handful, all real. `tests/test_dead.py` covers each case with a positive control.
