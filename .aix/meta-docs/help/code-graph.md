@@ -57,7 +57,9 @@ Dead code (--dead)
                       a framework loads by convention: Django migrations/admin/apps/urls/management commands, Cargo
                       lib.rs/build.rs/benches/examples/src/bin, scripts/, public/, and Java classes the container
                       instantiates (@Controller, @RestController, @Service, @Component, @Repository, @Entity, JAX-RS
-                      @Path, JUnit). Not resolved: tsconfig path aliases (`@/x`) and folders loaded as text.
+                      @Path, JUnit). TypeScript imports through tsconfig/jsconfig `baseUrl` and `paths` (`@/x`,
+                      `extends`, solution-style `references`) resolve. A folder a string in code names
+                      (`'data/static/codefixes'`, `Path('templates/')`) is loaded as data: its files are live.
                       Reachability, not fan-in: an orphan cluster importing itself is dead.
   DEAD FUNCTIONS      with --functions, Python only: a function or method whose simple name is never referenced
                       anywhere else, as a bare name or an attribute. Decorated functions (routes, fixtures,

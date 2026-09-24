@@ -40,13 +40,33 @@ def is_entry_module(node: str) -> bool:
         or p.name.startswith(".") or bool(ENTRY_FOLDERS & set(p.parts[:-1])) or has_main_guard(node)
 
 
+PATH_LITERAL = re.compile(r"""['"](?:\./)?((?=[\w.@/-]*/)[\w@][\w.@-]*(?:/[\w.@-]+)*/?)['"]""")   # a literal with a slash: a path
+
+
+def data_folders(nodes) -> set:
+    """Folders a string literal in code names (`'data/static/codefixes'`, `'./fixtures/'`): their files are loaded as
+    data (read, listed, served), not imported. Relative to the project root or to the file naming them."""
+    out = set()
+    for n in nodes:
+        f = ROOT / n
+        if f.suffix not in (".py", ".js", ".jsx", ".ts", ".tsx", ".mjs"):
+            continue
+        for m in PATH_LITERAL.finditer(f.read_text(encoding="utf-8", errors="replace")):
+            for base in (ROOT, f.parent):
+                folder = (base / m.group(1)).resolve()
+                if folder.is_dir() and folder != ROOT.resolve() and folder.is_relative_to(ROOT.resolve()):
+                    out.add(rel(folder))
+    return out
+
+
 def dead_modules(nodes, edges):
-    """Files no entry module reaches through imports. Reachability, not fan-in: an orphan cluster that imports
-    each other is dead as a whole."""
+    """(entry modules, dead files, data folders): files no entry module reaches through imports and that no
+    string in code names as a folder. Reachability, not fan-in: an orphan cluster importing each other is dead."""
     roots = {n for n in nodes if is_entry_module(n)}
     _, reach = reach_sets(nodes, edges)
-    live = set(roots) | {x for r in roots for x in reach[r]}
-    return roots, sorted(n for n in nodes if n not in live)
+    data = data_folders(nodes)
+    live = set(roots) | {x for r in roots for x in reach[r]} | {n for n in nodes if any(n.startswith(d + "/") for d in data)}
+    return roots, sorted(n for n in nodes if n not in live), data
 
 
 IMPLICIT_NAMES = {"main", "setup", "teardown", "setUp", "tearDown"}
@@ -103,10 +123,12 @@ def dead_functions(roots):
 
 
 def render_dead(nodes, edges, paths, functions):
-    roots, dead = dead_modules(nodes, edges)
+    roots, dead, data = dead_modules(nodes, edges)
     lines = ["", f"Dead code — {', '.join(paths)}", "",
-             f"  entry modules (live by definition): {len(roots)}  e.g. " + ", ".join(sorted(roots)[:6]),
-             f"  DEAD MODULES {len(dead)}  (no entry module reaches them through imports)"]
+             f"  entry modules (live by definition): {len(roots)}  e.g. " + ", ".join(sorted(roots)[:6])]
+    if data:
+        lines.append("  loaded as data (a folder named by a string in code, its files read, not imported): " + ", ".join(sorted(data)[:8]))
+    lines.append(f"  DEAD MODULES {len(dead)}  (no entry module reaches them through imports)")
     lines += [f"    {n}" for n in dead[:40]]
     if functions:
         df = dead_functions(paths)
@@ -116,5 +138,5 @@ def render_dead(nodes, edges, paths, functions):
         lines.append("  (add --functions for Python dead functions and methods)")
     lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting. Fix with: skill refactor-dead")
     lines.append("  Live by convention: tests, main/lib/build, Django migrations/admin/apps/commands, Cargo benches/examples/bin, Maven src/it, scripts/, public/,")
-    lines.append("  dot-files, *.config.*, container-managed Java classes (@Controller, @Service, @Entity, ...). Not resolved: tsconfig path aliases, files loaded as text.")
+    lines.append("  dot-files, *.config.*, container-managed Java classes (@Controller, @Service, @Entity, ...), folders named by a string in code.")
     return "\n".join(lines), len(dead) + (len(df) if functions else 0)

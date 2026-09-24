@@ -13,7 +13,8 @@ def write(root, files: dict):
 
 
 def dead_modules(out: str) -> set:
-    return set(re.findall(r"^    (\S+)$", out.split("DEAD MODULES")[1].split("DEAD FUNCTIONS")[0], re.M))
+    tail = out.split("DEAD MODULES")[1].split("DEAD FUNCTIONS")[0].split("  Every line")[0]
+    return set(re.findall(r"^    (\S+)$", tail, re.M))
 
 
 class NestedRoots(unittest.TestCase):
@@ -74,6 +75,45 @@ class LiveByConvention(unittest.TestCase):
                           "scripts/release.js": "console.log(1);\n", "public/service-worker.js": "self.x = 1;\n",
                           "src/index.js": "import './app.js';\n", "src/app.js": "export const a = 1;\n", "src/unused.js": "export const b = 2;\n"})
         self.assertEqual(dead, {"src/unused.js"})
+
+
+class AliasesAndDataFolders(unittest.TestCase):
+    def setUp(self):
+        self.home = temp_home(self)
+        self.project = self.home / "app"
+
+    def dead(self, files: dict) -> str:
+        write(self.project, files)
+        install(self.home, self.project)
+        project_cmd(self.project, self.home, "code", "find", "--yes")
+        return project_cmd(self.project, self.home, "code", "dead").stdout
+
+    def test_tsconfig_paths_and_base_url(self):
+        out = self.dead({"package.json": "{}\n",
+                         "tsconfig.json": '{\n  // comments and trailing commas are allowed here\n  "compilerOptions": {"baseUrl": ".", "paths": {"@/*": ["src/*"], "@ui": ["src/ui/index.ts"],},},\n}\n',
+                         "src/index.ts": "import { a } from '@/lib/a';\nimport { b } from 'src/lib/b';\nimport { ui } from '@ui';\n",
+                         "src/lib/a.ts": "export const a = 1;\n", "src/lib/b.ts": "export const b = 2;\n", "src/ui/index.ts": "export const ui = 3;\n",
+                         "src/lib/unused.ts": "export const u = 4;\n"})
+        self.assertEqual(dead_modules(out), {"src/lib/unused.ts"}, "@/ (paths), a bare baseUrl path and an exact alias resolve\n" + out)
+
+    def test_solution_style_tsconfig_with_references_and_extends(self):
+        out = self.dead({"package.json": "{}\n", "tsconfig.base.json": '{"compilerOptions": {"baseUrl": "./", "paths": {"~/*": ["app/*"]}}}\n',
+                         "frontend/tsconfig.json": '{"files": [], "references": [{"path": "./tsconfig.app.json"}]}\n',
+                         "frontend/tsconfig.app.json": '{"extends": "../tsconfig.base.json", "compilerOptions": {"outDir": "dist"}}\n',
+                         "frontend/main.ts": "import { x } from '~/x';\n", "app/x.ts": "export const x = 1;\n", "app/y.ts": "export const y = 2;\n"})
+        self.assertEqual(dead_modules(out), {"app/y.ts"}, out)
+
+    def test_folder_named_in_code_is_loaded_as_data(self):
+        out = self.dead({"package.json": "{}\n", "server.js": "const fs = require('fs');\nconst FIXES = 'data/static/fixes';\nfs.readdirSync(FIXES);\n",
+                         "data/static/fixes/one.ts": "export const one = 1;\n", "data/static/fixes/two.ts": "export const two = 2;\n",
+                         "data/other/three.ts": "export const three = 3;\n"})
+        self.assertIn("loaded as data (a folder named by a string in code, its files read, not imported): data/static/fixes", out)
+        self.assertEqual(dead_modules(out), {"data/other/three.ts"}, out)
+
+    def test_python_folder_named_relative_to_the_file(self):
+        out = self.dead({"app/main.py": "from pathlib import Path\nTEMPLATES = Path(__file__).parent / 'templates/'\nfor f in Path('templates/').iterdir():\n    pass\n",
+                         "app/templates/a.py": "x = 1\n", "app/stale.py": "y = 2\n"})
+        self.assertEqual(dead_modules(out), {"app/stale.py"}, out)
 
 
 class DeadFunctions(unittest.TestCase):

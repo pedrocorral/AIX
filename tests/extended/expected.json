@@ -57,15 +57,15 @@
  },
  "juice-shop": {
   "clones": 35,
-  "dead": 155,
-  "graph": 831,
+  "dead": 7,
+  "graph": 858,
   "security": 57,
   "style": 1036,
   "vulnerabilities": 22
  },
  "pygoat": {
   "clones": 4,
-  "dead": 8,
+  "dead": 7,
   "graph": 29,
   "security": 69,
   "style": 184,

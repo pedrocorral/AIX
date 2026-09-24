@@ -1,6 +1,6 @@
 # AIX manifest. Tools and scripts read this; agents rarely need to.
 name: aix
-version: 2.21.8
+version: 2.21.9
 spec: https://agentskills.io   # skills follow the Agent Skills open format (SKILL.md + YAML front-matter)
 entrypoint: AGENTS.md
 paths:                    # where things live in a project (2.0 layout); the code tools search code_roots by default

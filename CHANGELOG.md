@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.9 — 2026-09-24
+
+- `aix code dead` resolves TypeScript imports through `tsconfig.json` / `jsconfig.json`: `baseUrl` (bare `src/app/x`), `paths` (`@/*`, exact aliases), `extends` and solution-style `references`, comments and trailing commas included. A folder a string in code names (`'data/static/codefixes'`, `Path('templates/')`) is loaded as data: its files are live and the report says so. Facades are no longer collapsed before the dead-code walk: an `index.ts` that is the entry of its folder kept its imports invisible and its siblings looked dead. Juice Shop's dead modules: 155 to a handful, all real. `tests/test_dead.py` covers each case with a positive control.
+
 ## 2.21.8 — 2026-09-24
 
 - Nested code roots collapse into the outer one: `.` with `src` and `tests` measured every file under `src/` twice, so every function was its own exact clone and every count was inflated. On the twelve extended projects the clone groups went from 739 to 43 (bat), 978 to 77 (ripgrep), 382 to 13 (requests), 998 to 19 (Excalidraw). Clone groups made only of test functions are listed and not gated: tests share a shape by nature.

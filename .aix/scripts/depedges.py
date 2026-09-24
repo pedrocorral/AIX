@@ -1,7 +1,7 @@
 """Leaf over codefiles: the edges of the dependency graph. Module-level imports per language (Python, JS/TS, Rust,
 Java) resolved to project files, and Python call edges between functions. Unresolved imports are ignored, never
 guessed."""
-import ast, re
+import ast, json, re
 from collections import defaultdict
 from pathlib import Path
 
@@ -82,15 +82,88 @@ def py_module_edges(f: Path, idx):
 JS_IMPORT = re.compile(r"""(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)|import\(\s*['"]([^'"]+)['"]\s*\)""")
 
 
+JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs")
+_TS_CONFIGS = {}   # folder -> {"baseUrl": Path, "paths": {pattern: [targets]}} or None, once per run
+
+
+def _jsonc(text: str):
+    """tsconfig.json is JSON with comments and trailing commas."""
+    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
+    return json.loads(re.sub(r",\s*([}\]])", r"\1", text))
+
+
+def _own_options(data: dict, cfg: Path) -> dict:
+    """baseUrl (resolved) and paths declared in this file; paths without a baseUrl are relative to the file."""
+    opts = data.get("compilerOptions") or {}
+    out = {}
+    if opts.get("baseUrl"):
+        out["baseUrl"] = (cfg.parent / opts["baseUrl"]).resolve()
+    if opts.get("paths"):
+        out["paths"] = opts["paths"]
+        out.setdefault("baseUrl", cfg.parent.resolve())
+    return out
+
+
+def _linked_configs(data: dict, cfg: Path) -> list:
+    """The files `extends` and (solution-style tsconfigs) `references` point to."""
+    links = ([data["extends"]] if isinstance(data.get("extends"), str) else []) + [r.get("path", "") for r in data.get("references", [])]
+    return [(cfg.parent / (link if link.endswith(".json") else link + "/tsconfig.json")).resolve() for link in links if link]
+
+
+def _ts_options(cfg: Path, seen: set = None) -> dict:
+    """baseUrl and paths of a tsconfig, following `extends` and `references`; the nearest declaration wins."""
+    seen = seen or set()
+    if cfg in seen or not cfg.is_file():
+        return {}
+    seen.add(cfg)
+    try:
+        data = _jsonc(cfg.read_text(encoding="utf-8", errors="replace"))
+    except ValueError:
+        return {}
+    out = _own_options(data, cfg)
+    for linked in _linked_configs(data, cfg):
+        for k, v in _ts_options(linked, seen).items():
+            out.setdefault(k, v)
+    return out
+
+
+def _ts_config_for(f: Path) -> dict:
+    """The options of the nearest tsconfig.json / jsconfig.json at or above the file, inside the project."""
+    for folder in [f.parent, *f.parent.parents]:
+        if folder in _TS_CONFIGS:
+            return _TS_CONFIGS[folder]
+        cfg = next((folder / n for n in ("tsconfig.json", "jsconfig.json") if (folder / n).is_file()), None)
+        if cfg or folder == ROOT.resolve() or not folder.is_relative_to(ROOT.resolve()):
+            _TS_CONFIGS[folder] = _ts_options(cfg) if cfg else {}
+            return _TS_CONFIGS[folder]
+    return {}
+
+
+def _alias_bases(spec: str, f: Path) -> list:
+    """Where a bare specifier may live: tsconfig `paths` patterns (`@/*` -> `src/*`), then `baseUrl` itself."""
+    cfg = _ts_config_for(f)
+    if not cfg:
+        return []
+    bases = []
+    for pattern, targets in (cfg.get("paths") or {}).items():
+        prefix = pattern.split("*")[0]
+        if spec.startswith(prefix) and (("*" in pattern) or spec == pattern):
+            rest = spec[len(prefix):]
+            bases += [cfg["baseUrl"] / t.replace("*", rest) for t in targets]
+    return bases + [cfg["baseUrl"] / spec]
+
+
+def _resolve_js(base: Path):
+    cands = [base] + [base.with_suffix(e) for e in JS_SUFFIXES] + [base / f"index{e}" for e in JS_SUFFIXES]
+    return next((c for c in cands if c.is_file()), None)
+
+
 def js_module_edges(f: Path):
     out = []
     for m in JS_IMPORT.finditer(f.read_text(encoding="utf-8", errors="replace")):
         spec = next(g for g in m.groups() if g)
-        if not spec.startswith("."):
-            continue
-        base = (f.parent / spec)
-        cands = [base] + [base.with_suffix(e) for e in (".ts", ".tsx", ".js", ".jsx", ".mjs")] + [base / f"index{e}" for e in (".ts", ".tsx", ".js", ".jsx")]
-        hit = next((c for c in cands if c.is_file()), None)
+        bases = [f.parent / spec] if spec.startswith(".") else _alias_bases(spec, f)
+        hit = next((h for h in map(_resolve_js, bases) if h), None)
         if hit:
             out.append(hit)
     return out

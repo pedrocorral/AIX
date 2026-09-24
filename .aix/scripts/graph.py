@@ -21,7 +21,7 @@ Static analysis is approximate for dynamic languages: unresolved imports/calls a
 import sys
 from codefiles import EXT, HUB_FAN, ROOT, default_roots
 from depedges import function_graph, module_graph
-from graphmetrics import STABLE_MAX, collapse_facades, is_composition_root, measure
+from graphmetrics import STABLE_MAX, is_composition_root, measure
 from deadcode import render_dead
 from clones import SIMILARITY, render_clones
 
@@ -156,7 +156,7 @@ def main(args):
         text, n_exact = render_clones(o.paths, o.similarity)
         return _finish(o, text, n_exact, "exact clone group(s)")
     if o.dead:
-        mn, me, _ = collapse_facades(*map(set, module_graph(o.paths)))
+        mn, me = module_graph(o.paths)   # reachability needs every edge: a facade's own imports keep its folder alive
         text, n_dead = render_dead(mn, me, o.paths, o.functions)
         return _finish(o, text, n_dead, "dead-code candidate(s)")
     m = measure(nodes, edges)
