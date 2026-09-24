@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.20.0 — 2026-09-24
+
+- Several agents in one repository: seats `agent-001` .. `agent-NNN` (`aix agent set total N`, default 1), claimed per session (`aix agent claim`, bound locally under `.aix/sessions/`), recorded in `docs/road-map/going-on/agents/` with tool, user, host, process, heartbeat and task. A seat whose process is gone on this machine is taken over by the next claim; one whose heartbeat is older than `agents_lease` (default 4h) on another machine only with `--force`; a full table is refused with the list of who works. `aix task start` claims a seat by itself, signs the task (`owner:`, `claimed:`, `claimed_by:` with the tool and person behind the seat), refuses a task another live seat holds (`--force` takes it) and warns when the task's `scope:` overlaps a going-on task; `aix task list` shows owners and overlaps. With more than one seat every seat has its own `STATE-agent-NNN.md` and `STATE.md` is the generated overview. `aix agent release` frees the seat; the hand-off skill does it. `aix doctor` reports stale seats and tasks held by no live seat. The session block and the resume and hand-off skills tell the agents.
+
 ## 2.19.3 — 2026-09-23
 
 - The remaining GitHub Actions workflow (`aix-docs.yml`, from the initial commit) is removed: nothing of AIX runs on GitHub.

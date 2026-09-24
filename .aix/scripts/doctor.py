@@ -133,6 +133,24 @@ def check_layers():
               + ("" if idx.get("user_layer") else "  (user layer not applied: no terminal / AIX_NO_USER)"))
 
 
+def check_seats():
+    """Seats nobody is sitting on any more, and going-on tasks whose owner is not a live seat."""
+    import seats, re
+    if not (ROOT / "docs" / "road-map" / "going-on").is_dir():
+        return
+    all_ = seats.all_seats(ROOT)
+    for name, s in seats.stale(ROOT):
+        problem(f"seat {name} is {s['state']}: {s.get('tool')} {s.get('user')}@{s.get('host')} left without `aix agent release`",
+                "the next `aix agent claim` takes it over (a seat expired on another machine needs --force)")
+    for f in sorted((ROOT / "docs" / "road-map" / "going-on").glob("TASK-*.md")):
+        m = re.search(r"^owner:\s*(agent-\d+)", f.read_text(encoding="utf-8"), re.M)
+        if m and (all_.get(m.group(1)) is None or all_[m.group(1)]["state"] not in ("live", "remote")):
+            problem(f"{f.name[:9]} is going-on but its owner {m.group(1)} is not a live seat", "`aix task start` it from a live session (--force if held), or `aix task block` it")
+    live = [n for n, s in all_.items() if s and s["state"] == "live"]
+    if seats.total(ROOT) > 1:
+        print(f"seats: {seats.total(ROOT)} total, {sum(1 for s in all_.values() if s)} taken, {len(live)} live here")
+
+
 def check_agents_blocks():
     """AGENTS.md is assembled from .aix/instructions blocks; a hand edit outside the managed sections is lost on install."""
     import layers, tempfile, shutil
@@ -154,7 +172,7 @@ def inst_headers(blocks):
 
 
 def main():
-    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_agents_blocks):
+    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_seats, check_agents_blocks):
         check()
     for what, fix in problems:
         print(f"PROBLEM {what}\n        fix: {fix}")

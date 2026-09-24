@@ -14,3 +14,4 @@ Read this when: you want to know how to do something with AIX. Skip when: you al
 | `09-code.md` | The code tools: find, graph, dead, clones, style, stats, security, vulnerabilities, gates | Measuring and cleaning code |
 | `10-maintain.md` | Doctor, versions, self-test, troubleshooting | Something looks wrong |
 | `11-reference.md` | Every command with its syntax, one table | Looking up an option |
+| `12-team.md` | Several agents in one repository: seats, claims, scopes, one state per seat | More than one agent works on the repo |

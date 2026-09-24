@@ -7,9 +7,9 @@ description: Resume work at session start or on "continue / where were we / pick
 Reading budget: ≤ 3 000 tokens before speaking.
 
 ## Procedure
-1. `cat docs/road-map/going-on/STATE.md`; `cat docs/conflicts/open/INDEX.md` (any row = frozen scope; do not touch those files).
+1. `aix agent whoami` (no seat: `aix agent claim`). `cat docs/road-map/going-on/STATE.md`; with several seats that is the overview, then `cat docs/road-map/going-on/STATE-<your seat>.md`. `cat docs/conflicts/open/INDEX.md` (any row = frozen scope; do not touch those files).
 2. If `active_task` is set: open `docs/road-map/going-on/<TASK>.md`; read `context_files` list; open exactly those files.
-   If `none`: `cat docs/road-map/pending/next/INDEX.md`; propose the top task to the user (one line) unless the user already stated what to do.
+   If `none`: `cat docs/road-map/pending/next/INDEX.md`; propose the top task to the user (one line) unless the user already stated what to do. `aix task start ID` claims it; if it is held by another live seat, take the next one.
 3. Verify cheaply: `git status --short`, and run the test command named in the task (or the domain's unit tests only).
 4. Report in ≤ 6 lines: active task + goal, last progress entry, verified facts (tests/git), immediate next action, blockers. Then proceed with `core-sdd-workflow`.
 

@@ -79,6 +79,8 @@ The instructions                      (aix instructions ...)
   aix agents [NAME...|all|--list]     which agents this project equips (claude, copilot, cursor, gemini, opencode,
                                       codex): a checklist, detected ones preselected; writes agents: to config;
                                       install links folders and pointer files only for those. No line = all
+  aix agent claim|release|whoami|list  a seat (agent-001 ...) for this session when several agents share the repo;
+      set total N | get total         how many seats; set lease 4h | get lease
   aix instructions [list]             every instruction any layer offers: state (active / optional off / disabled /
                                       not in profile), layer, kind (block that builds AGENTS.md, scoped by globs, always)
   aix instructions info ID | show ID  details | the file
@@ -797,6 +799,25 @@ prints everything. Long output goes through your pager ($PAGER, else less) in a 
 .aix/meta-docs/guide/ and travel with every project; an organisation or a project can replace a chapter by placing
 the same file under its layer's meta-docs/guide/."""
 
+TOPICS["agent"] = """aix agent claim [--force] | release | whoami | list | set total N | get total | set lease 4h | get lease
+aix task start ID [--force]
+
+Several agents in one repository, without collisions. A seat is a number, agent-001 up to `agents_total`
+(default 1: a single-agent project changes nothing). `aix agent claim` takes the first free seat for this session
+and binds it locally (.aix/sessions/), so every later command from the same session signs with it; `aix task start`
+claims one by itself. The seat file docs/road-map/going-on/agents/agent-NNN.md (committed) says who sits there:
+tool, user, host, process, heartbeat, task; other machines see it through git.
+A seat is free, live, or stale. Stale on this machine = the process is gone (the session ended without releasing):
+the next claim takes it over and says so. Stale on another machine = no heartbeat for `agents_lease` (default 4h):
+only `claim --force` takes it, a slow session is not a dead one. Nothing free, nothing stale: refused, listing who works.
+`aix task start ID` signs the task with the seat (owner:, claimed:) and refuses a task another live seat holds
+(--force takes it); tasks declare `scope:` (paths/globs) and a start warns when two going-on tasks overlap;
+`aix task list` shows owners and overlaps among open tasks. With more than one seat, each seat has its own
+STATE-agent-NNN.md and STATE.md becomes the generated overview of every seat. `aix agent release` at the end
+of a session; the hand-off skill does it. `aix doctor` reports stale seats and tasks held by no live seat.
+Agents whose process is not recognised (claude, code, cursor, gemini, opencode, codex) still get a seat, listed as
+`agent`; AIX_TOOL names them, AIX_HOST overrides the host name."""
+
 TOPICS["instructions"] = """aix instructions [list] | info ID | show ID | enable ID | disable ID      (alias: aix rules ...)
 
 Instructions are the second kind of thing a layer ships, next to skills. Two kinds:
@@ -877,7 +898,7 @@ for _old, _new in (("graph", "code graph"), ("complexity", "code graph"), ("vali
 def topic_help(name: str):
     text = TOPICS.get(name)
     if not text:
-        print(f"aix: no help for '{name}'. Topics: guide, self-install, install, upgrade, doctor, agents, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
+        print(f"aix: no help for '{name}'. Topics: guide, self-install, install, upgrade, doctor, agent, agents, instructions, profile, code, code graph, code dead, code clones, code style, code security, code vulnerabilities, code stats, refactor, docs, docs validate, docs coverage, docs security, task, skills, about, version")
         sys.exit(1)
     print(text)
 
@@ -996,7 +1017,7 @@ def cmd_task(args):
         bucket = rest[2] if len(rest) > 2 and rest[1] == "--bucket" else "next"
         rm.cmd_new(rest[0], bucket)
     elif sub == "start" and rest:
-        rm.cmd_start(rest[0])
+        rm.cmd_start(rest[0], "--force" in rest)
     elif sub == "block" and rest:
         rm.cmd_block(rest[0], rest[1] if len(rest) > 1 else "")
     elif sub == "done" and rest:
@@ -1093,6 +1114,37 @@ def page(text: str):
         except OSError:
             pass
     print(text, end="")
+
+
+def run_agent(args):
+    """aix agent claim [--force] | release | whoami | list | set total N | set lease 4h | get total|lease"""
+    import seats
+    sub, rest = (args[0], args[1:]) if args else ("list", [])
+    if sub == "claim":
+        seats.claim(ROOT, "--force" in rest)
+    elif sub == "release":
+        seats.release(ROOT)
+    elif sub == "whoami":
+        me = seats.mine(ROOT)
+        _, pid, tool = seats.session()
+        print(me or f"no seat (this session: {tool}, {seats.user()}@{seats.host()}, process {pid}); `aix agent claim` takes one")
+    elif sub == "list":
+        seats.report(ROOT)
+    elif sub == "get" and rest[:1] in (["total"], ["lease"]):
+        print(seats.setting(ROOT, "agents_total", "1") if rest[0] == "total" else seats.setting(ROOT, "agents_lease", "4h"))
+    elif sub == "set" and len(rest) == 2 and rest[0] in ("total", "lease"):
+        if rest[0] == "total":
+            n = int(rest[1]) if rest[1].isdigit() and int(rest[1]) >= 1 else sys.exit("aix agent set total N: N must be 1 or more")
+            taken = [name for name, s in seats.all_seats(ROOT).items() if s and int(name[6:]) > n]
+            if taken:
+                sys.exit(f"cannot shrink to {n}: {', '.join(taken)} still taken (release them first)")
+            seats.set_setting(ROOT, "agents_total", str(n), "seats for agents working in this repository at once (aix agent)")
+        else:
+            seats.parse_duration(rest[1])
+            seats.set_setting(ROOT, "agents_lease", rest[1], "a seat on another machine with no heartbeat for this long counts as stale (aix agent)")
+        print(f"agents_{rest[0]}: {rest[1]}")
+    else:
+        sys.exit("usage: aix agent claim [--force] | release | whoami | list | set total N | set lease 4h | get total | get lease")
 
 
 def run_agents(args):
@@ -1245,6 +1297,8 @@ def main(argv):
         run_instructions(args)
     elif cmd == "agents":
         run_agents(args)
+    elif cmd == "agent":
+        run_agent(args)
     elif cmd == "guide":
         run_guide(args)
     elif cmd in ("version", "-V", "--version"):

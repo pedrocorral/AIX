@@ -7,7 +7,7 @@ description: Write the hand-off (task log, files changed, verification, next act
 ## Procedure
 1. Update the active task: **Progress log** entry (done / half-done at file:function / failed / decisions), **Files changed** list, **Verification performed** (exact command → result), **Exact next actions** (numbered, concrete).
 2. Update `context_files` if new files became essential; remove ones no longer needed.
-3. **Rewrite** `docs/road-map/going-on/STATE.md` from `.aix/templates/session-state.md`: `updated`, `active_task`, "where we are" (3 lines), files to load, verified facts (last test run result, migrations, env), immediate next action (imperative, concrete), blockers/questions.
+3. **Rewrite** your state file from `.aix/templates/session-state.md` (`docs/road-map/going-on/STATE.md`, or `STATE-<your seat>.md` when the table has several seats; `aix agent whoami` says which): `updated`, `active_task`, "where we are" (3 lines), files to load, verified facts (last test run result, migrations, env), immediate next action (imperative, concrete), blockers/questions.
 4. Make sure every doc you created/changed is listed in its folder INDEX. Run `aix docs validate` and fix errors.
 5. If the task is done: `aix docs coverage` and `aix task done <TASK>` (or equivalent), check DoD.
-6. Commit: `<type>(<scope>): <summary> [IDs]`. Tell the user the next action in one sentence.
+6. Commit: `<type>(<scope>): <summary> [IDs]`. If the session ends here: `aix agent release`. Tell the user the next action in one sentence.
