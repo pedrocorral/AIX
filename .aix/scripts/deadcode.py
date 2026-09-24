@@ -1,6 +1,6 @@
 """`aix code dead`: modules nobody imports and Python functions nobody names. Conservative by design (vulture's
 rule): a decorated, exported, dunder, implicit or test function is live whatever the graph says."""
-import ast
+import ast, re
 from collections import defaultdict
 from pathlib import Path
 
@@ -13,16 +13,23 @@ ENTRY_STEMS = ROOT_STEMS | {"manage", "wsgi", "asgi", "cli", "conftest", "setup"
 ENTRY_SUFFIX = (".config.ts", ".config.js", ".config.mjs", ".d.ts")
 
 
+JAVA_ENTRY = re.compile(r"static\s+void\s+main\s*\(|@(?:SpringBootApplication|SpringBootTest|Test|ParameterizedTest|Configuration|WebMvcTest|DataJpaTest)\b")
+
+
 def has_main_guard(node: str) -> bool:
-    """A Python file run as a script (`if __name__ == "__main__":`) is an entry point in its own right."""
+    """A file run or loaded on its own: a Python script (`if __name__ == "__main__":`), a Java class with `main` or a
+    framework annotation (Spring Boot application or configuration, JUnit test)."""
     f = ROOT / node
-    return f.suffix == ".py" and f.is_file() and '__name__ == "__main__"' in f.read_text(encoding="utf-8", errors="replace")
+    if not f.is_file() or f.suffix not in (".py", ".java"):
+        return False
+    text = f.read_text(encoding="utf-8", errors="replace")
+    return '__name__ == "__main__"' in text if f.suffix == ".py" else bool(JAVA_ENTRY.search(text))
 
 
 def is_entry_module(node: str) -> bool:
     """Modules nothing needs to import for them to be alive: entry points, tests, framework/tool config, scripts."""
     p = Path(node)
-    return is_root_or_test(node) or p.stem in ENTRY_STEMS or p.name.endswith(ENTRY_SUFFIX) or p.name in FACADE_NAMES \
+    return is_root_or_test(node) or p.stem.lower() in ENTRY_STEMS or p.name.endswith(ENTRY_SUFFIX) or p.name in FACADE_NAMES \
         or has_main_guard(node)
 
 

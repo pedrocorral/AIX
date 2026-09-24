@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots, SKIP, rel
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
+from depscan import scan_dependencies
 
 
 # ---- scanning -----------------------------------------------------------------------------------------------------
@@ -49,6 +50,29 @@ def _line_findings(f: Path, i: int, raw: str, lang, langs: set):
             yield (vul, cwe, title, rel(f), i, raw.strip()[:110], advice, accepted)
 
 
+SQL_ASSIGN = re.compile(r"\b(\w+)\s*=\s*[\"'](?:SELECT|INSERT|UPDATE|DELETE|WITH)\b[^\"']*[\"']\s*\+", re.I)
+SQL_RUN = r"(?:createQuery|createNativeQuery|executeQuery|executeUpdate|execute|prepareStatement|query|raw|exec)\(\s*{name}\b"
+SQL_ADVICE = "PreparedStatement / parameters with ? placeholders; never concatenate values into the statement"
+SQL_REACH = 40   # lines between the assembled statement and its execution that are still one method
+
+
+def _assembled_sql(f: Path, lines: list, lang) -> list:
+    """`q = "SELECT ... " + value` executed within the next SQL_REACH lines: the ordinary two-line shape the
+    single-line rule cannot see. Reported at the executing line, with both lines in the snippet."""
+    out = []
+    for i, raw in enumerate(lines):
+        m = SQL_ASSIGN.search(strip_comment(raw, lang))
+        if not m:
+            continue
+        rx = re.compile(SQL_RUN.format(name=re.escape(m.group(1))))
+        j = next((j for j in range(i + 1, min(i + 1 + SQL_REACH, len(lines))) if rx.search(strip_comment(lines[j], lang))), None)
+        if j is not None:
+            acc = ACCEPT.search(lines[j])
+            accepted = acc.group(1) + acc.group(2).strip() if acc and acc.group(1) == "VUL-INJ-001" else None
+            out.append(("VUL-INJ-001", "CWE-89", "SQL built from strings, executed below", rel(f), j + 1, f"{raw.strip()[:70]}  ...  {lines[j].strip()[:40]}", SQL_ADVICE, accepted))
+    return out
+
+
 def scan_file(f: Path):
     """[(vul, cwe, title, file, line_no, snippet, advice, accepted)]"""
     lang = LANG.get(f.suffix)
@@ -60,7 +84,8 @@ def scan_file(f: Path):
     skipped = _skip_marker(lines, f)
     if skipped:
         return [skipped]
-    return [fx for i, raw in enumerate(lines, 1) for fx in _line_findings(f, i, raw, lang, langs)]
+    found = [fx for i, raw in enumerate(lines, 1) for fx in _line_findings(f, i, raw, lang, langs)]
+    return found + (_assembled_sql(f, lines, lang) if lang else [])
 
 
 def scan_dockerfile(f: Path):
@@ -73,52 +98,6 @@ def scan_dockerfile(f: Path):
         if image.lower() not in ("scratch",) and not re.search(r"@sha256:|:[\w.-]+$", image) or image.endswith(":latest"):
             out.append(("VUL-DEP-001", "CWE-1104", DOCKER_RULES[1][2], rel(f), text.count("\n", 0, m.start()) + 1, m.group(0).strip(), DOCKER_RULES[1][3], None))
     return out
-
-
-DEP = ("VUL-DEP-001", "CWE-1104")
-PY_LOCKS = ("uv.lock", "poetry.lock", "pdm.lock", "requirements.txt", "requirements.lock")
-JS_LOCKS = ("package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb")
-
-
-def _manifests(root: Path, pattern: str):
-    return [f for f in root.rglob(pattern) if not any(s in f.parts for s in SKIP)]
-
-
-def _has_lock(f: Path, locks) -> bool:
-    return any((f.parent / l).exists() for l in locks)
-
-
-def _unpinned_requirements(root: Path):
-    for f in _manifests(root, "requirements*.txt"):
-        for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-            s = line.split("#")[0].strip()
-            if s and not s.startswith(("-", "git+", "http")) and "==" not in s and "@" not in s:
-                yield (*DEP, "unpinned dependency", rel(f), i, s, "pin exact versions (==) or use a lockfile (uv/poetry/pip-tools)", None)
-
-
-def _node_manifests(root: Path):
-    for f in _manifests(root, "package.json"):
-        text = f.read_text(encoding="utf-8", errors="replace")
-        for m in re.finditer(r'"([^"]+)"\s*:\s*"(\*|latest|>=?[^"]*|x)"', text):
-            yield (*DEP, "unbounded dependency range", rel(f), text.count("\n", 0, m.start()) + 1, m.group(0), "use ^/~ ranges with a committed lockfile, or exact versions", None)
-        if not _has_lock(f, JS_LOCKS):
-            yield (*DEP, "no lockfile next to package.json", rel(f), 1, "package.json without lockfile", "commit package-lock.json / pnpm-lock.yaml so builds are reproducible", None)
-
-
-def _python_and_rust_manifests(root: Path):
-    for f in _manifests(root, "pyproject.toml"):
-        declares = re.search(r"^\s*(?:dependencies|requires)\s*=", f.read_text(encoding="utf-8", errors="replace"), re.M)
-        if declares and not _has_lock(f, PY_LOCKS):
-            yield (*DEP, "no lockfile next to pyproject.toml", rel(f), 1, "pyproject without uv.lock/poetry.lock", "commit a lockfile so builds are reproducible", None)
-    for f in _manifests(root, "Cargo.toml"):
-        has_deps = re.search(r"^\[dependencies\]", f.read_text(encoding="utf-8", errors="replace"), re.M)
-        if has_deps and not (f.parent / "Cargo.lock").exists():
-            yield (*DEP, "no Cargo.lock", rel(f), 1, "Cargo.toml without Cargo.lock", "commit Cargo.lock", None)
-
-
-def scan_dependencies(root: Path):
-    """Unpinned dependency declarations and missing lockfiles (VUL-DEP-001)."""
-    return [*_unpinned_requirements(root), *_node_manifests(root), *_python_and_rust_manifests(root)]
 
 
 ENV_FILES = (".env", ".env.local", ".env.production")

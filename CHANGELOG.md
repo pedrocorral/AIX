@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.3 — 2026-09-24
+
+- Java: the dependency graph resolves references that need no `import` (classes of the same package) and wildcard imports (`import a.b.*`), so cycles, upward dependencies, hubs and dead modules mean something in a Java project; before, a Spring project showed almost no edges and every class as dead. A class with `public static void main` or a Spring Boot / JUnit annotation is an entry module. `aix code security` reports SQL assembled on one line (`q = "SELECT ... " + id`) and executed within the next 40 lines, in every language, at the executing line; the single-line rule missed the ordinary shape. Fixture `tests/fixtures/java-app`, `tests/test_java.py`.
+
 ## 2.21.2 — 2026-09-24
 
 - The kit commits its own generated reports (`docs/tests/coverage-matrix.md`, `dependency-graph.md`, `code-style.md`, `code-security.md`, `code-stats.md`, `code-vulnerabilities.md`): the `.gitignore` lines that hid them are gone, as the kit already asks of projects. They are regenerated at release time only, so the history shows the numbers per release without churn in between.

@@ -2,6 +2,7 @@
 Java) resolved to project files, and Python call edges between functions. Unresolved imports are ignored, never
 guessed."""
 import ast, re
+from collections import defaultdict
 from pathlib import Path
 
 from codefiles import ROOT, CODE_ROOTS, EXT, rel, source_files
@@ -136,24 +137,52 @@ def rust_module_edges(f: Path):
 JAVA_IMPORT = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)\s*;", re.M)
 
 
-def java_module_edges(f: Path, java_idx):
+JAVA_PACKAGE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.M)
+JAVA_WILDCARD = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)\.\*\s*;", re.M)
+JAVA_NOISE = re.compile(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"", re.S)   # comments and string literals carry no references
+
+
+def _java_package(text: str) -> str:
+    m = JAVA_PACKAGE.search(text)
+    return m.group(1) if m else ""
+
+
+def _java_imports(text: str, paths: dict) -> list:
+    """Explicit class imports resolved to project files (the longest path suffix that exists)."""
     out = []
-    for m in JAVA_IMPORT.finditer(f.read_text(encoding="utf-8", errors="replace")):
+    for m in JAVA_IMPORT.finditer(text):
         parts = m.group(1).split(".")
-        for n in range(len(parts), 0, -1):
-            hit = java_idx.get("/".join(parts[:n]))
-            if hit:
-                out.append(hit); break
+        hit = next((paths[k] for n in range(len(parts), 0, -1) if (k := "/".join(parts[:n])) in paths), None)
+        if hit:
+            out.append(hit)
     return out
 
 
+def _java_visible(text: str, idx: dict) -> dict:
+    """Class -> file for the classes a Java file may name without importing them: its own package and the packages
+    it imports with `.*`."""
+    visible = dict(idx["packages"].get(_java_package(text), {}))
+    for m in JAVA_WILDCARD.finditer(text):
+        visible.update(idx["packages"].get(m.group(1), {}))
+    return visible
+
+
+def java_module_edges(f: Path, idx: dict):
+    text = f.read_text(encoding="utf-8", errors="replace")
+    out = _java_imports(text, idx["paths"])
+    visible = _java_visible(text, idx)
+    named = set(re.findall(r"\b([A-Z]\w*)\b", JAVA_NOISE.sub(" ", text))) - {f.stem}
+    return out + [visible[n] for n in sorted(named) if n in visible]
+
+
 def _java_index(files) -> dict:
-    idx = {}
-    for f in files:
-        if f.suffix == ".java":
-            parts = f.resolve().relative_to(ROOT).with_suffix("").parts
-            for i in range(len(parts)):
-                idx.setdefault("/".join(parts[i:]), f)
+    """paths: path suffix -> file (explicit imports); packages: package -> {Class: file} (same-package and wildcard use)."""
+    idx = {"paths": {}, "packages": defaultdict(dict)}
+    for f in [f for f in files if f.suffix == ".java"]:
+        parts = f.resolve().relative_to(ROOT).with_suffix("").parts
+        for i in range(len(parts)):
+            idx["paths"].setdefault("/".join(parts[i:]), f)
+        idx["packages"][_java_package(f.read_text(encoding="utf-8", errors="replace"))][f.stem] = f
     return idx
 
 
