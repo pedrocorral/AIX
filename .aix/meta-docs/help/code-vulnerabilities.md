@@ -14,10 +14,20 @@ Three analyses, all on by default, each selectable:
               Output: "input reaches <sink>" with the chain (which variable, assigned where, from which source).
               Limits: Python only; a value crossing files is not followed; a taint path is static evidence that
               input CAN reach a sink, not proof of exploitability in production.
-  --cve       pinned dependencies from requirements*.txt (==), uv.lock / poetry.lock / pdm.lock, package-lock.json,
-              pnpm-lock.yaml, Cargo.lock, sent in one batch to the OSV database (api.osv.dev). Reports the advisory
-              id, summary and the first fixed version, per VUL-DEP-001. Needs the network; when unreachable it says
-              so, skips, and the gate is not failed by it.
+  --cve       Known vulnerabilities of what the project installs, from OSV (osv.dev), one finding per vulnerable
+              package and manifest (a package in two lockfiles is two findings: each lockfile is fixed on its own),
+              with the advisory ids, a summary and the first fixed version, per VUL-DEP-001. What is queried:
+              - lockfiles as they are, they hold the whole tree: uv.lock, poetry.lock, pdm.lock, Cargo.lock,
+                package-lock.json, pnpm-lock.yaml, yarn.lock (v1 and berry), Pipfile.lock, Gemfile.lock,
+                composer.lock, go.sum;
+              - `==` pins in any *requirements*.txt and the dependencies of every pom.xml (properties,
+                dependencyManagement, versions inherited from the parent, exclusions), each resolved to the packages
+                it pulls in through deps.dev (Google's open dependency graph, no key), the way osv-scanner does it;
+                answers are cached under ~/.cache/aix/depsdev, a resolved version never changes.
+              Not read: version ranges (`>=`, `^`) in requirements or package.json, a pom whose parent is not on
+              Maven Central (its unversioned dependencies are listed as unresolved). The note under the section says
+              how many packages from how many manifests, how many of them transitive, and what was unreachable:
+              when OSV or deps.dev is not there it says so, skips, and the gate is not failed by it.
   --history   `git log -p --all` over every commit (or the last --commits N) through the secret rules of aix code
               security: the register's own (private keys, cloud/API tokens, hard-coded passwords) and the gitleaks
               rule set (221 provider patterns and a generic one with an entropy floor and allowlists, from

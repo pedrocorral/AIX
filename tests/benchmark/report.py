@@ -147,9 +147,15 @@ def secrets(D: dict) -> str:
     return table(["project", "ours secrets in history", "s", "gitleaks", "s", "gitleaks by rule", "files flagged by both", "files ours", "files gitleaks"], rows)
 
 
+def _cve_cells(summary: str) -> list:
+    """packages, transitive, vulnerable, advisories out of the report's note; the note itself when it has none."""
+    m = re.search(r"(\d+) packages from (\d+) manifest.*?(\d+) of them pulled in.*?(\d+) vulnerable, (\d+) advisories", summary)
+    return [m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)] if m else [summary[:60], "", "", "", ""]
+
+
 def cves(D: dict) -> str:
-    rows = [[n, d["ours"]["cve"]["summary"][:90], d["ours"]["cve"]["secs"], "; ".join(f"{f[0]} ({f[1]} packages, {f[2]})" for f in d["theirs"]["osv-scanner"]["files"]) or "–", d["theirs"]["osv-scanner"]["vulns"], d["theirs"]["osv-scanner"]["secs"]] for n, d in D.items()]
-    return table(["project", "ours (`--cve`, OSV querybatch)", "s", "osv-scanner: manifest (packages, vulnerable)", "osv vulns", "s"], rows)
+    rows = [[n, *_cve_cells(d["ours"]["cve"]["summary"]), d["ours"]["cve"]["secs"], "; ".join(f"{f[0]} ({f[1]}, {f[2]})" for f in d["theirs"]["osv-scanner"]["files"]) or "–", d["theirs"]["osv-scanner"]["vulns"], d["theirs"]["osv-scanner"]["secs"]] for n, d in D.items()]
+    return table(["project", "ours packages", "manifests", "transitive", "vulnerable", "advisories", "s", "osv-scanner: manifest (vulnerable packages, advisories)", "osv advisories", "s"], rows)
 
 
 SECTIONS = [("Security findings, time and overlap", security), ("Recall on the documented vulnerabilities (tests/extended/known.json)", recall_table),

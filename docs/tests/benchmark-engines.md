@@ -3,7 +3,7 @@
 Read this when: deciding whether a code tool should be replaced, wrapped or kept; before changing what a tool covers.
 Skip when: running or writing tests.
 
-Facts only. Every number below was produced by `tests/benchmark/engines.py` on 2026-09-25 (kit 2.21.18) over the twelve extended
+Facts only. Every number below was produced by `tests/benchmark/engines.py` on 2026-09-25 (kit 2.21.19) over the twelve extended
 projects (`tests/extended/projects.json`, cached clones at their pinned commits, never in the repository) and every
 hand verdict names the file and line so anyone can re-read it. Nothing here says which tool is better; it says what each
 one found, what it missed, how long it took and where it was wrong.
@@ -154,21 +154,34 @@ Measured twice: before and after 2.21.18, which put the gitleaks rule set inside
 
 ### Known CVEs
 
-Ours reads `requirements*.txt` (`==` only), `uv/poetry/pdm/Cargo.lock`, `package-lock.json`, `pnpm-lock.yaml`, and
-queries exactly those versions. osv-scanner also reads `pom.xml`, `yarn.lock`, `Pipfile.lock`, `go.sum`, `Gemfile.lock`,
-and resolves a `requirements.txt` transitively before querying: on requests it reports `idna 3.9.0` (2 advisories)
-pulled in by the one pinned line `Sphinx==7.2.6` (0 advisories, ours reports 0); on flask's `examples/celery/requirements.txt`
-osv reports 27 advisories over the resolved tree, ours 9 over the 4 pinned lines. Neither side reads `package.json`
-ranges, so express and juice-shop (no lockfile) get nothing from either. Two bugs in ours surfaced by the run, both
-in `.aix/scripts/cvecheck.py`:
+Measured twice: before and after 2.21.19, which put osv-scanner's approach inside the kit (`manifests.py`,
+`depsdev.py`, `cvecheck.py`). Table 9 is the after.
 
-1. OSV's querybatch accepts 1000 queries; ours sends the whole lockfile in one call and reports "OSV unreachable
-   (network)" on NodeGoat (`package-lock.json`, 1091 packages). Verified by hand: HTTP 400 `too many queries`.
-2. `_version_key` raises `TypeError: '<' not supported between instances of 'int' and 'str'` on pygoat, whose
-   requirements resolve to advisories with mixed version parts; the command dies with a traceback.
-
-Where both read the same lockfile they agree: ripgrep `Cargo.lock`, 5 advisories on each side. WebGoat and
-spring-petclinic (`pom.xml`) and excalidraw (`yarn.lock`) get 0 from ours and 128, 6 and 495 from osv-scanner.
+- Before: ours read `requirements*.txt` (`==` only), `uv/poetry/pdm/Cargo.lock`, `package-lock.json`,
+  `pnpm-lock.yaml`, queried exactly those versions, sent the whole lockfile to OSV in one call (HTTP 400
+  `too many queries` above 1000, read as "unreachable": NodeGoat, 1091 packages) and died with a `TypeError` in its
+  version sort on pygoat. osv-scanner also read `pom.xml`, `yarn.lock`, `Pipfile.lock`, `go.sum`, `Gemfile.lock`
+  and resolved a `requirements.txt` or a pom transitively before querying.
+- After: ours reads the same manifests plus `composer.lock`, resolves pins and Maven dependencies through deps.dev
+  (the same graph osv-scanner uses), applies a pom's properties, dependencyManagement, parent-managed versions and
+  exclusions, queries in batches of 1000, and reports one finding per vulnerable package and manifest.
+- Same advisories on every lockfile: NodeGoat `package-lock.json` 301 and 301, excalidraw's four `yarn.lock` 495 and
+  495, ripgrep `Cargo.lock` 5 and 5, bat `Cargo.lock` 23 and 23. Same on spring-petclinic's `pom.xml` (6, four
+  packages, all transitive) and on flask's `examples/celery/requirements.txt` (27).
+- Differences, by name: WebGoat 135 (ours) to 128: the two resolvers pick different versions for a few transitives
+  of the same starters (jackson 2.15.3 on one side, thymeleaf 3.1.2 on the other). pygoat 323 to 430: osv-scanner
+  lists each pin twice, as declared (`Django==4.2`, 93 advisories) and as resolved (`4.2.0`, the same 93), and picks
+  older transitives (`urllib3 1.26.9`, 16 advisories, where deps.dev gives 1.26.20, 10); counted once per package
+  its number is 327. bat 157 to 181: `Jinja2>=2.8.1` in a syntax-test fixture is a range, osv-scanner resolves
+  ranges to their lowest version, ours reads `==` pins only. requests 0 to 2: `Sphinx==7.2.6` pulls `idna`, which
+  osv-scanner resolved to 3.9.0 (2 advisories) and deps.dev to 3.20.0 (none); both are valid resolutions of the
+  same pin on different days.
+- commons-lang 1 to 0: osv-scanner reported no manifest at all for its `pom.xml` (parent `commons-parent:73`); ours
+  resolved 28 packages through deps.dev and found `commons-lang3 3.14.0`, pulled in by a test dependency, with one
+  advisory (the project's own earlier release).
+- Neither side reads `package.json` ranges: express and juice-shop (no lockfile) get nothing from either.
+- Time: ours 0.1 to 19 s per project after the first run (deps.dev answers are cached on disk, advisory details are
+  fetched in parallel); osv-scanner 0.1 to 80 s (Maven resolution is its slow path).
 
 ## Tables
 
@@ -176,18 +189,18 @@ spring-petclinic (`pom.xml`) and excalidraw (`yarn.lock`) get 0 from ours and 12
 
 | project | ours security+taint: non-test / test | s | semgrep p/default: non-test / test | s | bandit: non-test / test | s | ours also in semgrep (±10) | semgrep also in ours (±10) | in vendored files: ours / semgrep |
 |---|---|---|---|---|---|---|---|---|---|
-| flask | 14 / 30 | 0.9 | 16 / 0 | 3.9 | 13 / 1016 | 0.7 | 7 of 14 | 4 of 16 | 0 / 1 |
-| requests | 8 / 25 | 0.9 | 6 / 0 | 3.4 | 14 / 665 | 0.5 | 4 of 8 | 3 of 6 | 0 / 0 |
-| express | 5 / 24 | 1.6 | 53 / 0 | 3.5 | – | – | 0 of 5 | 0 of 53 | 0 / 0 |
-| excalidraw | 12 / 0 | 5.7 | 41 / 0 | 12.0 | – | – | 1 of 12 | 1 of 41 | 0 / 0 |
-| spring-petclinic | 0 / 0 | 0.5 | 16 / 0 | 2.7 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
-| commons-lang | 4 / 2 | 6.3 | 8 / 0 | 7.0 | – | – | 2 of 4 | 1 of 8 | 0 / 0 |
-| ripgrep | 0 / 0 | 1.2 | 16 / 0 | 3.6 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
-| bat | 0 / 39 | 2.8 | 23 / 0 | 3.6 | – | – | 0 of 0 | 0 of 23 | 0 / 0 |
-| NodeGoat | 16 / 0 | 0.8 | 31 / 4 | 3.0 | – | – | 8 of 16 | 7 of 31 | 0 / 0 |
-| pygoat | 86 / 0 | 0.7 | 135 / 0 | 4.6 | 65 / 0 | 0.3 | 63 of 86 | 64 of 135 | 0 / 0 |
-| WebGoat | 63 / 11 | 10.1 | 208 / 0 | 43.0 | – | – | 18 of 63 | 27 of 208 | 19 / 26 |
-| juice-shop | 80 / 14 | 14.7 | 61 / 3 | 29.7 | – | – | 23 of 80 | 16 of 61 | 15 / 0 |
+| flask | 14 / 30 | 0.8 | 16 / 0 | 4.1 | 13 / 1016 | 0.6 | 7 of 14 | 4 of 16 | 0 / 1 |
+| requests | 8 / 25 | 1.0 | 6 / 0 | 3.2 | 14 / 665 | 0.4 | 4 of 8 | 3 of 6 | 0 / 0 |
+| express | 5 / 24 | 1.8 | 53 / 0 | 3.0 | – | – | 0 of 5 | 0 of 53 | 0 / 0 |
+| excalidraw | 12 / 0 | 5.0 | 41 / 0 | 12.9 | – | – | 1 of 12 | 1 of 41 | 0 / 0 |
+| spring-petclinic | 0 / 0 | 0.3 | 16 / 0 | 3.0 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
+| commons-lang | 4 / 2 | 5.2 | 8 / 0 | 6.9 | – | – | 2 of 4 | 1 of 8 | 0 / 0 |
+| ripgrep | 0 / 0 | 1.3 | 16 / 0 | 3.7 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
+| bat | 0 / 39 | 2.8 | 23 / 0 | 3.0 | – | – | 0 of 0 | 0 of 23 | 0 / 0 |
+| NodeGoat | 16 / 0 | 0.6 | 31 / 4 | 3.7 | – | – | 8 of 16 | 7 of 31 | 0 / 0 |
+| pygoat | 86 / 0 | 0.7 | 135 / 0 | 4.0 | 65 / 0 | 0.3 | 63 of 86 | 64 of 135 | 0 / 0 |
+| WebGoat | 63 / 11 | 9.6 | 208 / 0 | 43.9 | – | – | 18 of 63 | 27 of 208 | 19 / 26 |
+| juice-shop | 80 / 14 | 13.5 | 61 / 3 | 25.1 | – | – | 23 of 80 | 16 of 61 | 15 / 0 |
 
 ### 2. Recall on the documented vulnerabilities (tests/extended/known.json)
 
@@ -211,9 +224,9 @@ ours-only, by rule: HTML injected without escaping 47, hard-coded password / sec
 
 | project | ours hygiene (leftover, swallowed, bug) | s (whole style run) | ruff F401,F841,ARG,B006,E722,S110: non-test / test | s | ruff by rule (non-test) | ours also in ruff (±1) | ruff non-test also in ours (±1) |
 |---|---|---|---|---|---|---|---|
-| flask | 3 | 0.8 | 17 / 161 | 0.0 | ARG001 8, ARG002 8, S110 1 | 1 of 3 | 1 of 17 |
-| requests | 1 | 0.8 | 63 / 15 | 0.0 | F401 59, ARG001 2, ARG002 2 | 0 of 1 | 0 of 63 |
-| pygoat | 59 | 0.4 | 80 / 0 | 0.0 | E722 30, F401 29, F841 7, ARG002 6, S110 4, ARG001 4 | 58 of 59 | 62 of 80 |
+| flask | 3 | 0.7 | 17 / 161 | 0.0 | ARG001 8, ARG002 8, S110 1 | 1 of 3 | 1 of 17 |
+| requests | 1 | 0.6 | 63 / 15 | 0.0 | F401 59, ARG001 2, ARG002 2 | 0 of 1 | 0 of 63 |
+| pygoat | 59 | 0.3 | 80 / 0 | 0.0 | E722 30, F401 29, F841 7, ARG002 6, S110 4, ARG001 4 | 58 of 59 | 62 of 80 |
 
 ### 5. Cyclomatic complexity over 10: ours vs lizard
 
@@ -224,72 +237,72 @@ ours-only, by rule: HTML injected without escaping 47, hard-coded password / sec
 | express | 3 | 0 | 4 / 0 | 0 | 0.3 | 1 | – |
 | excalidraw | 117 | 0 | 89 / 4 | 0 | 1.1 | 53 | – |
 | spring-petclinic | 1 | 0 | 0 / 1 | 0 | 0.1 | 0 | – |
-| commons-lang | 73 | 0 | 58 / 7 | 0 | 2.0 | 44 | – |
+| commons-lang | 73 | 0 | 58 / 7 | 0 | 1.9 | 44 | – |
 | ripgrep | 46 | 0 | 44 / 0 | 0 | 0.4 | 43 | – |
 | bat | 39 | 21 | 14 / 49 | 47 | 0.7 | 28 | – |
-| NodeGoat | 2 | 0 | 7 / 0 | 7 | 0.1 | 0 | – |
+| NodeGoat | 2 | 0 | 7 / 0 | 7 | 0.2 | 0 | – |
 | pygoat | 1 | 0 | 1 / 0 | 0 | 0.1 | 1 | 1 |
 | WebGoat | 43 | 32 | 170 / 0 | 149 | 1.0 | 17 | – |
-| juice-shop | 46 | 0 | 91 / 0 | 78 | 1.2 | 28 | – |
+| juice-shop | 46 | 0 | 91 / 0 | 78 | 1.0 | 28 | – |
 
 ### 6. Dead functions: ours vs vulture (Python projects)
 
 | project | ours dead functions | s | vulture unused function/method (≥ 60 %): non-test / test | s | both (same file:line) | vulture-only (non-test) | ours-only |
 |---|---|---|---|---|---|---|---|
-| flask | 1 | 1.0 | 9 / 245 | 0.2 | 1 | 8 | 0 |
-| requests | 18 | 0.8 | 21 / 4 | 0.2 | 18 | 3 | 0 |
-| pygoat | 4 | 0.5 | 12 / 0 | 0.1 | 4 | 8 | 0 |
+| flask | 1 | 0.6 | 9 / 245 | 0.2 | 1 | 8 | 0 |
+| requests | 18 | 0.5 | 21 / 4 | 0.1 | 18 | 3 | 0 |
+| pygoat | 4 | 0.3 | 12 / 0 | 0.1 | 4 | 8 | 0 |
 
 ### 7. Clones: ours vs PMD CPD
 
 | project | ours exact clone groups | test-only groups | s | CPD duplications (60 tokens) | test-only | CPD languages | s | ours listed groups that CPD also pairs (same files) |
 |---|---|---|---|---|---|---|---|---|
-| flask | 26 | 5 of 20 listed | 0.4 | 10 | 4 | python | 0.6 | 12 of 20 |
-| requests | 13 | 4 of 13 listed | 0.3 | 5 | 4 | python | 0.7 | 4 of 13 |
+| flask | 26 | 5 of 20 listed | 0.3 | 10 | 4 | python | 0.5 | 12 of 20 |
+| requests | 13 | 4 of 13 listed | 0.2 | 5 | 4 | python | 0.6 | 4 of 13 |
 | express | 5 | 3 of 5 listed | 0.3 | 139 | 134 | ecmascript | 0.6 | 4 of 5 |
-| excalidraw | 20 | 6 of 20 listed | 1.9 | 47 | 21 | ecmascript, typescript | 5.4 | 4 of 20 |
-| spring-petclinic | 6 | 5 of 6 listed | 0.1 | 10 | 10 | java | 0.5 | 4 of 6 |
-| commons-lang | 474 | 13 of 20 listed | 15.2 | 807 | 749 | java | 1.1 | 17 of 20 |
-| ripgrep | 78 | 2 of 20 listed | 1.0 | 0 | 0 | none (Rust unsupported) | 0.0 | 0 of 20 |
-| bat | 43 | 18 of 20 listed | 0.8 | 75 | 74 | ecmascript, java, python, typescript | 2.2 | 4 of 20 |
+| excalidraw | 20 | 6 of 20 listed | 1.5 | 47 | 21 | ecmascript, typescript | 4.8 | 4 of 20 |
+| spring-petclinic | 6 | 5 of 6 listed | 0.1 | 10 | 10 | java | 0.4 | 4 of 6 |
+| commons-lang | 474 | 13 of 20 listed | 13.6 | 807 | 749 | java | 1.0 | 17 of 20 |
+| ripgrep | 78 | 2 of 20 listed | 0.8 | 0 | 0 | none (Rust unsupported) | 0.0 | 0 of 20 |
+| bat | 43 | 18 of 20 listed | 0.7 | 75 | 74 | ecmascript, java, python, typescript | 2.3 | 4 of 20 |
 | NodeGoat | 0 | 0 of 0 listed | 0.1 | 10 | 0 | ecmascript | 0.6 | 0 of 0 |
 | pygoat | 4 | 0 of 4 listed | 0.2 | 6 | 0 | ecmascript, python | 1.0 | 3 of 4 |
-| WebGoat | 55 | 12 of 20 listed | 2.0 | 190 | 42 | ecmascript, java | 1.5 | 14 of 20 |
-| juice-shop | 35 | 0 of 20 listed | 1.3 | 516 | 172 | ecmascript, python, typescript | 7.5 | 14 of 20 |
+| WebGoat | 55 | 12 of 20 listed | 1.6 | 190 | 42 | ecmascript, java | 1.4 | 14 of 20 |
+| juice-shop | 35 | 0 of 20 listed | 1.0 | 516 | 172 | ecmascript, python, typescript | 6.7 | 14 of 20 |
 
 ### 8. Secrets in git history: ours vs gitleaks
 
 | project | ours secrets in history | s | gitleaks | s | gitleaks by rule | files flagged by both | files ours | files gitleaks |
 |---|---|---|---|---|---|---|---|---|
-| flask | 3 | 1.1 | 6 | 0.3 | generic-api-key 6 | 2 | 2 | 2 |
-| requests | 4 | 0.9 | 4 | 0.7 | private-key 4 | 4 | 4 | 4 |
+| flask | 3 | 1.0 | 6 | 0.3 | generic-api-key 6 | 2 | 2 | 2 |
+| requests | 4 | 1.0 | 4 | 0.6 | private-key 4 | 4 | 4 | 4 |
 | express | 1 | 0.9 | 0 | 0.3 | – | 0 | 1 | 0 |
-| excalidraw | 3 | 3.9 | 3 | 0.4 | gcp-api-key 2, generic-api-key 1 | 3 | 3 | 3 |
-| spring-petclinic | 0 | 0.6 | 0 | 0.3 | – | 0 | 0 | 0 |
-| commons-lang | 0 | 4.7 | 0 | 0.5 | – | 0 | 0 | 0 |
-| ripgrep | 0 | 1.5 | 0 | 0.4 | – | 0 | 0 | 0 |
+| excalidraw | 3 | 3.0 | 3 | 0.4 | gcp-api-key 2, generic-api-key 1 | 3 | 3 | 3 |
+| spring-petclinic | 0 | 0.5 | 0 | 0.3 | – | 0 | 0 | 0 |
+| commons-lang | 0 | 4.5 | 0 | 0.5 | – | 0 | 0 | 0 |
+| ripgrep | 0 | 1.6 | 0 | 0.3 | – | 0 | 0 | 0 |
 | bat | 0 | 3.3 | 0 | 0.4 | – | 0 | 0 | 0 |
-| NodeGoat | 5 | 0.7 | 3 | 0.3 | generic-api-key 2, private-key 1 | 3 | 5 | 3 |
-| pygoat | 12 | 0.9 | 10 | 0.3 | generic-api-key 8, jwt 2 | 3 | 4 | 3 |
-| WebGoat | 23 | 3.5 | 24 | 0.6 | jwt 16, generic-api-key 6, private-key 2 | 14 | 16 | 14 |
-| juice-shop | 98 | 6.5 | 50 | 0.8 | generic-api-key 38, jwt 11, private-key 1 | 22 | 52 | 22 |
+| NodeGoat | 5 | 0.5 | 3 | 0.3 | generic-api-key 2, private-key 1 | 3 | 5 | 3 |
+| pygoat | 12 | 0.9 | 10 | 0.4 | generic-api-key 8, jwt 2 | 3 | 4 | 3 |
+| WebGoat | 23 | 3.7 | 24 | 0.6 | jwt 16, generic-api-key 6, private-key 2 | 14 | 16 | 14 |
+| juice-shop | 98 | 5.8 | 50 | 0.8 | generic-api-key 38, jwt 11, private-key 1 | 22 | 52 | 22 |
 
 ### 9. Known CVEs: ours vs osv-scanner
 
-| project | ours (`--cve`, OSV querybatch) | s | osv-scanner: manifest (packages, vulnerable) | osv vulns | s |
-|---|---|---|---|---|---|
-| flask | 9 finding(s)  (20 pinned dependencies queried) | 3.3 | examples/celery/requirements.txt (4 packages, 27) | 27 | 5.7 |
-| requests | 0 finding(s)  (1 pinned dependencies queried) | 0.5 | docs/requirements.txt (1 packages, 2) | 2 | 7.4 |
-| express | 0 finding(s)  (0 pinned dependencies queried) | 0.1 | – | 0 | 0.1 |
-| excalidraw | 0 finding(s)  (0 pinned dependencies queried) | 0.1 | dev-docs/yarn.lock (59 packages, 149); src/packages/excalidraw/yarn.lock (47 packages, 107); src/packages/utils/yarn.lock (19 packages, 34); yarn.lock (65 packages, 205) | 495 | 3.6 |
-| spring-petclinic | 0 finding(s)  (0 pinned dependencies queried) | 0.1 | pom.xml (4 packages, 6) | 6 | 38.2 |
-| commons-lang | 0 finding(s)  (0 pinned dependencies queried) | 0.1 | – | 0 | 4.4 |
-| ripgrep | 5 finding(s)  (61 pinned dependencies queried) | 2.2 | Cargo.lock (4 packages, 5) | 5 | 0.8 |
-| bat | 28 finding(s)  (195 pinned dependencies queried) | 9.8 | Cargo.lock (13 packages, 23); assets/syntaxes/02_Extra/syntax_test_requirements.txt (3 packages, 79); tests/syntax-tests/source/Requirements.txt/requirements.txt (3 packages, 79) | 181 | 3.9 |
-| NodeGoat | OSV unreachable (network); 1091 pinned dependencies not checked | 0.7 | package-lock.json (130 packages, 301) | 301 | 4.1 |
-| pygoat | crashed: TypeError: '<' not supported between instances of 'int' and 'str' | 6.3 | dockerized_labs/broken_auth_lab/requirements.txt (4 packages, 27); dockerized_labs/broken_auth_lab/requirements.txt (3 packages, 26); dockerized_labs/insec_des_lab/requirements.txt (2 packages, 14); dockerized_labs/insec_des_lab/requirements.txt (2 packages, 14); dockerized_labs/sensitive_data_exposure/requirements.txt (2 packages, 35); dockerized_labs/sensitive_data_exposure/requirements.txt (2 packages, 18); requirements.txt (13 packages, 237); requirements.txt (5 packages, 163) | 534 | 12.0 |
-| WebGoat | 0 finding(s)  (0 pinned dependencies queried) | 0.1 | pom.xml (3 packages, 39); pom.xml (38 packages, 89) | 128 | 54.0 |
-| juice-shop | 0 finding(s)  (0 pinned dependencies queried) | 0.1 | – | 0 | 0.1 |
+| project | ours packages | manifests | transitive | vulnerable | advisories | s | osv-scanner: manifest (vulnerable packages, advisories) | osv advisories | s |
+|---|---|---|---|---|---|---|---|---|---|
+| flask | 20 | 1 | 8 | 4 | 27 | 1.5 | examples/celery/requirements.txt (4, 27) | 27 | 4.7 |
+| requests | 15 | 1 | 14 | 0 | 0 | 0.6 | docs/requirements.txt (1, 2) | 2 | 6.9 |
+| express | 0 | 0 | 0 | 0 | 0 | 0.1 | – | 0 | 0.1 |
+| excalidraw | 3190 | 4 | 0 | 190 | 495 | 18.7 | dev-docs/yarn.lock (59, 149); src/packages/excalidraw/yarn.lock (47, 107); src/packages/utils/yarn.lock (19, 34); yarn.lock (65, 205) | 495 | 3.8 |
+| spring-petclinic | 172 | 1 | 145 | 4 | 6 | 1.9 | pom.xml (4, 6) | 6 | 38.7 |
+| commons-lang | 28 | 1 | 21 | 1 | 1 | 2.9 | – | 0 | 4.4 |
+| ripgrep | 61 | 1 | 0 | 4 | 5 | 1.2 | Cargo.lock (4, 5) | 5 | 0.8 |
+| bat | 247 | 3 | 40 | 17 | 157 | 2.6 | Cargo.lock (13, 23); assets/syntaxes/02_Extra/syntax_test_requirements.txt (3, 79); tests/syntax-tests/source/Requirements.txt/requirements.txt (3, 79) | 181 | 3.2 |
+| NodeGoat | 1091 | 1 | 0 | 130 | 301 | 11.6 | package-lock.json (130, 301) | 301 | 3.9 |
+| pygoat | 59 | 4 | 29 | 22 | 323 | 3.7 | dockerized_labs/broken_auth_lab/requirements.txt (4, 27); dockerized_labs/broken_auth_lab/requirements.txt (3, 26); dockerized_labs/insec_des_lab/requirements.txt (2, 14); dockerized_labs/insec_des_lab/requirements.txt (2, 14); dockerized_labs/sensitive_data_exposure/requirements.txt (2, 35); dockerized_labs/sensitive_data_exposure/requirements.txt (2, 18); requirements.txt (13, 237); requirements.txt (5, 163) | 534 | 10.8 |
+| WebGoat | 239 | 1 | 205 | 43 | 135 | 4.4 | pom.xml (3, 39); pom.xml (38, 89) | 128 | 60.3 |
+| juice-shop | 0 | 0 | 0 | 0 | 0 | 0.1 | – | 0 | 0.1 |
 
 
 ## Where the numbers come from

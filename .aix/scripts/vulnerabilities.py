@@ -7,7 +7,8 @@
               deserialisation, outbound requests). Sanitisers (int/float, shlex.quote, escape, secure_filename,
               uuid, parameterised execute, Path.resolve with is_relative_to) clear the taint.
               Result: "input reaches sink" with the path. Static, one call deep across functions, one file at a time.
-  --cve       pinned dependencies (requirements, uv/poetry locks, package-lock, pnpm-lock, Cargo.lock) checked in one
+  --cve       every lockfile (uv/poetry/pdm/Cargo, package-lock, pnpm, yarn, Pipfile, Gemfile, composer, go.sum) as it is, and
+              `==` pins and pom.xml dependencies resolved through deps.dev, checked in one
               batch against the OSV database (api.osv.dev). Needs the network; stops cleanly and says so otherwise.
   --history   `git log -p` through the secret rules: keys, tokens and hard-coded passwords in past commits (a rotated
               key in history is still a leak). Bounded by --commits N (default 300).
@@ -195,15 +196,23 @@ def _sections(modes, paths, commits):
     if "--taint" in modes:
         sections.append(("taint paths (Python, JS/TS)", taint(paths) + jstaint.taint(paths), "input sources followed to sinks, one call deep, per file"))
     if "--cve" in modes:
-        found, n = cve()
+        found, stats = cve()
         unreachable = found is None
-        note = f"OSV unreachable (network); {n} pinned dependencies not checked" if unreachable else f"{n} pinned dependencies queried"
-        sections.append(("known CVEs (OSV)", found, note))
+        sections.append(("known CVEs (OSV)", found, _cve_note(stats)))
     if "--history" in modes:
         h = history(commits)
         scope = f"last {commits} commits" if commits else "every commit"
         sections.append(("secrets in git history", h, f"{scope}, all branches, {len(secretrules.RULES)} gitleaks patterns + the register's" if h is not None else "no git repository"))
     return sections, unreachable
+
+
+def _cve_note(stats: dict) -> str:
+    """What was queried: manifests, packages (of them transitive, resolved through deps.dev), and what could not be."""
+    scope = f"{stats['packages']} packages from {len(stats['manifests'])} manifest(s), {stats['transitive']} of them pulled in by the {stats['direct']} direct declarations"
+    tail = f"; {len(stats['unresolved'])} Maven dependencies without a resolvable version: {', '.join(stats['unresolved'][:3])}" if stats["unresolved"] else ""
+    if stats["unreachable"] and stats["vulnerable"] == 0 and stats["advisories"] == 0:
+        return f"OSV or deps.dev unreachable (network); {scope} not fully checked" + tail
+    return f"{scope}; {stats['vulnerable']} vulnerable, {stats['advisories']} advisories" + (" (deps.dev unreachable for some: partial)" if stats["unreachable"] else "") + tail
 
 
 def _write_outputs(text: str, sections, paths, unreachable: bool, args):

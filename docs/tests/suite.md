@@ -24,6 +24,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_help.py` | the help pages: Markdown per topic, aliases, unknown topic, usage/about, a layer replacing a page |
 | `test_java.py` | Java: references without an import are edges, entry classes live, SQL assembled then executed is found |
 | `test_wrappers.py` | pass-through wrappers found and legitimate shapes left alone, in five languages |
+| `test_cve.py` | known CVEs offline: every manifest kind read (yarn v1/berry, Pipfile, Gemfile, composer, go.sum, pom with properties, management, parent, exclusions), resolution through a fake deps.dev with the disk cache, OSV batches of 1000, the version sort, the report note |
 | `test_secrets.py` | the gitleaks rule set inside the kit: every rule compiles, keyword gate, entropy floor, allowlists, files that are secrets by name, one finding per line, whole-history walk with `--commits` as a bound, `[docs]` tag |
 | `test_js_taint.py` | JS/TS taint: 40 marked sinks found across five frameworks, the negatives clean, tags and gate |
 | `test_two_line.py` | a string assembled on one line and used by a dangerous call later is found, in four languages; the negatives stay clean |
