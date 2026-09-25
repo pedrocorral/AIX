@@ -18,10 +18,13 @@ Three analyses, all on by default, each selectable:
               pnpm-lock.yaml, Cargo.lock, sent in one batch to the OSV database (api.osv.dev). Reports the advisory
               id, summary and the first fixed version, per VUL-DEP-001. Needs the network; when unreachable it says
               so, skips, and the gate is not failed by it.
-  --history   `git log -p --all` over the last --commits N (default 300) through the secret rules of aix code
-              security (private keys, cloud/API tokens, hard-coded passwords). A leaked secret in history is live
-              until rotated, even if the file was cleaned. Files carrying `aix: skip-security-scan` are skipped at
-              the commit where they carried it.
+  --history   `git log -p --all` over every commit (or the last --commits N) through the secret rules of aix code
+              security: the register's own (private keys, cloud/API tokens, hard-coded passwords) and the gitleaks
+              rule set (221 provider patterns and a generic one with an entropy floor and allowlists, from
+              config/gitleaks.toml, MIT). A leaked secret in history is live until rotated, even if the file was
+              cleaned. Files carrying `aix: skip-security-scan` are skipped at the commit where they carried it;
+              images, fonts, binaries and package-manager lockfiles are never read. A finding in documentation
+              (docs/, *.md, *.rst, *.adoc) is tagged [docs]: listed, not gated, like [test].
 
 JavaScript/TypeScript (.js .jsx .ts .tsx .mjs) is followed without a parser, statement by statement, scoped by braces:
   sources     req/request.query|params|body|headers|cookies (Express, Fastify), ctx.query|request.body (Koa),

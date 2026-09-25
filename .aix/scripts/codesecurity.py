@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots, SKIP, rel
 import assembled
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
-from depscan import scan_dependencies
+from secretscan import SECRET_ADVICE, secret_findings
+import secretscan
+from depscan import scan_dependencies, scan_dockerfile
 
 
 # ---- scanning -----------------------------------------------------------------------------------------------------
@@ -26,6 +28,11 @@ from depscan import scan_dependencies
 def is_test(p: Path) -> bool:
     return any(part in ("tests", "test", "__tests__", "fixtures") for part in p.parts) or p.name.startswith("test_") \
         or ".test." in p.name or ".spec." in p.name
+
+
+def is_docs(p: Path) -> bool:
+    """Documentation: an example key in a manual is listed, not gated (a real one there is still a leak: read it)."""
+    return "docs" in p.parts or p.suffix in (".md", ".rst", ".adoc")
 
 
 LITERAL = r"(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)"
@@ -56,6 +63,18 @@ def _line_findings(f: Path, i: int, raw: str, lang, langs: set):
             yield (vul, cwe, title, rel(f), i, raw.strip()[:110], advice, accepted)
 
 
+def _rule_findings(f: Path, lines: list, lang, langs: set) -> list:
+    """The per-line rules on code lines, then the secret patterns on every line the secret rules did not report."""
+    found = [fx for i, raw in enumerate(lines, 1) if not _not_code(raw, i, lines, lang) for fx in _line_findings(f, i, raw, lang, langs)]
+    taken = {fx[4] for fx in found if fx[0] == "VUL-SECRET-001"}
+    return found + list(secret_findings(rel(f), lines, taken, _accepted_secret))
+
+
+def _accepted_secret(raw: str):
+    acc = ACCEPT.search(raw)
+    return f"{acc.group(1)} {acc.group(2).strip()}".strip() if acc and acc.group(1) == "VUL-SECRET-001" else None
+
+
 def scan_file(f: Path):
     """[(vul, cwe, title, file, line_no, snippet, advice, accepted)]"""
     lang = LANG.get(f.suffix)
@@ -67,7 +86,7 @@ def scan_file(f: Path):
     skipped = _skip_marker(lines, f)
     if skipped:
         return [skipped]
-    found = [fx for i, raw in enumerate(lines, 1) if not _not_code(raw, i, lines, lang) for fx in _line_findings(f, i, raw, lang, langs)]
+    found = _rule_findings(f, lines, lang, langs)
     if lang and not assembled.exempt(f):
         found += assembled.findings(f, lines, lang, lambda l: strip_comment(l, lang))
     return _inline_tests_tagged(found, lines, lang)
@@ -103,18 +122,6 @@ def _not_code(raw: str, i: int, lines: list, lang) -> bool:
     return prose
 
 
-def scan_dockerfile(f: Path):
-    text = f.read_text(encoding="utf-8", errors="replace")
-    out = []
-    if re.search(r"^\s*FROM\b", text, re.M) and not re.search(r"^\s*USER\s+(?!root\b)\w", text, re.M):
-        out.append(("VUL-INFRA-001", "CWE-250", DOCKER_RULES[0][2], rel(f), 1, "no USER instruction", DOCKER_RULES[0][3], None))
-    for m in re.finditer(r"^\s*FROM\s+([^\s]+)", text, re.M):
-        image = m.group(1)
-        if image.lower() not in ("scratch",) and not re.search(r"@sha256:|:[\w.-]+$", image) or image.endswith(":latest"):
-            out.append(("VUL-DEP-001", "CWE-1104", DOCKER_RULES[1][2], rel(f), text.count("\n", 0, m.start()) + 1, m.group(0).strip(), DOCKER_RULES[1][3], None))
-    return out
-
-
 ENV_FILES = (".env", ".env.local", ".env.production")
 
 
@@ -124,6 +131,9 @@ def _scan_target(f: Path):
         return scan_dockerfile(f)
     if f.name != ".env.example" and (f.suffix in TEXT_EXT or f.name in ENV_FILES):
         return scan_file(f)
+    by_name = secretscan.path_secret(rel(f))
+    if by_name:
+        return [("VUL-SECRET-001", "CWE-798", f"secret pattern: {by_name[0]}", rel(f), 1, by_name[1], SECRET_ADVICE, None)]
     return []
 
 
@@ -179,7 +189,7 @@ def _vul_lines(vul: str, fxs: list, rows: dict) -> list:
     desc, status = rows.get(vul, ("(not in register)", "?"))
     lines = [f"  {vul}  {desc[:70]}  [register: {status}]"]
     for _, cwe, title, file, ln, snippet, advice, acc in sorted(fxs, key=lambda x: (x[3], x[4]))[:25]:
-        tag = "accepted: " + acc if acc else ("test" if is_test(ROOT / file) else "REVIEW")
+        tag = "accepted: " + acc if acc else ("test" if is_test(ROOT / file) else "docs" if is_docs(ROOT / file) else "REVIEW")
         lines += [f"    {file}:{ln}  {title} ({cwe})  [{tag}]", f"      {snippet}"]
         if not acc:
             lines.append(f"      -> {advice}")
@@ -189,14 +199,19 @@ def _vul_lines(vul: str, fxs: list, rows: dict) -> list:
 
 
 def _summary_line(live, tests, accepted, covered, by_vul) -> str:
-    return (f"  findings to review {len(live)}" + (f"; in tests (not gated, --strict to gate) {len(tests)}" if tests else "")
+    return (f"  findings to review {len(live)}" + (f"; in tests or docs (not gated, --strict to gate) {len(tests)}" if tests else "")
             + (f"; accepted in code {len(accepted)}" if accepted else "") + f"; register rows with rules {len(covered)}, with findings {len(by_vul)}")
 
 
+def _not_gated(fx) -> bool:
+    """Tests and documentation are listed, not gated."""
+    return is_test(ROOT / fx[3]) or is_docs(ROOT / fx[3])
+
+
 def _classify(findings, strict: bool):
-    """(to review, in tests, accepted) among the real findings."""
-    live = [fx for fx in findings if not fx[7] and (strict or not is_test(ROOT / fx[3]))]
-    tests = [fx for fx in findings if not fx[7] and is_test(ROOT / fx[3])]
+    """(to review, in tests or docs, accepted) among the real findings."""
+    live = [fx for fx in findings if not fx[7] and (strict or not _not_gated(fx))]
+    tests = [fx for fx in findings if not fx[7] and _not_gated(fx)]
     accepted = [fx for fx in findings if fx[7]]
     return live, tests, accepted
 

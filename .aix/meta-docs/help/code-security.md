@@ -8,8 +8,10 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   VUL-INJ-001/002    SQL built from strings; shell commands (shell=True, exec/system); eval; template strings;
                      paths from request input                                             CWE-89/78/95/1336/22
   VUL-INPUT-001/002  pickle/marshal/yaml.load without SafeLoader, ObjectInputStream, XML entities  CWE-502/20
-  VUL-SECRET-001/002 private keys, cloud/API tokens, hard-coded passwords; TLS verification off; DEBUG on;
-                     ALLOWED_HOSTS *                                                       CWE-798/295/489/16
+  VUL-SECRET-001/002 private keys, cloud/API tokens, hard-coded passwords, plus the gitleaks rule set (221
+                     provider patterns and a generic one: keyword gate, regex, entropy floor, allowlists for
+                     placeholders and example values; secrets by file name such as .p12); TLS verification off;
+                     DEBUG on; ALLOWED_HOSTS *                                          CWE-798/295/489/16
   VUL-AUTHN-001/002  md5/sha1 for passwords, random for tokens; JWT unverified / alg none; cookies without
                      Secure/HttpOnly                                                       CWE-328/338/347/614
   VUL-WEB-001/002/003 innerHTML/dangerouslySetInnerHTML/mark_safe; CSRF disabled; CORS *; open redirect

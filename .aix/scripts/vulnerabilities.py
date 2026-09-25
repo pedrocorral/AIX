@@ -20,11 +20,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots
-from codesecurity import is_test, register_rows
+from codesecurity import is_docs, is_test, register_rows
 from taint import taint
 import jstaint
 from cvecheck import cve, dependencies
 from secrethistory import history
+import secretrules
 
 
 
@@ -37,7 +38,7 @@ SHOWN_PER_ROW = 20
 def _finding_line(f) -> str:
     _, cwe, what, file, ln, snippet, advice, acc = f
     where = f"{file}:{ln}" if ln else file
-    tag = f"accepted: {acc}" if acc else "test" if is_test(ROOT / file) else "REVIEW"
+    tag = f"accepted: {acc}" if acc else "test" if is_test(ROOT / file) else "docs" if is_docs(ROOT / file) else "REVIEW"
     return f"      {where}  {what} ({cwe})  [{tag}]\n        {snippet}\n        -> {advice}"
 
 
@@ -63,7 +64,7 @@ def render(sections, paths, strict):
         if findings is None:
             lines += [f"  {title}: {note}", ""]
             continue
-        total_live += sum(1 for f in findings if not f[7] and (strict or not is_test(ROOT / f[3])))
+        total_live += sum(1 for f in findings if not f[7] and (strict or not (is_test(ROOT / f[3]) or is_docs(ROOT / f[3]))))
         lines.append(f"  {title}: {len(findings)} finding(s)" + (f"  ({note})" if note else ""))
         lines += _finding_lines(findings, rows) + [""]
     lines.append("  A taint path is static evidence that input can reach a sink, not a proof of exploitability in production;")
@@ -200,7 +201,8 @@ def _sections(modes, paths, commits):
         sections.append(("known CVEs (OSV)", found, note))
     if "--history" in modes:
         h = history(commits)
-        sections.append(("secrets in git history", h, f"last {commits} commits, all branches" if h is not None else "no git repository"))
+        scope = f"last {commits} commits" if commits else "every commit"
+        sections.append(("secrets in git history", h, f"{scope}, all branches, {len(secretrules.RULES)} gitleaks patterns + the register's" if h is not None else "no git repository"))
     return sections, unreachable
 
 
@@ -220,8 +222,8 @@ def _gate(n_live: int, unreachable: bool):
     print("GATE PASSED" + ("  (CVE check skipped: OSV unreachable)" if unreachable else ""))
 
 
-def _commits_flag(args, default=300) -> int:
-    """Remove `--commits N` from args (in place) and return N."""
+def _commits_flag(args, default=None):
+    """Remove `--commits N` from args (in place) and return N; None = the whole history."""
     if "--commits" not in args:
         return default
     i = args.index("--commits"); value = int(args[i + 1]); del args[i:i + 2]

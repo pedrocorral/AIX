@@ -24,6 +24,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_help.py` | the help pages: Markdown per topic, aliases, unknown topic, usage/about, a layer replacing a page |
 | `test_java.py` | Java: references without an import are edges, entry classes live, SQL assembled then executed is found |
 | `test_wrappers.py` | pass-through wrappers found and legitimate shapes left alone, in five languages |
+| `test_secrets.py` | the gitleaks rule set inside the kit: every rule compiles, keyword gate, entropy floor, allowlists, files that are secrets by name, one finding per line, whole-history walk with `--commits` as a bound, `[docs]` tag |
 | `test_js_taint.py` | JS/TS taint: 40 marked sinks found across five frameworks, the negatives clean, tags and gate |
 | `test_two_line.py` | a string assembled on one line and used by a dangerous call later is found, in four languages; the negatives stay clean |
 | `test_registry.py` | registry downloads (network) |
@@ -31,6 +32,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_hygiene.py` | leftovers, swallowed exceptions and known bugs found, the legitimate shapes left alone, in four languages |
 | `test_ideal.py` | B built from A with known answers; the distance and its edits in the report and the gate |
 | `test_funcgraph.py` | function-level graphs for JS/TS, Rust and Java with known answers |
+| `benchmark/engines.py`, `benchmark/report.py` | not in the suite: the benchmark of the code tools against external engines on the extended projects (`docs/tests/benchmark-engines.md`); needs the engines on disk and the network |
 | `test_extended.py` | the code tools on twelve real projects from a cache outside the repo (`aix self-test --extended`): no crash, time limits, recorded numbers, documented vulnerabilities found |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on

@@ -3,7 +3,7 @@
   "clones": 0,
   "dead": 6,
   "graph": 32,
-  "security": 9,
+  "security": 11,
   "style": 38,
   "vulnerabilities": 5
  },
@@ -11,7 +11,7 @@
   "clones": 55,
   "dead": 30,
   "graph": 820,
-  "security": 62,
+  "security": 67,
   "style": 1437,
   "vulnerabilities": 0
  },
@@ -59,7 +59,7 @@
   "clones": 35,
   "dead": 7,
   "graph": 858,
-  "security": 55,
+  "security": 58,
   "style": 1037,
   "vulnerabilities": 22
  },
@@ -67,7 +67,7 @@
   "clones": 4,
   "dead": 7,
   "graph": 29,
-  "security": 66,
+  "security": 74,
   "style": 184,
   "vulnerabilities": 12
  },

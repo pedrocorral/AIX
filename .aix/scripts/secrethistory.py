@@ -1,9 +1,11 @@
-"""Leaf: secrets in git history. The register's secret rules run over the diffs of the last N commits."""
+"""Leaf: secrets in git history. The register's secret rules and the gitleaks rule set run over the added lines of
+every commit on every branch (or the last N with --commits N)."""
 import re, subprocess
 from pathlib import Path
 
 from codefiles import ROOT
 from codesecurity import RULES, SKIP_FILE, MARKER_LINES
+import secretscan
 
 
 # ---- secrets in git history ------------------------------------------------------------------------------------
@@ -20,10 +22,11 @@ def has_skip_marker(path: str, commit: str, root: Path = ROOT) -> bool:
     return any(SKIP_FILE.search(l) for l in head.splitlines()[:MARKER_LINES])
 
 
-def _git_log(commits: int, root: Path):
+def _git_log(commits, root: Path):
+    limit = [f"-n{commits}"] if commits else []
     try:
-        return subprocess.run(["git", "-c", f"safe.directory={root}", "log", "-p", "--all", "--no-color", "--unified=0", "--diff-filter=AM", f"-n{commits}"],
-                              cwd=root, capture_output=True, text=True, errors="replace", timeout=120).stdout
+        return subprocess.run(["git", "-c", f"safe.directory={root}", "log", "-p", "--all", "--no-color", "--unified=0", "--diff-filter=AM", *limit],
+                              cwd=root, capture_output=True, text=True, errors="replace", timeout=600).stdout
     except Exception:
         return None
 
@@ -39,20 +42,32 @@ class _History:
         if (self.commit, path) in self.checked:
             return
         self.checked.add((self.commit, path))
-        (self.skip_paths.add if has_skip_marker(path, self.commit, self.root) else self.skip_paths.discard)(path)
+        skip = path.startswith(".aix/") or has_skip_marker(path, self.commit, self.root)   # the kit's manifest is hashes keyed by file
+        (self.skip_paths.add if skip else self.skip_paths.discard)(path)
+
+    def _record(self, title: str, secret: str, code: str):
+        key = (title, self.path, secret[:40])
+        if key not in self.seen:
+            self.seen.add(key)
+            self.findings.append(("VUL-SECRET-001", "CWE-798", f"{title} in history (commit {self.commit})", self.path, 0, code.strip()[:100],
+                                  "rotate the secret now; history keeps it even after removal (git filter-repo to purge)", None))
 
     def added_line(self, code: str):
-        for vul, cwe, title, _langs, rx, advice in SECRET_RULES:
+        """The register's own secret rules first; the gitleaks rules on a line they did not already report."""
+        hit = False
+        for _vul, _cwe, title, _langs, rx, _advice in SECRET_RULES:
             m = re.search(rx, code)
-            key = (title, self.path, m.group(0)[:40]) if m else None
-            if key and key not in self.seen:
-                self.seen.add(key)
-                self.findings.append((vul, cwe, f"{title} in history (commit {self.commit})", self.path, 0, code.strip()[:100],
-                                      "rotate the secret now; history keeps it even after removal (git filter-repo to purge)", None))
+            if m:
+                hit = True
+                self._record(title, m.group(0), code)
+        if not hit and not secretscan.path_allowed(self.path):
+            for rid, _description, secret in secretscan.find(self.path, code):
+                self._record(f"secret pattern: {rid}", secret, code)
 
 
-def history(commits=300, root: Path = ROOT):
-    """Secret findings in the last `commits` of the repository at `root`; None when there is no git history."""
+def history(commits=None, root: Path = ROOT):
+    """Secret findings in the history of the repository at `root` (all commits, or the last `commits`); None when
+    there is no git history."""
     if not (root / ".git").exists():
         return None
     log = _git_log(commits, root)
