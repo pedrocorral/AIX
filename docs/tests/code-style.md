@@ -2,7 +2,7 @@
 
 ```
   runtime: Python 3.13 (python on PATH (assumed: nothing in the project declares a version)); Java: version unknown (no pom.xml / build.gradle)
-  functions analysed 1074; over a limit 0 (lines 0, cognitive 0, cyclomatic 0, nesting 0, params 0, pass-through 0, leftovers 0, swallowed 0, bugs 0); with any finding 440; files over 400 lines: 0
+  functions analysed 1075; over a limit 0 (lines 0, cognitive 0, cyclomatic 0, nesting 0, params 0, pass-through 0, leftovers 0, swallowed 0, bugs 0); with any finding 440; files over 400 lines: 0
 
   FUNCTION                                                     lines  cogn  cycl  nest  prm  findings
   .aix/scripts/stats.py:selftest                                  12     5     5     1    0   single-letter name `d`; public function without a docstring / doc comment

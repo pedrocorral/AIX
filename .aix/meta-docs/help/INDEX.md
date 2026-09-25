@@ -7,6 +7,7 @@ A layer (`.aix/org/meta-docs/help/`, `.aix/custom/meta-docs/help/`) overrides a 
 | Path | What | Read when |
 |---|---|---|
 | `usage.md` | The one-screen usage printed by a bare `aix` (`{n}` is replaced by the skill count) | Never directly: `aix` |
+| `newie.md` | AIX in one screen for a first day: what it is, set up once, every day, when something is odd (`aix newie`, `aix for-dummies`) | The first hour |
 | `about.md` | The long story: what AIX is, the loop, the layers (`aix about`) | Presenting AIX |
 | `install.md`, `upgrade.md`, `doctor.md`, `self-install.md` | Getting the kit into a project and keeping it current | Setting up |
 | `agent.md`, `agents.md`, `policy.md`, `profile.md`, `instructions.md`, `skills.md`, `task.md`, `guide.md`, `help.md`, `version.md` | The project commands | Daily use |

@@ -3,6 +3,7 @@ Ordered by priority (top = next). Each becomes a `TASK-*` file when it has requi
 
 | Item | Why |
 |---|---|
+| Licence audit of installed libraries (Black Duck-like): `aix code licenses` from installed metadata plus a `security-audit-licenses` skill, so an agent can check that an open-source dependency's licence is not too restrictive for the product | asked 2026-09-25, next +0.0.1 |
 | Planted-finding tests for `aix code security`, `vulnerabilities`, `dead`, `clones` | the four tools are only smoke-run today |
 | Tests for `aix task`, `aix docs coverage`, `aix docs security --gate`, always-on wiring | uncovered commands |
 | Windows: run the suite there once; `install.ps1`; `aix self-install` on PowerShell | never executed |

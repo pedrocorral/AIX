@@ -16,6 +16,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 | `aix install --into DIR [--from SRC] [--from-org SRC] [--from-custom SRC] [--agents a,b] [--copy] [--replace-all\|--skip-all\|--merge-all]` | Copy the kit into a project and set it up |
 | `aix upgrade [PROJECT] [--dry-run] [--yes] [--from-org SRC] [--from-custom SRC]` | Bring a project to the version of the `aix` on PATH |
 | `aix doctor` | Health check with a fix per problem |
+| `aix newie` (alias `aix for-dummies`) | AIX in one screen: the basics only |
 | `aix version`, `aix about`, `aix help [CMD]`, `aix guide [CHAPTER] [--all]` | Versions, the introduction, the help, this guide |
 
 ## Choices of a project

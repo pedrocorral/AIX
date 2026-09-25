@@ -20,7 +20,7 @@ def skill_count():
     return sum(1 for _ in (ROOT / ".aix" / "skills").rglob("SKILL.md"))
 
 
-ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update", "self-test", "guide"}  # need no project
+ANYWHERE = {"help", "-h", "--help", "about", "version", "-V", "--version", "self-install", "self-update", "self-test", "guide", "newie"}  # need no project
 
 
 def is_kit() -> bool:
@@ -138,7 +138,7 @@ def cmd_task(args):
 
 
 ALIASES = {"graph": ["code", "graph"], "complexity": ["code", "graph"], "validate": ["docs", "validate"],
-           "coverage": ["docs", "coverage"], "security": ["docs", "security"], "rules": ["instructions"]}
+           "coverage": ["docs", "coverage"], "security": ["docs", "security"], "rules": ["instructions"], "for-dummies": ["newie"], "basics": ["newie"]}
 CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--clones"]}
 
 
@@ -191,7 +191,7 @@ def _commands():
         "install": cmd_install, "upgrade": lambda a: __import__("upgrade").main(a), "doctor": lambda a: sys.exit(run_script("doctor.py")),
         "code": run_code, "docs": run_docs, "task": cmd_task, "skills": lambda a: __import__("skills").main(a),
         "profile": run_profile, "policy": run_policy, "check": run_check, "instructions": run_instructions,
-        "agents": run_agents, "agent": run_agent, "guide": run_guide,
+        "agents": run_agents, "agent": run_agent, "guide": run_guide, "newie": lambda a: print(helptext.text("newie"), end=""),
     }
 
 

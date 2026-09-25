@@ -59,6 +59,7 @@ tells you whether everything is in place and how to fix what is not.
 | `.claude/`, `.github/`, `.cursor/`, `.agents/`, `.opencode/` | Generated for the selected agents. Links, never edit |
 
 ## Getting help
+- `aix newie` (or `aix for-dummies`): AIX in one screen, the basics only.
 - `aix` alone or `aix help`: the command overview.
 - `aix help <command>`: one command in detail, for example `aix help agents`.
 - `aix guide`: this guide; `aix guide <chapter>` opens one chapter, for example `aix guide skills`.

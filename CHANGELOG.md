@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.14 — 2026-09-25
+
+- `aix newie` (aliases `aix for-dummies`, `aix basics`): AIX in one screen for a first day, deliberately not everything: what it is, set up once, every day, when something is odd, three things to know. A page under `.aix/meta-docs/help/` like the others, so a layer can replace it. Works outside a project.
+
 ## 2.21.13 — 2026-09-25
 
 - Precision review: every security, taint and hygiene finding on the eight clean extended projects was read against its source line. 154 findings; 88 were the tools' fault, from 22 root causes, each now a rule and a test case: `engines` entries and published libraries in the dependency rules, Cargo workspaces locking at the root, values made only of literals and `__dirname`/`__file__`, build and tooling scripts, signature and docstring lines, constant `os.system` commands, `innerHTML = ""` and DOM-to-DOM copies, Rust `#[cfg(test)]` code, a brace parser that counted braces inside strings and comments, line drift from stripped comments, closures reading a `const` declared below them, Rust `#[...]` attributes as decorators, declarations without a body, `..end` ranges, `e=None` callback slots, compat modules, multi-line re-exports, and `@contextmanager`-style decorators no longer making parameters input. The 66 that remain were read one by one: 58 are true or worth a reviewer's look, 8 are debatable and stay (public Firebase and Algolia keys, MD5 mandated by HTTP Digest, a library opening its own resource paths).

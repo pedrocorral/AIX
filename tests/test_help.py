@@ -43,6 +43,13 @@ class HelpPages(unittest.TestCase):
         about = run(["about"], cwd=KIT, home=self.home).stdout
         self.assertEqual(about.strip(), (HELP / "about.md").read_text(encoding="utf-8").strip())
 
+    def test_newie_is_one_screen_and_has_aliases(self):
+        out = run(["newie"], cwd=KIT, home=self.home).stdout
+        self.assertEqual(out, (HELP / "newie.md").read_text(encoding="utf-8"))
+        self.assertLessEqual(out.count("\n"), 40, "one screen, the basics only")
+        for alias in ("for-dummies", "basics"):
+            self.assertEqual(run([alias], cwd=KIT, home=self.home).stdout, out, alias)
+
     def test_a_layer_replaces_a_page(self):
         project = self.home / "app"
         install(self.home, project)
