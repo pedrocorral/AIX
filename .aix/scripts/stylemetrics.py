@@ -187,7 +187,7 @@ def analyse_py(file: Path, cls, fn, lang="python", lines: list = None):
     doc = ast.get_docstring(fn) is not None
     return dict(name=f"{cls + '.' if cls else ''}{fn.name}", file=rel(file), line=fn.lineno, lang=lang,
                 lines=(fn.end_lineno or fn.lineno) - fn.lineno + 1, params=len(params), cyclomatic=cyclomatic_py(fn),
-                cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc, passthrough=passthrough_py(fn), hygiene=hygiene.function_py(fn, lines or [], cls),
+                cognitive=cog, cognitive_items=cog_items, nesting=depth, deepest=block, docstring=doc, passthrough=passthrough_py(fn), hygiene=hygiene.function_py(fn, lines or [], cls, is_test(file, fn.name)),
                 public=not fn.name.startswith("_"), short_names=names_py(fn), magic=magic_py(fn), fname=fn.name, node=fn, cls=cls,
                 test=is_test(file, fn.name), decorated=bool(fn.decorator_list), jsx=False)
 
@@ -243,7 +243,7 @@ def analyse_tokens(file: Path, name: str, header_end: int, text: str, lang: str)
         walk.feed(m.group(0), start_line + cleaned.count("\n", 0, m.start()))
     before = text[max(0, text.rfind("\n", 0, text.rfind("\n", 0, header_end))):header_end]
     magic, short = _advice_tokens(cleaned, start_line)
-    decorated = bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*", before)) or (lang == "rust" and _trait_impl(text, header_end))
+    decorated = bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*|^\s*#\[", before, re.M)) or (lang == "rust" and _trait_impl(text, header_end))
     forwards = passthrough_tokens(re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S), head, name, lang, decorated)
     fx = dict(name=name, file=rel(file), line=start_line, lang=lang, lines=body.count("\n") + 1, params=_params_of(head), cyclomatic=walk.cyc,
               cognitive=walk.cog, cognitive_items=walk.items, nesting=max(walk.depth - 1, 0), deepest=(walk.deepest_line, walk.deepest_line),
@@ -301,20 +301,27 @@ def _token_functions(file: Path, text: str, lang: str) -> list:
     out = []
     for m in FUNC_HEAD[lang].finditer(text):
         name = next((g for g in m.groups() if g), None)
-        if name and name not in KEYWORDS:
+        brace = text.find("{", m.end() - 1)
+        if name and name not in KEYWORDS and brace >= 0 and ";" not in text[m.end() - 1:brace]:   # `;` first: a declaration, no body
             out.append(analyse_tokens(file, name, m.end() - 1, text, lang))
     return out
 
 
 def functions_in(file: Path):
     lang = EXT.get(file.suffix)
-    if not lang:
+    if not lang or file.name.endswith(".d.ts"):   # type declarations have no bodies
         return []
     text = file.read_text(encoding="utf-8", errors="replace")
     return _python_functions(file, text) if lang == "python" else _token_functions(file, text, lang)
 
 
 _REEXPORT_INDEX = None
+
+
+def _from_imports(f: Path) -> list:
+    """(module, names) of every `from m import a, b` in a file, parenthesised multi-line imports included."""
+    text = f.read_text(encoding="utf-8", errors="replace")
+    return [(m.group(1), m.group(2) or m.group(3)) for m in re.finditer(r"^\s*from\s+([\w.]+)\s+import\s+(?:\(([^)]*)\)|([^\n]+))", text, re.M | re.S)]
 
 
 def reexported_from(file: Path) -> set:
@@ -325,7 +332,7 @@ def reexported_from(file: Path) -> set:
         _REEXPORT_INDEX = {}
         for f in source_files(CODE_ROOTS):
             if f.suffix == ".py":
-                for mod, names in re.findall(r"^\s*from\s+([\w.]+)\s+import\s+\(?([^)\n]+)", f.read_text(encoding="utf-8", errors="replace"), re.M):
+                for mod, names in _from_imports(f):
                     _REEXPORT_INDEX.setdefault(mod.split(".")[-1], set()).update(n.strip().split(" as ")[0] for n in names.split(","))
     return _REEXPORT_INDEX.get(file.stem, set())
 

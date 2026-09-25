@@ -75,19 +75,24 @@ def normalise_tokens(text: str) -> list:
     return out
 
 
+SKIP_TOKEN = re.compile(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\\n])*\"|'(?:\\.|[^'\\\n]){1,3}'|`(?:[^`\\]|\\.)*`|\br#*\"[^\"]*\"#*", re.S)
+# what a brace inside cannot open or close: comments, strings, char literals (`'a'`, not a Rust lifetime), template literals, raw strings
+
+
 def brace_block(text: str, start: int) -> str:
-    """Text from the first '{' at/after `start` to its matching '}'."""
+    """Text from the first '{' at/after `start` to its matching '}', braces inside strings and comments ignored."""
     i = text.find("{", start)
     if i < 0:
         return ""
-    depth = 0
-    for j in range(i, len(text)):
-        if text[j] == "{":
-            depth += 1
-        elif text[j] == "}":
-            depth -= 1
-            if depth == 0:
-                return text[i:j + 1]
+    depth, j = 0, i
+    while j < len(text):
+        m = SKIP_TOKEN.match(text, j)
+        if m:
+            j = m.end(); continue
+        depth += (text[j] == "{") - (text[j] == "}")
+        if depth == 0:
+            return text[i:j + 1]
+        j += 1
     return text[i:]
 
 

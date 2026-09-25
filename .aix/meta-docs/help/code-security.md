@@ -25,7 +25,14 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   open/fs/File (CWE-22); HTML -> innerHTML/send/Markup (CWE-79); {{ }} -> Template (CWE-1336); http -> requests/fetch/
   URL (CWE-918); any literal -> a shell (CWE-78) or eval (CWE-95). Reported at the call, both lines in the snippet.
   Not a finding: no literal, a reassignment in between (`cmd = shlex.quote(cmd)`), an argument list, spawn without
-  shell: true, a callee that is no sink. Shape only, no input source: noisier than aix code vulnerabilities by design.
+  shell: true, a callee that is no sink, a value made only of literals and the file's own location (`__dirname`,
+  `__file__`, `OUT_DIR`), and build scripts and `scripts/` folders (the developer's own inputs). Shape only, no input
+  source: noisier than aix code vulnerabilities by design.
+
+  Never a finding, in every rule: a signature line (`def render_template_string(...)`), a Python docstring line,
+  a constant command (`os.system("make")`), `innerHTML = ""` or another node's markup, Rust code under
+  `#[cfg(test)]`, a `node`/`npm` entry under `engines`, a published library without a lockfile (the consumer
+  locks), a Cargo workspace member (the workspace locks at its root).
 
 How to read it
   A match is a FINDING TO REVIEW, never proof of exploitability; a row with no match is not proven clean. The

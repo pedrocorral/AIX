@@ -78,8 +78,8 @@ def _split_top(params: str) -> list:
     """Split on the commas outside every `<>`, `()` and `[]`: `Vec<(&str, T<'a>)>, x: u8` is two parameters."""
     out, depth, cur = [], 0, ""
     for ch in params:
-        depth += ch in "<([" 
-        depth -= ch in ">)]"
+        depth += ch in "<([{"
+        depth -= ch in ">)]}"
         if ch == "," and depth == 0:
             out.append(cur); cur = ""
         else:

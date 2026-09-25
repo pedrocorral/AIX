@@ -2,7 +2,7 @@
 
 ```
   runtime: Python 3.13 (python on PATH (assumed: nothing in the project declares a version)); Java: version unknown (no pom.xml / build.gradle)
-  functions analysed 1066; over a limit 0 (lines 0, cognitive 0, cyclomatic 0, nesting 0, params 0, pass-through 0, leftovers 0, swallowed 0, bugs 0); with any finding 438; files over 400 lines: 0
+  functions analysed 1074; over a limit 0 (lines 0, cognitive 0, cyclomatic 0, nesting 0, params 0, pass-through 0, leftovers 0, swallowed 0, bugs 0); with any finding 440; files over 400 lines: 0
 
   FUNCTION                                                     lines  cogn  cycl  nest  prm  findings
   .aix/scripts/stats.py:selftest                                  12     5     5     1    0   single-letter name `d`; public function without a docstring / doc comment
@@ -19,6 +19,7 @@
   .aix/scripts/codesecurity.py:_classify                           6     3    10     0    2   magic number 3; magic number 7
   .aix/scripts/codesecurity.py:_audit_rows                        11     7     7     3    3   magic number 3; magic number 4
   .aix/scripts/runtime.py:_node_year                               2     6     4     0    1   magic number 14; magic number 18
+  .aix/scripts/clones.py:brace_block                              15     6     5     2    2   single-letter name `i`; single-letter name `j`
   .aix/scripts/clones.py:render_clones                            14     4     7     1    2   public function without a docstring / doc comment; magic number 20
   .aix/scripts/secrethistory.py:history                           16     8     9     4    2   single-letter name `h`; magic number 300
   .aix/scripts/stats.py:describe                                  10     3     5     1    1   single-letter name `n`; single-letter name `s`
@@ -34,8 +35,7 @@
   .aix/scripts/clones.py:find_clones                              12     1     7     1    2   magic number 4; magic number 4
   .aix/scripts/codefind.py:tui                                    12     5     5     2    5   single-letter name `s`; public function without a docstring / doc comment
   .aix/scripts/jstaint.py:taint                                   14    11     8     3    1   magic number 3; magic number 4
-  .aix/scripts/roadmap.py:cmd_new                                  7     0     1     0    2   single-letter name `t`; single-letter name `t`
-  ... 408 more; narrow the target or use --all
+  ... 410 more; narrow the target or use --all
   modernise (2, advice for the detected runtime):
     .aix/scripts/linkfs.py:link_or_copy line 36: `os.path.relpath` -> `pathlib.Path` reads as objects, not string plumbing
     .aix/scripts/selfinstall.py:on_path line 35: `os.path.expanduser` -> `pathlib.Path` reads as objects, not string plumbing

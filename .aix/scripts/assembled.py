@@ -41,6 +41,28 @@ SINKS = {  # kind -> (row, cwe, title, advice, {lang: sink regex; `name` is the 
 }
 
 
+CONSTANT_BASES = re.compile(r"__dirname|__filename|__file__|import\.meta\.url|env!\(|OUT_DIR|CARGO_MANIFEST_DIR|process\.cwd\(\)")
+TOOLING = ("build.rs", "setup.py", "conftest.py")
+
+
+def exempt(f) -> bool:
+    """Build scripts and tooling assemble paths and commands from the developer's own inputs: not this rule's subject."""
+    return f.name in TOOLING or "scripts" in f.parts[:-1] or f.name.endswith((".config.js", ".config.ts", ".config.mjs"))
+
+
+INTERPOLATED = re.compile(r"\$\{([^}]*)\}|\{([A-Za-z_]\w*)(?::[^}]*)?\}")
+
+
+def from_values(rhs: str) -> bool:
+    """A value takes part in the assembly: not only literals and the file's own location (`__dirname`, `__file__`).
+    What a string interpolates (`${x}`, `{x}`) is a value too."""
+    def interpolations(m):
+        return " ".join(g for pair in INTERPOLATED.findall(m.group(0)) for g in pair if g)
+    rest = re.sub(STRING, interpolations, CONSTANT_BASES.sub("", rhs))
+    rest = re.sub(r"[A-Za-z_][\w.:]*\s*\(|\.[A-Za-z_]\w*", " ", rest)   # `path.join(`, `.root_path`: a callee or an attribute, not a value
+    return bool(re.search(r"(?<![\w.])[A-Za-z_]\w*", rest))
+
+
 def kind_of(rhs: str) -> str:
     """What the assembled string is, by its literal text: sql, html, template, url, path, or 'any' (shell and eval only)."""
     literals = " ".join(m.strip("fFrb").strip("\"'`") for m in re.findall(STRING, rhs))
@@ -90,7 +112,7 @@ def findings(f, lines: list, lang: str, clean) -> list:
     out = []
     for i, raw in enumerate(lines):
         m = ASSIGN.match(_statement(lines, i, clean))
-        if not m or not (ASSEMBLED.search(m.group(2)) or PATH_BUILDERS.search(m.group(2))):
+        if not m or not (ASSEMBLED.search(m.group(2)) or PATH_BUILDERS.search(m.group(2))) or not from_values(m.group(2)):
             continue
         for kind in sinks_for(kind_of(m.group(2))):
             rule = SINKS[kind]

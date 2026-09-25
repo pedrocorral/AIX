@@ -231,6 +231,17 @@ const Destructured = ({ style }) => {
 function positionalBeforeUsed(unused, x) {
   return x;
 }
+function laterDeclared() {
+  const onKey = () => { indent(); return isDone; };
+  const indent = () => 1;
+  let isDone = false;
+  el.innerHTML = "";
+  node.innerHTML = svg.outerHTML;
+  return onKey;
+}
+const Typed = ({ color, onClick, name, src }: Props) => {
+  return color + onClick + name;
+};
 function assignmentInCondition(a, b) {
   if (a = b) { return 1; }                                  // FIND:bug
   while ((a = next())) { break; }
@@ -280,6 +291,14 @@ fn generic_params<'a>(mapping: Vec<(&'a str, Target<'a>)>, count: usize) -> usiz
 }
 pub fn public_api(x: u8, hint: u8) -> u8 {
     x
+}
+#[cfg(not(unix))]
+fn from_entry_os(depth: usize, ent: &Entry) -> Result<u8, Error> {
+    Err(Error::new("unsupported platform"))
+}
+fn range_use(version: &str) -> usize {
+    let end = version.find(' ').unwrap_or(0);
+    version[..end].len()
 }
 fn if_let_pattern(ctx: Ctx) -> u8 {
     if let ContextMode::Limited(ref limited) = ctx.mode {

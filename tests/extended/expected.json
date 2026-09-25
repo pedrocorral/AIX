@@ -11,7 +11,7 @@
   "clones": 55,
   "dead": 30,
   "graph": 820,
-  "security": 74,
+  "security": 62,
   "style": 1437,
   "vulnerabilities": 0
  },
@@ -19,8 +19,8 @@
   "clones": 43,
   "dead": 2,
   "graph": 85,
-  "security": 2,
-  "style": 1174,
+  "security": 0,
+  "style": 1168,
   "vulnerabilities": 0
  },
  "commons-lang": {
@@ -35,15 +35,15 @@
   "clones": 19,
   "dead": 15,
   "graph": 2594,
-  "security": 22,
-  "style": 1240,
+  "security": 9,
+  "style": 1232,
   "vulnerabilities": 3
  },
  "express": {
   "clones": 5,
   "dead": 1,
   "graph": 161,
-  "security": 6,
+  "security": 3,
   "style": 144,
   "vulnerabilities": 24
  },
@@ -51,7 +51,7 @@
   "clones": 26,
   "dead": 1,
   "graph": 565,
-  "security": 17,
+  "security": 12,
   "style": 836,
   "vulnerabilities": 2
  },
@@ -59,7 +59,7 @@
   "clones": 35,
   "dead": 7,
   "graph": 858,
-  "security": 57,
+  "security": 55,
   "style": 1036,
   "vulnerabilities": 22
  },
@@ -67,7 +67,7 @@
   "clones": 4,
   "dead": 7,
   "graph": 29,
-  "security": 69,
+  "security": 66,
   "style": 184,
   "vulnerabilities": 12
  },
@@ -75,16 +75,16 @@
   "clones": 13,
   "dead": 0,
   "graph": 104,
-  "security": 10,
+  "security": 8,
   "style": 596,
-  "vulnerabilities": 7
+  "vulnerabilities": 0
  },
  "ripgrep": {
-  "clones": 77,
+  "clones": 78,
   "dead": 7,
   "graph": 71,
-  "security": 10,
-  "style": 2593,
+  "security": 0,
+  "style": 2579,
   "vulnerabilities": 0
  },
  "spring-petclinic": {

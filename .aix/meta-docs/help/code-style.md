@@ -14,8 +14,11 @@ Metrics and limits (.aix/config.yaml `style:` block; sources in .aix/meta-docs/c
   leftovers             none  an import nothing in the file uses (JS/TS, Java, Python; a Rust `use` may carry a trait, the
                               compiler warns), a variable assigned and never read, a trailing parameter never read (one
                               before a used parameter is positional: a callback's contract). Not: `_` names, re-export
-                              files and names other modules import from this one, decorated, overriding, public or
-                              dunder methods, stubs, tests (fixtures arrive by name), req/res/next/err/event callbacks
+                              files, compat modules and names other modules import from this one, decorated (Rust
+                              `#[...]` too), overriding, public or dunder methods, stubs, declarations without a body,
+                              tests (fixtures arrive by name), req/res/next/err/event callbacks, `e=None` slots. A
+                              closure may read a `const` declared below it. Swallowed exceptions in test files are
+                              not reported: a test may catch to assert nothing more happens.
   swallowed             none  a catch/except that does nothing and says nothing; a bare `except:` whatever it does
                               (a statement or a comment inside the block is intent)
   bugs                  none  a mutable default argument (Python), an assignment inside a condition (JS; wrap it in its

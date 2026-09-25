@@ -1,7 +1,7 @@
 """Leaf: taint analysis of Python files. Sources (request attributes, environment, stdin, decorated route
 parameters) flow through assignments and loops; a sink reached without a sanitiser is a finding, local calls are
 followed one level."""
-import ast
+import ast, re
 from pathlib import Path
 
 from codefiles import ROOT, rel, source_files
@@ -9,7 +9,7 @@ from depedges import iter_functions
 from securityrules import ACCEPT, ADVICE, SKIP_FILE, MARKER_LINES
 
 
-REQUEST_ATTRS = {"args", "form", "json", "values", "data", "files", "GET", "POST", "query_params", "path_params",
+REQUEST_ATTRS = {"args", "form", "json", "values", "data", "files", "GET", "POST", "FILES", "META", "COOKIES", "query_params", "path_params",
                  "headers", "cookies", "body", "get_json", "get_data", "stream"}
 SOURCE_CALLS = {"input", "os.getenv", "os.environ.get", "sys.stdin.read", "sys.stdin.readline"}
 SANITISERS = {"int", "float", "bool", "len", "shlex.quote", "escape", "html.escape", "markupsafe.escape", "bleach.clean",
@@ -121,10 +121,22 @@ def is_source(node, tainted) -> str:
     return ""
 
 
+INPUT_DECORATORS = re.compile(r"route|\.(?:get|post|put|patch|delete|options|head|api_route|websocket)\b|command|task|callback|handler|listener|endpoint|on_|\.hook|receiver|view|"
+                              r"csrf|login_required|require_|permission|throttle|authenticat", re.I)
+REQUEST_PARAMS = {"request", "req"}   # a Django or Flask view names its request so, whatever its decorators
+
+
+def _framework_called(fn) -> bool:
+    """A decorator that registers the function with a framework (a route, a command, a task, a handler): its
+    parameters arrive from outside. `@contextmanager`, `@property`, `@lru_cache` and the like do not."""
+    return any(INPUT_DECORATORS.search(ast.unparse(d)) for d in fn.decorator_list)
+
+
 def decorated_params(fn):
-    """Parameters of a decorated function (route handler, command, task) are input, except DI defaults."""
-    if not fn.decorator_list:
-        return []
+    """Parameters of a framework-called function (route handler, command, task) are input, except DI defaults; a
+    parameter named `request` is input in any function."""
+    if not _framework_called(fn):
+        return [a.arg for a in fn.args.args if a.arg in REQUEST_PARAMS]
     out = []
     for a, default in zip(fn.args.args[::-1], (fn.args.defaults[::-1] + [None] * len(fn.args.args))):
         if a.arg in ("self", "cls"):

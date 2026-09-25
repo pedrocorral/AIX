@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.13 — 2026-09-25
+
+- Precision review: every security, taint and hygiene finding on the eight clean extended projects was read against its source line. 154 findings; 88 were the tools' fault, from 22 root causes, each now a rule and a test case: `engines` entries and published libraries in the dependency rules, Cargo workspaces locking at the root, values made only of literals and `__dirname`/`__file__`, build and tooling scripts, signature and docstring lines, constant `os.system` commands, `innerHTML = ""` and DOM-to-DOM copies, Rust `#[cfg(test)]` code, a brace parser that counted braces inside strings and comments, line drift from stripped comments, closures reading a `const` declared below them, Rust `#[...]` attributes as decorators, declarations without a body, `..end` ranges, `e=None` callback slots, compat modules, multi-line re-exports, and `@contextmanager`-style decorators no longer making parameters input. The 66 that remain were read one by one: 58 are true or worth a reviewer's look, 8 are debatable and stay (public Firebase and Algolia keys, MD5 mandated by HTTP Digest, a library opening its own resource paths).
+
 ## 2.21.12 — 2026-09-25
 
 - The kit's own graph is at the ideal shape: `aix code graph` and `aix code graph --functions` report 0 edits on `.aix/scripts` (15 before). Two recursive walkers (cognitive complexity, taint sources) became worklists, so no function cycle remains; nine hub functions became a composer of two; `install_skills.py` lost three leaves (`linkfs.py`, `agentsmd.py`, `manifest.py`, plus `sections.py` for the managed Markdown sections).

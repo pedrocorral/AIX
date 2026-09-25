@@ -16,7 +16,7 @@ INTERPOLATED = re.compile(r"\$\{([^}]*)\}|\{([A-Za-z_]\w*)(?::[^}]*)?\}")   # `$
 JSX_TAG = re.compile(r"(?<![\w>])<[a-zA-Z][\w.]*(?:\s[^<>]*)?/?>|</")   # a tag, not a generic (`Array<string>` follows a word)
 CALLBACK_PARAMS = {"req", "res", "next", "err", "error", "event", "ctx", "context", "done", "callback", "cb", "reject", "resolve"}
 MUTABLE_CALLS = {"list", "dict", "set", "bytearray", "defaultdict", "OrderedDict", "deque"}
-RE_EXPORT_FILES = ("__init__.py", "index.ts", "index.tsx", "index.js", "mod.rs", "lib.rs")
+RE_EXPORT_FILES = ("__init__.py", "index.ts", "index.tsx", "index.js", "mod.rs", "lib.rs", "compat.py", "_compat.py", "compat.ts", "compat.js")
 NOT_IMPLEMENTED = re.compile(r"raise NotImplementedError|throw new UnsupportedOperationException|todo!\(|unimplemented!\(|^\s*(?:pass|\.\.\.)\s*$")
 
 
@@ -67,7 +67,9 @@ def unused_parameters_py(fn, cls=None) -> list:
     if _keeps_its_parameters_py(fn, cls):
         return []
     reads = _read_names(fn) | {"self", "cls"}
-    params = [a.arg for a in fn.args.posonlyargs + fn.args.args + fn.args.kwonlyargs]
+    positional = fn.args.posonlyargs + fn.args.args
+    defaulted = {a.arg for a, d in zip(positional[::-1], fn.args.defaults[::-1]) if isinstance(d, ast.Constant) and d.value is None}
+    params = [a.arg for a in positional + fn.args.kwonlyargs if a.arg not in defaulted]   # `e=None`: a callback's optional slot
     return [(fn.lineno, f"leftover: parameter `{p}` of `{fn.name}` is never read") for p in trailing_unused(params, reads)]
 
 
@@ -124,9 +126,10 @@ def mutable_defaults_py(fn) -> list:
     return out
 
 
-def function_py(fn, lines: list, cls=None) -> list:
-    """Every hygiene finding of one Python function: (line, message)."""
-    return sorted(unused_parameters_py(fn, cls) + unused_variables_py(fn) + swallowed_py(fn, lines) + mutable_defaults_py(fn))
+def function_py(fn, lines: list, cls=None, test: bool = False) -> list:
+    """Every hygiene finding of one Python function: (line, message). A test may catch to assert nothing more happens."""
+    swallowed = [] if test else swallowed_py(fn, lines)
+    return sorted(unused_parameters_py(fn, cls) + unused_variables_py(fn) + swallowed + mutable_defaults_py(fn))
 
 
 def _bound_names(node) -> list:
@@ -218,8 +221,9 @@ def _body_tokens(body: str, lang: str = "") -> str:
     """The body without comments and string text; what a string interpolates stays (`${x}`, `{x}`), `...x` reads x."""
     def keep(m):
         text = m.group(0)
-        return " " if text.startswith(("//", "/*")) else " ".join(g for pair in INTERPOLATED.findall(text) for g in pair if g)
-    return (STRINGS_COMMENTS_JS if lang == "js" else STRINGS_COMMENTS).sub(keep, body).replace("...", " ")
+        kept = " " if text.startswith(("//", "/*")) else " ".join(g for pair in INTERPOLATED.findall(text) for g in pair if g)
+        return kept + "\n" * text.count("\n")   # line numbers of what follows stay right
+    return (STRINGS_COMMENTS_JS if lang == "js" else STRINGS_COMMENTS).sub(keep, body).replace("...", " ").replace("..", " ")   # `...x` spreads, `..end` ranges
 
 
 def _read_in(name: str, text: str) -> bool:
@@ -260,7 +264,8 @@ def unused_in_function_tokens(fx: dict, params: list) -> list:
         name = m.group(1)
         if "SuppressWarnings" in inner[max(0, m.start() - 80):m.start()]:
             continue   # `@SuppressWarnings("unused")`: the author said so
-        if not name.startswith("_") and not _read_in(name, inner[m.end():]):
+        elsewhere = inner[:m.start()] + inner[m.end():]   # a closure above may read a `const` declared below
+        if not name.startswith("_") and not _read_in(name, elsewhere):
             out.append((fx["line"] + inner.count("\n", 0, m.start(1)), f"leftover: variable `{name}` in `{fx['fname']}` is assigned and never read"))
     return out
 
@@ -299,5 +304,5 @@ def bugs_tokens(fx: dict) -> list:
 
 
 def function_tokens(fx: dict, params: list) -> list:
-    """Every hygiene finding of one JS/TS, Rust or Java function: (line, message)."""
-    return sorted(unused_in_function_tokens(fx, params) + swallowed_tokens(fx) + bugs_tokens(fx))
+    """Every hygiene finding of one JS/TS, Rust or Java function: (line, message). A test may catch to assert nothing more happens."""
+    return sorted(unused_in_function_tokens(fx, params) + ([] if fx["test"] else swallowed_tokens(fx)) + bugs_tokens(fx))

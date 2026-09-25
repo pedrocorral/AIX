@@ -23,7 +23,7 @@ RULES = [
      r"(?:createQuery|createNativeQuery|executeQuery|executeUpdate|execute|prepareStatement)\(\s*\"[^\"]*\"\s*\+",
      "PreparedStatement with ? placeholders; never concatenate values into the statement"),
     ("VUL-INJ-002", "CWE-78", "OS command with a shell", {"py"},
-     r"(?:subprocess\.\w+\([^)]*shell\s*=\s*True|\bos\.system\(|\bos\.popen\(|commands\.getoutput\()",
+     r"(?:subprocess\.\w+\([^)]*shell\s*=\s*True|\b(?:os\.system|os\.popen|commands\.getoutput)\((?!\s*[\"'][^\"'+%{]*[\"']\s*\)))",
      "subprocess.run([...], shell=False) with an argument list; validate each argument"),
     ("VUL-INJ-002", "CWE-78", "OS command with a shell", {"js"},
      r"(?:child_process\.)?\b(?:exec|execSync)\(\s*(?:`[^`]*\$\{|['\"][^'\"]*['\"]\s*\+|[A-Za-z_]\w*\s*[+`])",
@@ -89,7 +89,7 @@ RULES = [
      "Secure, HttpOnly and SameSite on session cookies"),
     # --- web -----------------------------------------------------------------------------------------------------
     ("VUL-WEB-001", "CWE-79", "HTML injected without escaping", {"js"},
-     r"(?:\.innerHTML\s*=|\.outerHTML\s*=|document\.write\(|dangerouslySetInnerHTML|v-html=|insertAdjacentHTML\()",
+     r"(?:\.(?:innerHTML|outerHTML)\s*=(?!=)(?!\s*[\"'][^\"']*[\"']\s*;?\s*$)(?!\s*`[^`$]*`\s*;?\s*$)(?!\s*[\w.]+\.(?:outerHTML|innerHTML)\s*;?\s*$)|document\.write\(|dangerouslySetInnerHTML|v-html=|insertAdjacentHTML\()",
      "textContent / framework bindings; if HTML is required, sanitise (DOMPurify) first"),
     ("VUL-WEB-001", "CWE-79", "HTML marked safe", {"py"},
      r"(?:\bmark_safe\(|\bMarkup\(|\|\s*safe\b|autoescape\s*=\s*False|render_template_string\()", "let the template engine escape; sanitise (bleach) before marking safe"),

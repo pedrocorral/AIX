@@ -67,8 +67,40 @@ def scan_file(f: Path):
     skipped = _skip_marker(lines, f)
     if skipped:
         return [skipped]
-    found = [fx for i, raw in enumerate(lines, 1) for fx in _line_findings(f, i, raw, lang, langs)]
-    return found + (assembled.findings(f, lines, lang, lambda l: strip_comment(l, lang)) if lang else [])
+    found = [fx for i, raw in enumerate(lines, 1) if not _not_code(raw, i, lines, lang) for fx in _line_findings(f, i, raw, lang, langs)]
+    if lang and not assembled.exempt(f):
+        found += assembled.findings(f, lines, lang, lambda l: strip_comment(l, lang))
+    return _inline_tests_tagged(found, lines, lang)
+
+
+def _inline_tests_tagged(found: list, lines: list, lang) -> list:
+    """Rust keeps its tests in the same file under `#[cfg(test)]`: a finding below that line is test code and is
+    left out, as findings in test files are not gated."""
+    first_test = next((i for i, raw in enumerate(lines, 1) if raw.strip().startswith("#[cfg(test)]")), None)
+    if lang != "rust" or first_test is None:
+        return found
+    return [fx for fx in found if fx[4] < first_test]
+
+
+DEFINITION = re.compile(r"^\s*(?:(?:pub(?:\([^)]*\))?|export|public|private|protected|static|abstract|async|default)\s+)*(?:def|function|fn|class|abstract|interface)\b.*[:{,;(]\s*$")
+# a signature line, nothing else on it (a one-line `def run(cmd): return os.system(cmd)` is still scanned)
+_DOC_STATE = {}
+
+
+def _not_code(raw: str, i: int, lines: list, lang) -> bool:
+    """A definition line names a thing, it does not use it; a Python docstring line is prose. The docstring state
+    is tracked per file, line 1 resets it."""
+    if DEFINITION.match(raw):
+        return True
+    if lang != "py":
+        return False
+    if i == 1:
+        _DOC_STATE["open"] = False
+    quotes = raw.count('"""') + raw.count("'''")
+    prose = _DOC_STATE["open"] or quotes > 0
+    if quotes % 2:
+        _DOC_STATE["open"] = not _DOC_STATE["open"]
+    return prose
 
 
 def scan_dockerfile(f: Path):

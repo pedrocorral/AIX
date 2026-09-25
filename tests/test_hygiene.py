@@ -49,11 +49,18 @@ class Hygiene(unittest.TestCase):
         self.assertEqual(sum(v == "leftover" for _, w in SAMPLES.values() for v in w.values()), 17)
 
     def test_reexport_module_and_test_file(self):
-        (self.project / "src" / "compat.py").write_text("from collections.abc import Mapping, MutableMapping\nfrom json import loads\n", encoding="utf-8")
-        (self.project / "src" / "core.py").write_text("from compat import Mapping\nfrom .compat import MutableMapping\n", encoding="utf-8")
-        out = project_cmd(self.project, self.home, "code", "style", "src/compat.py", "--all").stdout
+        (self.project / "src" / "shims.py").write_text("from collections.abc import Mapping, MutableMapping\nfrom json import loads\n", encoding="utf-8")
+        (self.project / "src" / "core.py").write_text("from shims import Mapping\nfrom .shims import (\n    MutableMapping,\n)\n", encoding="utf-8")
+        out = project_cmd(self.project, self.home, "code", "style", "src/shims.py", "--all").stdout
         self.assertNotIn("`Mapping`", out); self.assertNotIn("`MutableMapping`", out)
         self.assertIn("unused import `loads`", out, "a re-export module still has real leftovers")
+
+    def test_compat_module_and_declarations(self):
+        (self.project / "src" / "compat.py").write_text("from collections import OrderedDict\n", encoding="utf-8")
+        (self.project / "src" / "types.d.ts").write_text("declare function encode(value: string): Uint8Array;\n", encoding="utf-8")
+        (self.project / "src" / "trait.rs").write_text("trait Sink {\n    fn error_message<T: Display>(message: T) -> Self;\n}\n", encoding="utf-8")
+        out = project_cmd(self.project, self.home, "code", "style", "src/compat.py", "src/types.d.ts", "src/trait.rs", "--all").stdout
+        self.assertNotIn("leftover:", out, "a compat module re-exports on purpose; declarations have no body\n" + out)
 
     def test_gate_counts_and_card(self):
         r = project_cmd(self.project, self.home, "code", "style", "src", "--gate", check=False)
