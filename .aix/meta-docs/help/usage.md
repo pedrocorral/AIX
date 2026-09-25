@@ -10,7 +10,7 @@ Usage: aix <group> <command> [args]   (no command = this help; aix help <command
 aix acts on the nearest project at or above the current folder (the one holding .aix/config.yaml).
 
 The kit
-  aix newie                           AIX in one screen: what it is, set up once, every day, when something is odd
+  aix newie [2|3]                     AIX one screen at a time: the basics; then the loop; then making it yours
   aix guide [CHAPTER]                 the user guide: start, concepts, install, agents, skills, instructions, ...
   aix self-install                    make `aix` callable from any terminal (link + PATH in your shell profile)
   aix self-test [NAME...]             run the kit's own tests (from the clone)

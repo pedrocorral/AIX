@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.15 — 2026-09-25
+
+- `aix newie 2` and `aix newie 3`: one screen deeper each time. Level 2 is the loop (tasks, STATE.md, policies, seats, the docs as ground truth); level 3 is making it yours (skills, instructions, profiles, the four layers, agents, upgrades, the code tools). Each level ends with the next; past the last one the command says where the chain ends. A layer adds a level by adding `newie-4.md`.
+
 ## 2.21.14 — 2026-09-25
 
 - `aix newie` (aliases `aix for-dummies`, `aix basics`): AIX in one screen for a first day, deliberately not everything: what it is, set up once, every day, when something is odd, three things to know. A page under `.aix/meta-docs/help/` like the others, so a layer can replace it. Works outside a project.

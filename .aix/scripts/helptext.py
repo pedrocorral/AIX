@@ -37,3 +37,9 @@ def topics() -> list:
         base = (root / "meta-docs" / "help") if layer != "kit" else (ROOT / ".aix" / "meta-docs" / "help")
         names |= {f.stem.replace("code-", "code ").replace("docs-", "docs ") for f in base.glob("*.md")} if base.is_dir() else set()
     return sorted(names - {"usage", "about"})
+
+
+def levels(prefix: str) -> list:
+    """The numbered pages of a chain: newie.md is level 1, newie-2.md level 2, ... from every layer."""
+    import re
+    return sorted(int(m.group(1)) for f in topics() for m in [re.fullmatch(rf"{prefix}-(\d+)", f)] if m)

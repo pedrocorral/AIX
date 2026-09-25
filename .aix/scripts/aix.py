@@ -178,6 +178,16 @@ def run_docs(args):
     sys.exit(1)
 
 
+def run_newie(args):
+    """aix newie [N]: AIX one screen at a time; level 1 is the basics, each level ends with the next. A layer may add levels."""
+    level = args[0] if args and args[0].isdigit() else "1"
+    page = helptext.help_file("newie" if level == "1" else f"newie-{level}")
+    if page is None:
+        last = max(helptext.levels("newie"), default=1)
+        sys.exit(f"aix newie: no level {level}; the chain ends at {last} (aix newie {last})")
+    print(page.read_text(encoding="utf-8"), end="")
+
+
 def _run_self(cmd, args):
     import selfinstall
     {"self-install": selfinstall.main, "self-update": selfinstall.self_update, "self-test": selfinstall.self_test}[cmd](args)
@@ -191,7 +201,7 @@ def _commands():
         "install": cmd_install, "upgrade": lambda a: __import__("upgrade").main(a), "doctor": lambda a: sys.exit(run_script("doctor.py")),
         "code": run_code, "docs": run_docs, "task": cmd_task, "skills": lambda a: __import__("skills").main(a),
         "profile": run_profile, "policy": run_policy, "check": run_check, "instructions": run_instructions,
-        "agents": run_agents, "agent": run_agent, "guide": run_guide, "newie": lambda a: print(helptext.text("newie"), end=""),
+        "agents": run_agents, "agent": run_agent, "guide": run_guide, "newie": run_newie,
     }
 
 

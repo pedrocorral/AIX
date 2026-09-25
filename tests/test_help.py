@@ -49,6 +49,12 @@ class HelpPages(unittest.TestCase):
         self.assertLessEqual(out.count("\n"), 40, "one screen, the basics only")
         for alias in ("for-dummies", "basics"):
             self.assertEqual(run([alias], cwd=KIT, home=self.home).stdout, out, alias)
+        for level in ("2", "3"):
+            page = run(["newie", level], cwd=KIT, home=self.home).stdout
+            self.assertEqual(page, (HELP / f"newie-{level}.md").read_text(encoding="utf-8"))
+            self.assertLessEqual(page.count("\n"), 40, f"level {level} is one screen")
+        r = run(["newie", "9"], cwd=KIT, home=self.home, check=False)
+        self.assertEqual(r.returncode, 1); self.assertIn("the chain ends at 3", r.stderr)
 
     def test_a_layer_replaces_a_page(self):
         project = self.home / "app"

@@ -99,7 +99,7 @@ In the kit repository itself, `docs/` is the kit's own ground truth (its ADRs, t
 
 ## The guide
 
-`aix newie` (or `aix for-dummies`) is AIX in one screen, the basics only. `aix guide` prints the table of contents of the user guide, eleven chapters in plain language (`aix guide skills`, `aix guide 5`, `aix guide --all`); it travels with every project under `.aix/meta-docs/guide/`.
+`aix newie` (or `aix for-dummies`) is AIX in one screen, the basics only; `aix newie 2` and `3` go one level deeper each. `aix guide` prints the table of contents of the user guide, eleven chapters in plain language (`aix guide skills`, `aix guide 5`, `aix guide --all`); it travels with every project under `.aix/meta-docs/guide/`.
 
 ## Tests
 
