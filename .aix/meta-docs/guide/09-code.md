@@ -23,7 +23,7 @@ Builds A, the dependency graph between modules, and B, the ideal shape of the sa
 composer, arcs only downward, no cycle, no hub. The distance from A to B is a list of edits with reasons: CUT an arc
 that closes a cycle or points upward, SPLIT a node that is both used everywhere and orchestrating. Zero edits means
 the code already has the ideal shape. Also: stable nodes, propagation cost, NCCD, the folder modularity Q.
-`--functions` does the same for Python functions and says how many calls it could resolve; `--roles` lists every
+`--functions` does the same for functions, in the four languages, and says how many calls it could resolve; `--roles` lists every
 node's level and role. `--gate` fails on any CUT; `--max-distance N` caps the edits. `--report` writes
 `docs/tests/dependency-graph.md`. Each edit names the refactor skill that does it: `refactor-cycle`, `refactor-hub`.
 

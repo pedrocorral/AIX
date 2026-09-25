@@ -79,7 +79,7 @@ class Report(unittest.TestCase):
         self.assertRegex(roles, r"\s+0  leaf      in\s+1 out\s+0  src/leaf\.py")
         funcs = project_cmd(project, home, "code", "graph", "--functions").stdout
         self.assertRegex(funcs, r"resolved calls \d+ of \d+")
-        self.assertIn("(Python, calls resolved by name)", funcs)
+        self.assertIn("(calls resolved by name)", funcs)
 
 
 if __name__ == "__main__":

@@ -160,8 +160,8 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
                             code; B, the ideal shape of the same nodes (every node a leaf or a composer, arcs
                             only downward, no cycle, no hub); the distance A -> B as edits with reasons: CUT a
                             cycle or upward arc, SPLIT a hub. Also stable nodes, propagation cost, Lakos NCCD,
-                            folder modularity Q. --functions for the Python call graph (with the resolved-calls
-                            ratio); --roles per node; --gate for CI (any CUT, or more than --max-distance edits);
+                            folder modularity Q. --functions for the call graph in the four languages (with the
+                            resolved-calls ratio); --roles per node; --gate for CI (any CUT, or more than --max-distance edits);
                             --selftest proves the arithmetic on known-answer cases.
   aix code dead             dead code: modules no entry point reaches; with --functions, Python functions and
                             methods never referenced by name (decorated, dunder, exported, entry/test code excluded)

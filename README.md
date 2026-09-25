@@ -154,7 +154,7 @@ work, and the fact that Cargo and Go refuse to compile dependency cycles.
 
 | Step | What |
 |---|---|
-| A, the code | files and their imports (Python, JS/TS, Rust, Java) or Python functions and calls resolved by name; re-export facades collapsed; unresolved imports and calls ignored, never guessed, and the report says how many calls it matched |
+| A, the code | files and their imports, or functions and calls resolved by name (Python, JS/TS, Rust, Java); re-export facades collapsed; unresolved imports and calls ignored, never guessed, and the report says how many calls it matched |
 | **B, the ideal** | the same nodes arranged by the principle: every node a leaf or a composer, arcs only downward, no cycle, no hub. Built from A: cycles broken at the fewest arcs, upward arcs cut, levels assigned, hubs split into a leaf and a composer |
 | **distance A → B** | the edits that turn A into B, each with its reason: `CUT a -> b (closes a cycle among 3 nodes)`, `CUT m -> s (upward: layer 1 -> layer 3)`, `SPLIT x (in 5, out 6)`. A direct arc next to a longer path is not an edit. 0 = the code already has the ideal shape |
 | shape | stable nodes (Martin's instability ≤ 0.25, depending on them is free reuse), propagation cost, Lakos' NCCD, Newman modularity Q of the folder tree |

@@ -19,7 +19,9 @@ meaning: a SPLIT says where the shape breaks, the reader decides the cut."""
 import sys
 from codefiles import EXT, HUB_FAN, ROOT, default_roots
 import ideal
-from depedges import RESOLUTION, function_graph, module_graph
+from depedges import module_graph
+from pyfuncgraph import RESOLUTION, function_graph
+from funcgraph import function_graph_tokens
 from graphmetrics import STABLE_MAX, measure
 from deadcode import render_dead
 from clones import SIMILARITY, render_clones
@@ -48,7 +50,7 @@ def _a_line(m, functions: bool) -> str:
 
 
 def render(m, b: dict, functions: bool, scope: str):
-    level = "functions (Python, calls resolved by name)" if functions else "modules"
+    level = "functions (calls resolved by name)" if functions else "modules"
     lines = [f"Dependency graph ({level}) — {scope}", "", _a_line(m, functions), ideal.summary_line(b), "", *_shape_lines(m), ""]
     edits = ideal.edit_lines(b)
     if edits:
@@ -149,11 +151,18 @@ def _graph_gate(m, b: dict, max_distance):
     print("GATE PASSED")
 
 
+def _function_level(paths: list) -> tuple:
+    """The Python call graph (by AST) and the JS/TS, Rust and Java ones (by tokens), one graph."""
+    nodes, edges = function_graph(paths)          # resets the resolution count
+    more_nodes, more_edges = function_graph_tokens(paths)
+    return nodes | more_nodes, edges | more_edges
+
+
 def main(args):
     if "--selftest" in args:
         return selftest()
     o = _Options(args)
-    nodes, edges = function_graph(o.paths) if o.functions else module_graph(o.paths)
+    nodes, edges = _function_level(o.paths) if o.functions else module_graph(o.paths)
     if not nodes:
         sys.exit(f"no source files under {', '.join(o.paths)} (looked for {', '.join(EXT)})")
     if o.clones:

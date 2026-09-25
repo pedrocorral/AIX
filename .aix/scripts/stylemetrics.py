@@ -302,7 +302,7 @@ def _token_functions(file: Path, text: str, lang: str) -> list:
     for m in FUNC_HEAD[lang].finditer(text):
         name = next((g for g in m.groups() if g), None)
         brace = text.find("{", m.end() - 1)
-        if name and name not in KEYWORDS and brace >= 0 and ";" not in text[m.end() - 1:brace]:   # `;` first: a declaration, no body
+        if name and not (lang != "rust" and name in KEYWORDS) and brace >= 0 and ";" not in text[m.end() - 1:brace]:   # `;` first: a declaration; Rust's `fn new` is a function
             out.append(analyse_tokens(file, name, m.end() - 1, text, lang))
     return out
 

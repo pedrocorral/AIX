@@ -7,9 +7,12 @@ A is B. 0 edits = the code already has the ideal shape.
 What A is
   modules (default)   nodes = source files; edges = imports between project files. Python, JavaScript/TypeScript,
                       Rust, Java. External packages ignored; unresolved imports ignored, never guessed.
-  --functions         nodes = functions/methods (Python only, stdlib parser); edges = calls resolved by name in the
-                      module, through imported names, and self.method(). The report says how many of the calls
-                      that could target project code it matched; the rest are absent from A and from B.
+  --functions         nodes = functions/methods; edges = calls resolved by name: a function of the same file, a
+                      name imported by name, this.m() / self.m() inside a class or impl, Class.m() / Type::m() on a
+                      class defined or imported in the file, module.f() through a module import. Python by the
+                      stdlib parser; JavaScript/TypeScript, Rust and Java by tokens. A method on a value whose
+                      class the tool does not know is not an arc and not counted. The report says how many of the
+                      calls that could target project code it matched; the rest are absent from A and from B.
   PATH...             restrict to these folders (default: the `code_roots` of .aix/config.yaml that exist, else the
                       whole project without hidden, docs, dependency and build folders)
   facades collapsed   an __init__.py / index.ts / mod.rs that only re-exports its own folder is a name, not a
@@ -46,8 +49,9 @@ The shape numbers (A, for trends)
 What B does not know (printed on every report)
   unresolved calls    a call the tool could not match (a method on an object it never saw created, a callback, a
                       dispatch table) is absent from A and therefore from B. The resolved ratio says how much of
-                      the truth the graphs hold. Function graphs exist for Python; the other languages get the
-                      module-level A and B.
+                      the truth the graphs hold. Name-based in every language: two functions of one name in one
+                      file are one node; Rust trait dispatch and Java interfaces are the main blind spots. A ratio
+                      under about 70 % says B is built on a thin A.
   meaning             roles come from shape. A SPLIT says where the shape breaks; whether that is the right cut,
                       and which side of the split is the leaf, is the reader's design decision.
 
