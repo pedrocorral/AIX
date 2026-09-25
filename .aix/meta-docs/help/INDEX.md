@@ -11,5 +11,5 @@ A layer (`.aix/org/meta-docs/help/`, `.aix/custom/meta-docs/help/`) overrides a 
 | `about.md` | The long story: what AIX is, the loop, the layers (`aix about`) | Presenting AIX |
 | `install.md`, `upgrade.md`, `doctor.md`, `self-install.md` | Getting the kit into a project and keeping it current | Setting up |
 | `agent.md`, `agents.md`, `policy.md`, `profile.md`, `instructions.md`, `skills.md`, `task.md`, `guide.md`, `help.md`, `version.md` | The project commands | Daily use |
-| `code.md`, `code-find.md`, `code-graph.md`, `code-style.md`, `code-stats.md`, `code-security.md`, `code-vulnerabilities.md`, `code-licenses.md`, `refactor.md` | The code tools and the fix skills | Measuring code |
+| `code.md`, `code-find.md`, `code-graph.md`, `code-style.md`, `code-stats.md`, `code-security.md`, `code-vulnerabilities.md`, `code-licenses.md`, `code-sbom.md`, `refactor.md` | The code tools and the fix skills | Measuring code |
 | `docs.md`, `docs-validate.md`, `docs-coverage.md`, `docs-security.md` | The documentation tools | Closing a task, releasing |

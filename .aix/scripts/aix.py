@@ -138,11 +138,13 @@ def cmd_task(args):
 
 
 ALIASES = {"graph": ["code", "graph"], "complexity": ["code", "graph"], "validate": ["docs", "validate"],
-           "coverage": ["docs", "coverage"], "security": ["docs", "security"], "rules": ["instructions"], "for-dummies": ["newie"], "basics": ["newie"]}
+           "coverage": ["docs", "coverage"], "security": ["docs", "security"], "rules": ["instructions"], "for-dummies": ["newie"], "basics": ["newie"],
+           "blackduck": ["code", "sbom", "--gate"], "sbom": ["code", "sbom"]}
 CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--clones"]}
 
 
-CODE_TOOLS = {"find": "codefind", "style": "style", "security": "codesecurity", "stats": "stats", "vulnerabilities": "vulnerabilities", "licenses": "licenses", "licences": "licenses"}
+CODE_TOOLS = {"find": "codefind", "style": "style", "security": "codesecurity", "stats": "stats", "vulnerabilities": "vulnerabilities", "licenses": "licenses", "licences": "licenses",
+              "sbom": "sbom", "blackduck": "sbom"}
 
 
 def _graph_args(args):

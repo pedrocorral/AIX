@@ -43,6 +43,7 @@ STEPS = {  # id -> (kind, what, label)
     "security":        ("check", "aix code security --gate", "no unreviewed security finding"),
     "vulnerabilities": ("check", "aix code vulnerabilities --gate", "no taint path, known CVE or secret in history"),
     "licenses":        ("check", "aix code licenses --gate",   "no dependency with a copyleft, proprietary or unknown licence undecided"),
+    "sbom":            ("check", "aix code sbom --gate",       "the bill of materials is written; no advisory at or above sbom_max_severity, no licence undecided"),
     "docs":            ("check", "aix docs validate",        "IDs, links, indexes and statuses are consistent"),
     "coverage":        ("check", "aix docs coverage",        "the coverage matrix is regenerated"),
     "register":        ("check", "aix docs security --gate", "no VUL row without evidence"),

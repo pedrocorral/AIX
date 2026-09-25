@@ -1,6 +1,6 @@
 # AIX manifest. Tools and scripts read this; agents rarely need to.
 name: aix
-version: 2.21.19
+version: 2.21.20
 spec: https://agentskills.io   # skills follow the Agent Skills open format (SKILL.md + YAML front-matter)
 entrypoint: AGENTS.md
 paths:                    # where things live in a project (2.0 layout); the code tools search code_roots by default
@@ -18,6 +18,7 @@ paths:                    # where things live in a project (2.0 layout); the cod
   custom: .aix/custom       # this project's overrides (committed); person: ~/.config/aix ; organisation: .aix/org
   code_roots: [backend, frontend, shared, infra, src, app, tests, lib]   # those that exist; none -> the whole project
 # policy: standard           # the development cycle (aix policy use|off): minimal, standard, hotfix, release; absent = anarchy, nothing checked
+# sbom_max_severity: high   # aix code sbom --gate (aix blackduck) fails on an advisory at or above this: critical, high, medium, low
 # agents_total: 3            # seats for agents working at once (aix agent set total N); default 1
 # agents_lease: 4h           # a seat on another machine with no heartbeat for this long is stale
 # agents: [claude, copilot]   # the agents this project equips (claude, copilot, cursor, gemini, opencode, codex); set by `aix agents`; no line = all

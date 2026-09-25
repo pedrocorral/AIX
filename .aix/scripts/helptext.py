@@ -4,7 +4,7 @@ topic become dashes: `aix help code graph` reads code-graph.md)."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-ALIASES = {'validate': 'docs validate', 'coverage': 'docs coverage', 'security': 'docs security', 'code complexity': 'code graph', 'code dead': 'code graph', 'code clones': 'code graph', 'graph': 'code graph', 'complexity': 'code graph', 'self-update': 'self-install', 'self-test': 'self-install', 'rules': 'instructions'}  # old names and sub-commands documented with their parent
+ALIASES = {'validate': 'docs validate', 'coverage': 'docs coverage', 'security': 'docs security', 'code complexity': 'code graph', 'code dead': 'code graph', 'code clones': 'code graph', 'graph': 'code graph', 'complexity': 'code graph', 'self-update': 'self-install', 'self-test': 'self-install', 'rules': 'instructions', 'blackduck': 'code sbom', 'code blackduck': 'code sbom', 'sbom': 'code sbom'}  # old names and sub-commands documented with their parent
 
 
 def help_file(name: str):

@@ -1,15 +1,18 @@
 """Leaf: known CVEs of the dependencies, asked from OSV (osv.dev) for what the manifests declare and, for a
 requirements.txt or a pom.xml, for what those declarations pull in (resolved through deps.dev, see depsdev.py).
 Lockfiles are queried as they are: they already hold the whole tree."""
-import json, re, urllib.request
+import json, os, re, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from codefiles import ROOT
+import cvss
 import depsdev
 from manifests import lockfile_dependencies, pinned_requirements, poms
 
 BATCH = 1000   # OSV's querybatch limit
+OSV_CACHE = Path(os.environ.get("AIX_CACHE") or (Path.home() / ".cache" / "aix")) / "osv"
+OSV_TTL = 24 * 3600   # an advisory can be amended: re-read after a day
 
 
 def dependencies(root: Path) -> list:
@@ -115,22 +118,64 @@ def _version_key(s: str) -> list:
     return [(0, int(x)) if x.isdigit() else (1, x) for x in re.split(r"[.\-]", s)]
 
 
-def osv_detail(vid, name, timeout=15):
-    """Summary and the first fixed version FOR THIS PACKAGE (an advisory may cover several packages)."""
+def _fetch_vuln(vid: str, timeout=15):
     try:
         with urllib.request.urlopen(f"https://api.osv.dev/v1/vulns/{vid}", timeout=timeout) as r:
-            v = json.loads(r.read().decode())
+            return json.loads(r.read().decode())
     except Exception:
-        return "", ""
+        return None
+
+
+FETCH_VULN = _fetch_vuln
+
+
+def osv_vuln(vid: str) -> dict:
+    """The advisory record, cached on disk for a day; {} when it cannot be read."""
+    key = OSV_CACHE / f"{vid}.json"
+    if key.exists() and time.time() - key.stat().st_mtime < OSV_TTL:
+        return json.loads(key.read_text(encoding="utf-8"))
+    v = FETCH_VULN(vid)
+    if v is not None:
+        key.parent.mkdir(parents=True, exist_ok=True)
+        key.write_text(json.dumps(v), encoding="utf-8")
+    return v or {}
+
+
+def severity(v: dict) -> tuple:
+    """(label, score) of an advisory: the CVSS 3.x base score computed from its vector when it has one, else the
+    label its database gives (GHSA says CRITICAL/HIGH/MODERATE/LOW), else unknown."""
+    for entry in v.get("severity", []):
+        score = cvss.base_score(str(entry.get("score", "")))
+        if score is not None:
+            return cvss.label(score), score
+    given = str(v.get("database_specific", {}).get("severity", "") or next((a.get("ecosystem_specific", {}).get("severity", "") for a in v.get("affected", [])), "")).lower()
+    return ({"moderate": "medium"}.get(given, given) if given in ("critical", "high", "moderate", "medium", "low") else "unknown"), None
+
+
+def _fixed_versions(v: dict, name: str) -> list:
+    """Every fixed version an advisory lists FOR THIS PACKAGE (it may cover several), lowest first."""
     mine = [a for a in v.get("affected", []) if a.get("package", {}).get("name", "").lower() == name.lower()] or v.get("affected", [])
-    fixed = sorted({e["fixed"] for a in mine for rg in a.get("ranges", []) for e in rg.get("events", []) if "fixed" in e}, key=_version_key)
-    return v.get("summary", "")[:70], fixed[0] if fixed else ""
+    return sorted({e["fixed"] for a in mine for rg in a.get("ranges", []) for e in rg.get("events", []) if "fixed" in e}, key=_version_key)
+
+
+def fixed_version(v: dict, name: str, current: str = "") -> str:
+    """The fixed version to move to: the smallest above the current one (an advisory may fix several release
+    branches), else the highest listed; '' when none is listed."""
+    fixed = _fixed_versions(v, name)
+    above = [f for f in fixed if not current or _version_key(f) > _version_key(current)]
+    return above[0] if above else fixed[-1] if fixed else ""
+
+
+def osv_detail(vid, name, current: str = ""):
+    """Summary and the fixed version to move to for this package."""
+    v = osv_vuln(vid)
+    return (v.get("summary", "")[:70], fixed_version(v, name, current)) if v else ("", "")
 
 
 def _finding(dep: tuple, ids: list) -> tuple:
     """One finding per vulnerable package: the first three advisories with summaries, the rest by id."""
     eco, name, version, manifest = dep
-    told = [f"{vid} ({s}{', fixed in ' + f if f else ''})" if s else vid for vid, (s, f) in ((vid, osv_detail(vid, name)) for vid in ids[:3])]
+    told = [f"{vid} ({s}{', fixed in ' + f if f else ''})" if s else vid for vid, (s, f) in ((vid, osv_detail(vid, name, version)) for vid in ids[:3])]
     fixes = [x.split("fixed in ")[-1].rstrip(")") for x in told if "fixed in" in x]
     return ("VUL-DEP-001", "CWE-1395", f"{len(ids)} known vulnerabilit{'y' if len(ids) == 1 else 'ies'}: {name} {version} ({eco})", manifest, 0,
             "; ".join(told + ids[3:])[:240], f"upgrade {name} to {fixes[0] if fixes else 'a fixed version'} and re-run", None)

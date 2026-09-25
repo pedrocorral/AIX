@@ -11,8 +11,10 @@ Three tools on one engine (.aix/scripts/graph.py). All read the same dependency 
   aix code security   static security checks mapped to VUL rows and CWEs; --audit writes the audit evidence
   aix code vulnerabilities  deep checks: Python taint paths, known CVEs (OSV), secrets in git history
   aix code licenses   the licence of every installed dependency, classed; --gate on copyleft, proprietary, unknown
+  aix code sbom       the bill of materials (CycloneDX / SPDX) with licences and advisories, and the composition policy;
+                      `aix blackduck` runs it with the gate
   aix code stats      histogram of function sizes (or any style metric) with mean/sd/percentiles and offenders
   aix code find       which folders hold code: a checklist that sets paths.code_roots in .aix/config.yaml, the
                       default scope of every command above (also run at the end of aix install)
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
-proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security | code vulnerabilities | code stats.
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code security | code vulnerabilities | code licenses | code sbom | code stats.
