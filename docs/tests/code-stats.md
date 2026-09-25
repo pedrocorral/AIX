@@ -3,12 +3,12 @@
 ```
 Code stats — lines per function — .aix/scripts, tests
 
-  functions 1077   mean 7.5   sd 4.4   median 7   p90 14   p95 15   max 25   limit 60: 0 over (0.0 %)
+  functions 1096   mean 7.5   sd 4.4   median 7   p90 14   p95 15   max 26   limit 60: 0 over (0.0 %)
 
-         1-5 █████████████████████████████████████████████████████████████████████████▌ 409
-        6-10 ████████████████████████████████████████████████████████████████████████████ 422
-       11-20 ██████████████████████████████████████████▌ 237
-       21-30 █▌ 9
+         1-5 ████████████████████████████████████████████████████████████████████████▌ 412
+        6-10 ████████████████████████████████████████████████████████████████████████████ 430
+       11-20 ███████████████████████████████████████████ 244
+       21-30 █▌ 10
        31-40  0
        41-60  0
       61-100  0  <- over the limit
@@ -16,6 +16,7 @@ Code stats — lines per function — .aix/scripts, tests
         201+  0  <- over the limit
 
   largest functions (lines per function):
+       26    tests/test_licenses.py:Licenses.setUp  (line 15)
        25    .aix/scripts/upgrade.py:main  (line 330)
        24    .aix/scripts/style.py:_over_findings  (line 34)
        24    .aix/scripts/graph.py:main  (line 152)
@@ -25,6 +26,5 @@ Code stats — lines per function — .aix/scripts, tests
        21    .aix/scripts/gitignore.py:ask_and_apply  (line 49)
        21    tests/test_extended.py:Extended.run_project  (line 115)
        21    tests/test_policy.py:Policies.test_check_passes_and_a_required_failure_blocks_task_done  (line 69)
-       20    .aix/scripts/skills.py:cmd_info  (line 76)
   * = over its limit.  Detail: aix code style FILE:FUNCTION   Other metrics: --metric cognitive | cyclomatic | nesting | params
 ```

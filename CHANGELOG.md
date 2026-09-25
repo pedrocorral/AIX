@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.16 — 2026-09-25
+
+- `aix code licenses` (also `licences`): the licence of every installed dependency, read from the metadata on disk and never the network: Python dist-info under the project's venv, npm `node_modules`, the Cargo registry cache for `Cargo.lock`, the local Maven repository for `pom.xml`. Each licence is classed permissive / weak copyleft / strong copyleft / proprietary / unknown (`A OR B` takes the most permissive, `A AND B` the most restrictive); a dependency a manifest names but nothing installs is listed as such. `--gate` fails while a strong copyleft, proprietary or unknown licence is undecided; `.aix/config.yaml` `licenses_allow: [...]` and `licenses_known:` record the decisions and survive upgrades. The skill `security-audit-licenses` reads the LICENSE files behind the unknowns and records the decisions; register row VUL-DEP-003; a `licenses` step, advised in the `release` policy. Not legal advice, and it does not see what the code links to at runtime. `tests/test_licenses.py`.
+
 ## 2.21.15 — 2026-09-25
 
 - `aix newie 2` and `aix newie 3`: one screen deeper each time. Level 2 is the loop (tasks, STATE.md, policies, seats, the docs as ground truth); level 3 is making it yours (skills, instructions, profiles, the four layers, agents, upgrades, the code tools). Each level ends with the next; past the last one the command says where the chain ends. A layer adds a level by adding `newie-4.md`.

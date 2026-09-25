@@ -93,9 +93,9 @@ def install(home: Path, into: Path, *flags, kit: Path = KIT):
     return run(["install", "--into", into, *flags], cwd=kit, home=home, launcher=launcher)
 
 
-def project_cmd(project: Path, home: Path, *args, check=True):
-    """Run a command inside a project (the launcher re-executes the project's own copy of the CLI)."""
-    return run(args, cwd=project, home=home, check=check)
+def project_cmd(project: Path, home: Path, *args, check=True, **opts):
+    """Run a command inside a project (the launcher re-executes the project's own copy of the CLI); opts as for run."""
+    return run(args, cwd=project, home=home, check=check, **opts)
 
 
 def upgrade(project: Path, home: Path, *flags, kit: Path = KIT):

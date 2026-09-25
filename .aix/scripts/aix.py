@@ -142,7 +142,7 @@ ALIASES = {"graph": ["code", "graph"], "complexity": ["code", "graph"], "validat
 CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--clones"]}
 
 
-CODE_TOOLS = {"find": "codefind", "style": "style", "security": "codesecurity", "stats": "stats", "vulnerabilities": "vulnerabilities"}
+CODE_TOOLS = {"find": "codefind", "style": "style", "security": "codesecurity", "stats": "stats", "vulnerabilities": "vulnerabilities", "licenses": "licenses", "licences": "licenses"}
 
 
 def _graph_args(args):

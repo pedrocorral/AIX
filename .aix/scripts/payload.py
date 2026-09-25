@@ -50,7 +50,7 @@ def items(kit: Path, agents: list = None):
 
 
 PROJECT_KEYS = ("disabled_skills", "instructions", "disabled_instructions", "profile", "use", "source", "source_org", "source_custom",
-                "agents", "agents_total", "agents_lease", "policy", "style")   # config.yaml lines a project owns (kept by upgrade)
+                "agents", "agents_total", "agents_lease", "policy", "style", "licenses_allow", "licenses_known")   # config.yaml lines a project owns (kept by upgrade)
 
 
 def clean_config(text: str) -> str:

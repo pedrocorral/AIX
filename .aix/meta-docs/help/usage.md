@@ -48,6 +48,8 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
                                       weak hashes/randomness, JWT/cookies, XSS/CSRF/CORS, secrets in logs, prompt
                                       injection, Dockerfile root/unpinned, unpinned deps. Findings to REVIEW, never
                                       proof; --audit writes the audit report the register needs as evidence
+  aix code licenses [--gate] [--report]  every installed dependency's licence (Python, npm, Cargo, Maven), classed;
+                                      exceptions in .aix/config.yaml `licenses_allow`, `licenses_known`
   aix code stats [PATH...] [--metric lines|cognitive|cyclomatic|nesting|params] [--report]
                                       distribution of function sizes as a terminal histogram scaled to the window,
                                       mean, sd, median, p90/p95, max, share over the limit; the largest functions

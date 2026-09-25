@@ -13,6 +13,11 @@ Lists every top-level folder with source files, and the root itself when files s
 and the project marker (`pyproject.toml`, `package.json`, `Cargo.toml`, `pom.xml`). A checklist writes the choice;
 `--list` only prints, `--yes` accepts everything. `aix install` runs it at the end.
 
+## Licences: `aix code licenses`
+Reads the licence of every installed dependency from the metadata on disk and classes it. Strong copyleft,
+proprietary and unknown licences fail the gate until you decide: `licenses_allow: [...]` accepts an id, `licenses_known:`
+records what you read in a LICENSE file. The skill `security-audit-licenses` does the reading.
+
 ## Modularity: `aix code graph` (alias `complexity`)
 Builds A, the dependency graph between modules, and B, the ideal shape of the same nodes: every node a leaf or a
 composer, arcs only downward, no cycle, no hub. The distance from A to B is a list of edits with reasons: CUT an arc

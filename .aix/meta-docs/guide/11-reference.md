@@ -50,6 +50,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 | `aix code dead [PATH...] [--functions] [--gate]` | Unreachable modules and functions |
 | `aix code clones [PATH...] [--similarity PCT] [--gate]` | Duplicated functions |
 | `aix code style [TARGET...] [--gate] [--all] [--report] [--selftest]` | Readability per function; `FILE:FUNCTION` for one card |
+| `aix code licenses [--gate] [--report]` | Every installed dependency's licence, classed; the gate on copyleft, proprietary, unknown |
 | `aix code stats [PATH...] [--metric lines\|cognitive\|cyclomatic\|nesting\|params] [--report]` | The histogram |
 | `aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]` | Static security checks mapped to VUL rows |
 | `aix code vulnerabilities [PATH...] [--taint] [--cve] [--history] [--commits N] [--strict] [--gate] [--audit]` | Taint paths, CVEs, secrets in history |

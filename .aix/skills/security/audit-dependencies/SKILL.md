@@ -13,7 +13,7 @@ Run `bash <skill-dir>/scripts/run.sh` first: runs pip-audit / npm audit / osv-sc
 - No known high/critical CVEs (backend, frontend, build tooling, base images).
 - No install-time scripts from untrusted packages; registry sources pinned.
 - Minimal base images, non-root user.
-- New dependencies have a task note and licence check.
+- New dependencies have a task note; their licence goes through `security-audit-licenses` (`aix code licenses`).
 
 ## Procedure
 1. Locate code by layer (`.aix/meta-docs/architecture/project-layout.md`): root manifests, `backend/`, `frontend/`, `infra/` Dockerfiles. Grep targeted patterns; do not read whole directories.

@@ -10,6 +10,7 @@ Three tools on one engine (.aix/scripts/graph.py). All read the same dependency 
                       names, docstring, magic numbers; one function = a card with line-numbered advice
   aix code security   static security checks mapped to VUL rows and CWEs; --audit writes the audit evidence
   aix code vulnerabilities  deep checks: Python taint paths, known CVEs (OSV), secrets in git history
+  aix code licenses   the licence of every installed dependency, classed; --gate on copyleft, proprietary, unknown
   aix code stats      histogram of function sizes (or any style metric) with mean/sd/percentiles and offenders
   aix code find       which folders hold code: a checklist that sets paths.code_roots in .aix/config.yaml, the
                       default scope of every command above (also run at the end of aix install)
