@@ -162,16 +162,19 @@ def state_of(project: Path, seat: dict) -> str:
     return "expired" if age_seconds(seat.get("heartbeat", "")) > lease_seconds(project) else "remote"
 
 
+def _seat_entry(project: Path, n: int):
+    """(name, the seat file of seat n with its liveness state, or None when the seat is free)."""
+    name = seat_name(n)
+    f = seats_dir(project) / f"{name}.md"
+    if not f.exists():
+        return name, None
+    seat = {**read_seat(f), "state": None}
+    seat["state"] = state_of(project, seat)
+    return name, seat
+
+
 def all_seats(project: Path) -> dict:
-    d = seats_dir(project)
-    out = {}
-    for n in range(1, total(project) + 1):
-        name = seat_name(n)
-        f = d / f"{name}.md"
-        out[name] = {**read_seat(f), "state": None} if f.exists() else None
-        if out[name]:
-            out[name]["state"] = state_of(project, out[name])
-    return out
+    return dict(_seat_entry(project, n) for n in range(1, total(project) + 1))
 
 
 # ---- binding: which seat is mine ----------------------------------------------------------------------------------------
@@ -181,23 +184,31 @@ def binding_file(project: Path) -> Path:
     return sessions_dir(project) / (re.sub(r"[^A-Za-z0-9._-]", "_", key) + ".json")
 
 
-def mine(project: Path = ROOT):
-    """The seat bound to this session, when its seat file still names this session; else None."""
+def _bound_seat(project: Path):
+    """The seat name this session bound locally, or None."""
     f = binding_file(project)
     if not f.exists():
         return None
     try:
-        name = json.loads(f.read_text(encoding="utf-8"))["seat"]
+        return json.loads(f.read_text(encoding="utf-8"))["seat"]
     except (ValueError, KeyError):
         return None
+
+
+def _still_mine(project: Path, name: str) -> bool:
+    """The seat file exists and still names this host and session."""
     seat_file = seats_dir(project) / f"{name}.md"
     if not seat_file.exists():
-        return None
+        return False
     seat = read_seat(seat_file)
-    key, pid, _ = session()
-    if seat.get("host") != host() or seat.get("session") != key:
-        return None
-    return name
+    key, _pid, _ = session()
+    return seat.get("host") == host() and seat.get("session") == key
+
+
+def mine(project: Path = ROOT):
+    """The seat bound to this session, when its seat file still names this session; else None."""
+    name = _bound_seat(project)
+    return name if name and _still_mine(project, name) else None
 
 
 def bind(project: Path, name: str):
@@ -249,17 +260,20 @@ def claim(project: Path = ROOT, force: bool = False) -> str:
     _full_table(project, seats)
 
 
-def heartbeat(project: Path = ROOT, task: str = None):
-    name = mine(project)
-    if not name:
-        return None
-    f = seats_dir(project) / f"{name}.md"
-    seat = read_seat(f)
+def _touch(project: Path, name: str, task):
+    """Rewrite the seat file with a fresh heartbeat and, when given, the task."""
+    seat = read_seat(seats_dir(project) / f"{name}.md")
     seat["heartbeat"] = now()
     if task is not None:
         seat["task"] = task
     seat.pop("name", None)
     write_seat(project, name, seat)
+
+
+def heartbeat(project: Path = ROOT, task: str = None):
+    name = mine(project)
+    if name:
+        _touch(project, name, task)
     return name
 
 

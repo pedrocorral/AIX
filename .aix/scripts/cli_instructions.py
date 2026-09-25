@@ -3,8 +3,6 @@ and applied at once."""
 import sys
 from pathlib import Path
 
-from cli_install import cmd_install
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -53,7 +51,7 @@ def _instruction_switch(sub: str, iid: str, v):
         text = _edit_config_list(text, "instructions", None, iid)
     cfg.write_text(text, encoding="utf-8")
     print(f"{iid}: {sub}d; applying")
-    cmd_install([])
+    return True   # aix.py re-applies the installation
 
 
 def run_instructions(args):
@@ -74,4 +72,4 @@ def run_instructions(args):
     elif sub == "info":
         _instruction_info(iid, v)
     else:
-        _instruction_switch(sub, iid, v)
+        return _instruction_switch(sub, iid, v)

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.12 — 2026-09-25
+
+- The kit's own graph is at the ideal shape: `aix code graph` and `aix code graph --functions` report 0 edits on `.aix/scripts` (15 before). Two recursive walkers (cognitive complexity, taint sources) became worklists, so no function cycle remains; nine hub functions became a composer of two; `install_skills.py` lost three leaves (`linkfs.py`, `agentsmd.py`, `manifest.py`, plus `sections.py` for the managed Markdown sections).
+- Design change behind it: commands no longer re-install the kit themselves. `aix skills use|enable|disable|add|remove|update|always|on-demand`, `aix instructions enable|disable`, `aix profile use|off`, `aix policy use|off` and `aix agents` return that a choice changed, and `aix.py`, the composition root, applies it once (`install_into` plus the `.gitignore` step). The installer now has two importers instead of seven, and every command that changes a choice gets the same re-apply, `aix policy use` included.
+
 ## 2.21.11 — 2026-09-25
 
 - `aix code graph` builds two graphs. A is the code: modules and imports in four languages, or Python functions and calls resolved by name, now with the ratio of calls it could resolve. B is the ideal shape of the same nodes under the principle of `architecture/modularity.md`: every node a leaf or a composer, arcs only downward, no cycle, no hub. B is constructed from A (cycles broken at the fewest arcs, Eades, Lin & Smyth 1993; upward arcs cut; levels by longest path from the leaves; hubs split into a leaf part and a composer part) and the distance A -> B is the list of edits with reasons: `CUT a -> b (closes a cycle among 3 nodes)`, `CUT m -> s (upward: layer 1 -> layer 3)`, `SPLIT x (in 5, out 6)`. `--roles` prints every node's level in B and role in A. The gate fails on any CUT; `--max-distance N` caps the edits. What B does not know is printed on every report: unresolved calls, and meaning.

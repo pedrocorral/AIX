@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import install_skills as inst
+import manifest, sections
 import catalog as sk
 from extern import ALWAYS_FILES, always_on_names
 
@@ -101,7 +101,7 @@ def check_kit_edits():
     """Kit-owned files edited in this project: silently overwritten by the next `aix upgrade`."""
     if (ROOT / "AIX-DEVELOPMENT.md").exists():
         return  # the kit checkout itself
-    edited = inst.modified_kit_files(ROOT)
+    edited = manifest.modified_kit_files(ROOT)
     if edited is None:
         return problem(".aix/manifest.json missing (cannot detect local edits of kit files)", "run `aix install`")
     for f in edited:
@@ -206,7 +206,7 @@ def check_agents_blocks():
 
 
 def inst_headers(blocks):
-    return {f"## {b['section']}" for b in blocks if b["section"]} | set(inst.MANAGED)
+    return {f"## {b['section']}" for b in blocks if b["section"]} | set(sections.MANAGED)
 
 
 def main():

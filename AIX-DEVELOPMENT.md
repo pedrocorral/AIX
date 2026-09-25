@@ -81,7 +81,8 @@ AIX/
 │   ├── taint.py, jstaint.py, cvecheck.py, secrethistory.py   # leaves: taint paths (Python by AST; JS/TS by statements), OSV lookups, secrets in git history
 │   ├── vulnerabilities.py   # `aix code vulnerabilities`: the three leaves above, report, audit, gate
 │   ├── skills.py            # `aix skills`: catalogue, levels (always = named in AGENTS.md), enable/disable via .aix/config.yaml
-│   ├── install_skills.py    # links/copies .aix/skills/<cat>/<name> → <target>/<cat>-<name>; renders AGENTS.md sections and scoped instructions
+│   ├── install_skills.py    # install_into: THE operation that applies the kit to a project; aix.py runs it once after any command that changed a choice
+│   ├── linkfs.py, agentsmd.py, sections.py, manifest.py   # leaves: skill links per agent folder; AGENTS.md and instruction files rendered; the managed sections as text; the kit-file manifest
 │   ├── seed.py              # leaf: `--into` copies the payload (collision dialogue, .bak), seeds docs/ layer by layer, pointer texts
 │   ├── layers.py, yamlmini.py   # leaves: the layer resolution (skills, instructions, profiles, orphans) and the YAML subset it reads
 │   ├── validate.py          # front-matter, skill name==path, INDEX completeness, links, TS covers, VUL statuses, field dictionary

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from catalog import (ROOT, SKILLS, catalogue, always_on, disabled, set_disabled, set_use, installed_in, unlink_everywhere)
-import install_skills as inst
+import linkfs
 
 
 def level(flat, info, always):
@@ -117,7 +117,7 @@ def cmd_enable(flat):
     set_disabled(disabled() - {flat})
     import agents
     for t in agents.skill_dirs(ROOT):
-        inst.link_or_copy(cat[flat]["path"], ROOT / t / flat, copy=False)
+        linkfs.link_or_copy(cat[flat]["path"], ROOT / t / flat, copy=False)
     print(f"enabled {flat} (linked into all runtimes)")
 
 
@@ -134,8 +134,7 @@ def cmd_use(flat, iid):
     elif iid not in ids:
         sys.exit(f"{flat} has no implementation '{iid}'. Known: " + ", ".join(f"{i} ({l} layer)" for i, l in ids.items()))
     else:
-        set_use(flat, iid)
-    inst.install_into(ROOT, copy=False)
+        set_use(flat, iid)   # aix.py re-applies the installation once the command returns
     print(f"{flat}: now " + ("layer precedence" if iid == "default" else iid))
     cmd_info(flat)
 
@@ -193,6 +192,7 @@ def main(args):
     if sub not in actions or not _valid(sub, rest):
         sys.exit(SKILLS_USAGE)
     actions[sub]()
+    return sub in ("use", "enable", "disable") or sub in EXTERN_COMMANDS   # a change: aix.py re-applies the installation
 
 
 if __name__ == "__main__":

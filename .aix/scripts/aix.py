@@ -220,7 +220,16 @@ def main(argv):
     if handler is None:
         print(f"aix: unknown command '{argv[0]}'\n")
         usage(1)
-    handler(argv[1:])
+    if handler(argv[1:]) is True:
+        _reapply(argv[0])
+
+
+def _reapply(command: str):
+    """A command changed a choice (skills, instructions, profile, policy, agents): the root applies it once, so no
+    command needs to import the installer."""
+    import install_skills as inst, gitignore
+    inst.install_into(ROOT, copy=False)
+    gitignore.ask_and_apply(ROOT, label=f"aix {command}")
 
 
 if __name__ == "__main__":

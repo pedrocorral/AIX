@@ -67,48 +67,57 @@ def _first_source(nodes, tainted) -> str:
     return ""
 
 
-def _attribute_source(node, tainted) -> str:
+def _attribute_source(node):
+    """(description, nodes still to inspect): `request.args` / `os.environ` are sources; else look at the base."""
     base = dotted(node.value)
     if (base.split(".")[-1] == "request" and node.attr in REQUEST_ATTRS) or base in ENV_BASES:
-        return f"{base}.{node.attr}"
-    return is_source(node.value, tainted)
+        return f"{base}.{node.attr}", []
+    return "", [node.value]
 
 
-def _subscript_source(node, tainted) -> str:
+def _subscript_source(node):
     b = dotted(node.value)
     if b in ENV_BASES or b.endswith(TAINTED_SUBSCRIPTS):
-        return b + "[...]"
-    return is_source(node.value, tainted) or is_source(node.slice, tainted)
+        return b + "[...]", []
+    return "", [node.value, node.slice]
 
 
 def _is_sanitiser(name: str) -> bool:
-    return name in SANITISERS or name.split(".")[-1] in {s.split(".")[-1] for s in SANITISERS}
+    return name in SANITISERS or name.split(".")[-1] in SANITISERS
 
 
-def _call_source(node, tainted) -> str:
+def _call_source(node):
+    """A sanitiser stops the taint; a known source call is one; else the arguments, then the receiver, are inspected."""
     name = call_name(node)
     if _is_sanitiser(name):
-        return ""
+        return "", []
     if name in SOURCE_CALLS or name.endswith((".get_json", ".get_data")) or (name.endswith(".json") and "request" in name) or name.endswith(GETTERS):
-        return name + "()"
-    s = _first_source(list(node.args) + [k.value for k in node.keywords], tainted)
-    if s:
-        return s
-    return is_source(node.func, tainted) if isinstance(node.func, ast.Attribute) else ""
+        return name + "()", []
+    more = list(node.args) + [k.value for k in node.keywords] + ([node.func] if isinstance(node.func, ast.Attribute) else [])
+    return "", more
+
+
+INSPECT = {ast.Attribute: _attribute_source, ast.Subscript: _subscript_source, ast.Call: _call_source}
+
+
+def _inspect(node, tainted):
+    """(description, nodes still to inspect) for one node."""
+    if isinstance(node, ast.Name):
+        return tainted.get(node.id, ""), []
+    if type(node) in INSPECT:
+        return INSPECT[type(node)](node)
+    return "", (list(ast.iter_child_nodes(node)) if isinstance(node, COMPOUND) else [])
 
 
 def is_source(node, tainted) -> str:
-    """A description if `node` is an input source or carries taint, else ''."""
-    if isinstance(node, ast.Name):
-        return tainted.get(node.id, "")
-    if isinstance(node, ast.Attribute):
-        return _attribute_source(node, tainted)
-    if isinstance(node, ast.Subscript):
-        return _subscript_source(node, tainted)
-    if isinstance(node, ast.Call):
-        return _call_source(node, tainted)
-    if isinstance(node, COMPOUND):
-        return _first_source(ast.iter_child_nodes(node), tainted)
+    """A description if `node` is an input source or carries taint, else ''. A worklist, breadth first, so the
+    helpers never call back: each returns what it found and what is left to look at."""
+    todo = [node]
+    while todo:
+        found, more = _inspect(todo.pop(0), tainted)
+        if found:
+            return found
+        todo += more
     return ""
 
 

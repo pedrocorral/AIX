@@ -137,10 +137,14 @@ def _choose(cls: str, impls: list, use: dict):
     return _top_layer_choice(impls)
 
 
-def resolve(project: Path = ROOT, profile: dict = None):
-    """class -> {path, layer, id, version, manual, shadowed, chosen_by}; plus disabled {class: layer}."""
+def _selection(project: Path, profile: dict):
+    """(implementations by class, disabled classes, the use: map) the choice starts from."""
     found, disabled = implementations(project)
-    use = _use_map(config(project), profile)
+    return found, disabled, _use_map(config(project), profile)
+
+
+def _activate(found: dict, disabled: dict, use: dict) -> dict:
+    """class -> the chosen implementation with what it shadows; a class disabled on top is left out."""
     active = {}
     for cls, impls in found.items():
         if _disabled_on_top(cls, impls, disabled):
@@ -148,6 +152,13 @@ def resolve(project: Path = ROOT, profile: dict = None):
         chosen, why = _choose(cls, impls, use)
         others = [i for i in impls if i is not chosen]
         active[cls] = {**chosen, "chosen_by": why, "shadowed": [(i["layer"], i["path"], i["id"]) for i in others]}
+    return active
+
+
+def resolve(project: Path = ROOT, profile: dict = None):
+    """class -> {path, layer, id, version, manual, shadowed, chosen_by}; plus disabled {class: layer}."""
+    found, disabled, use = _selection(project, profile)
+    active = _activate(found, disabled, use)
     return active, {c: l for c, l in disabled.items() if c not in active}
 
 
@@ -187,14 +198,22 @@ def _keep_instruction(record: dict, key: str, wanted: set, off: set, listed: boo
     return not listed or key in wanted or record["layer"] == "kit"
 
 
-def instructions(project: Path = ROOT, profile: dict = None):
-    """id -> {path, layer, description, applyTo: [globs], always}. Later layer wins per id. No user layer."""
-    out = {fm["id"]: _instruction_record(layer, md, fm) for layer, md, fm in _instruction_files(project)}
+def _all_records(project: Path) -> dict:
+    return {fm["id"]: _instruction_record(layer, md, fm) for layer, md, fm in _instruction_files(project)}
+
+
+def _switched_on(records: dict, project: Path, profile: dict) -> dict:
+    """The records the config and the profile keep: optional ones when wanted, none that is disabled."""
     cfg = config(project)
     wanted = _wanted_instructions(cfg, profile)
     off = set(cfg.get("disabled_instructions") or [])
     listed = bool(profile) and isinstance(profile.get("instructions"), list)
-    return {k: v for k, v in out.items() if _keep_instruction(v, k, wanted, off, listed)}
+    return {k: v for k, v in records.items() if _keep_instruction(v, k, wanted, off, listed)}
+
+
+def instructions(project: Path = ROOT, profile: dict = None):
+    """id -> {path, layer, description, applyTo: [globs], always}. Later layer wins per id. No user layer."""
+    return _switched_on(_all_records(project), project, profile)
 
 
 def _instruction_state(iid: str, v: dict, active: dict, off: set) -> str:

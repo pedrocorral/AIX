@@ -78,11 +78,12 @@ def fix_class(skill_md: Path, cls: str, iid: str):
 
 def runtime_tools():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import install_skills, catalog
-    return install_skills, catalog
+    import linkfs, catalog
+    return linkfs, catalog
 
 
-def install_one(name: str, entry: dict):
+def _download(name: str, entry: dict) -> Path:
+    """Fetch the skill into .aix/skills/extern/<name>, fix its name or class, write its provenance."""
     dest = EXTERN / name
     if dest.exists():
         shutil.rmtree(dest)
@@ -92,22 +93,33 @@ def install_one(name: str, entry: dict):
         shutil.rmtree(dest)
         sys.exit(f"{entry['repo']}/{entry['path']} has no SKILL.md")
     cls = entry.get("class")
-    iid = f"@{entry['repo'].split('/')[0]}/{name}"
-    fix_class(dest / "SKILL.md", cls, iid) if cls else fix_name(dest / "SKILL.md", name)
-    prov = {"repo": entry["repo"], "path": entry["path"], "group": entry.get("group", "specific"), "fetched": date.today().isoformat()}
-    if cls:
-        prov["class"] = cls
+    fix_class(dest / "SKILL.md", cls, _implementation_id(name, entry)) if cls else fix_name(dest / "SKILL.md", name)
+    prov = {"repo": entry["repo"], "path": entry["path"], "group": entry.get("group", "specific"), "fetched": date.today().isoformat(), **({"class": cls} if cls else {})}
     (dest / ".aix-source").write_text(json.dumps(prov, indent=2) + "\n", encoding="utf-8")
+    return dest
+
+
+def _implementation_id(name: str, entry: dict) -> str:
+    return f"@{entry['repo'].split('/')[0]}/{name}"
+
+
+def _link(name: str, entry: dict, dest: Path):
+    """A classed skill becomes the chosen implementation of its class; a bare one is linked into every runtime."""
     inst, sk = runtime_tools()
+    cls = entry.get("class")
+    where = f"{entry['repo']}/{entry['path']} -> .aix/skills/extern/{name}"
     if cls:
-        flat = cls.replace("/", "-")
-        sk.set_use(flat, iid)
-        inst.install_into(ROOT, copy=False)
-        print(f"  {name}: {entry['repo']}/{entry['path']} -> .aix/skills/extern/{name}; now the implementation of {flat} (id {iid}; back with `aix skills use {flat} default`)")
+        flat, iid = cls.replace("/", "-"), _implementation_id(name, entry)
+        sk.set_use(flat, iid)   # aix.py re-applies the installation once the command returns
+        print(f"  {name}: {where}; now the implementation of {flat} (id {iid}; back with `aix skills use {flat} default`)")
         return
     for t in inst.TARGETS:
         inst.link_or_copy(dest, ROOT / t / name, copy=False)
-    print(f"  {name}: {entry['repo']}/{entry['path']} -> .aix/skills/extern/{name} (linked into all runtimes)")
+    print(f"  {name}: {where} (linked into all runtimes)")
+
+
+def install_one(name: str, entry: dict):
+    _link(name, entry, _download(name, entry))
 
 
 # ---- always-on wiring -------------------------------------------------------------------------------------
@@ -119,9 +131,9 @@ def always_on_names(text: str):
 
 def set_always(text: str, names, intro: str):
     """The `## Always-on skills` section rewritten with `names` (removed when empty); the rest of the file untouched."""
-    import install_skills
+    import sections
     block = "" if not names else ALWAYS_HEADER + "\n" + intro + "\n" + "".join(f"- `{n}`\n" for n in names) + "\n"
-    return install_skills._replace_section(text, ALWAYS_HEADER, block)
+    return sections.replace_section(text, ALWAYS_HEADER, block)
 
 
 def mark_always(name: str, on: bool):
@@ -191,9 +203,7 @@ def cmd_remove(names):
         if src.get("class"):
             flat = src["class"].replace("/", "-")
             shutil.rmtree(dest)
-            sk.set_use(flat, None)
-            inst, _ = runtime_tools()
-            inst.install_into(ROOT, copy=False)
+            sk.set_use(flat, None)   # aix.py re-applies the installation once the command returns
             print(f"  removed {name}; {flat} is back to layer precedence")
             continue
         sk.unlink_everywhere(name)
@@ -238,6 +248,7 @@ def main(args):
     if sub not in actions or (sub in ("add", "remove", "always", "on-demand") and not rest):
         sys.exit(USAGE)
     actions[sub]()
+    return sub != "registry"   # a change: aix.py re-applies the installation
 
 
 if __name__ == "__main__":

@@ -67,15 +67,20 @@ class _Cognitive:
         self.total += inc; self.items.append((getattr(node, "lineno", self.fn.lineno), inc, reason))
 
     def visit(self, node, depth):
-        """Dispatch one node: statements that break the flow, expressions that cost, nested functions, the rest."""
+        """Dispatch one node and visit what the handler hands back; the handlers never call visit themselves."""
+        for child, d in self._handle(node, depth):
+            self.visit(child, d)
+
+    def _handle(self, node, depth) -> list:
+        """(child, depth) pairs still to visit after this node's own cost is added."""
         handler = self._handler(node)
         if handler:
             return handler(node, depth)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)) and node is not self.fn:
-            return self._children(node, depth + 1)
+            return _at(ast.iter_child_nodes(node), depth + 1)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == self.fn.name:
             self.add(node, 1, "recursion (+1)")
-        self._children(node, depth)
+        return _at(ast.iter_child_nodes(node), depth)
 
     def _handler(self, node):
         if isinstance(node, ast.If):
@@ -84,44 +89,40 @@ class _Cognitive:
             return self._loop
         return {ast.Try: self._try, ast.IfExp: self._ternary, ast.BoolOp: self._bool}.get(type(node))
 
-    def _ternary(self, node, depth):
+    def _ternary(self, node, depth) -> list:
         self.add(node, 1 + depth, "ternary (+1)")
-        self._children(node, depth + 1)
+        return _at(ast.iter_child_nodes(node), depth + 1)
 
-    def _bool(self, node, depth):
+    def _bool(self, node, depth) -> list:
         self.add(node, 1, "boolean operator sequence (+1)")
-        self._each(node.values, depth)
+        return _at(node.values, depth)
 
-    def _each(self, nodes, depth):
-        for child in nodes:
-            self.visit(child, depth)
-
-    def _children(self, node, depth):
-        self._each(ast.iter_child_nodes(node), depth)
-
-    def _if(self, node, depth, is_elif=False):
+    def _if(self, node, depth, is_elif=False) -> list:
         if not is_elif:
             self.add(node, 1 + depth, f"if (+1, nesting +{depth})" if depth else "if (+1)")
-        self._each(node.body, depth + 1)
-        self.visit(node.test, depth)
+        out = _at(node.body, depth + 1) + [(node.test, depth)]
         if not node.orelse:
-            return
+            return out
         if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
             self.add(node.orelse[0], 1, "elif (+1)")
-            self._if(node.orelse[0], depth, is_elif=True)
-        else:
-            self.add(node.orelse[0], 1, "else (+1)")
-            self._each(node.orelse, depth + 1)
+            return out + self._if(node.orelse[0], depth, is_elif=True)
+        self.add(node.orelse[0], 1, "else (+1)")
+        return out + _at(node.orelse, depth + 1)
 
-    def _loop(self, node, depth):
+    def _loop(self, node, depth) -> list:
         self.add(node, 1 + depth, f"loop (+1, nesting +{depth})" if depth else "loop (+1)")
-        self._each(node.body + node.orelse, depth + 1)
+        return _at(node.body + node.orelse, depth + 1)
 
-    def _try(self, node, depth):
-        self._each(node.body + node.orelse + node.finalbody, depth)
+    def _try(self, node, depth) -> list:
+        out = _at(node.body + node.orelse + node.finalbody, depth)
         for h in node.handlers:
             self.add(h, 1 + depth, f"except (+1, nesting +{depth})" if depth else "except (+1)")
-            self._each(h.body, depth + 1)
+            out += _at(h.body, depth + 1)
+        return out
+
+
+def _at(nodes, depth) -> list:
+    return [(n, depth) for n in nodes]
 
 
 def cognitive_py(fn):
@@ -129,7 +130,8 @@ def cognitive_py(fn):
     boolean-operator sequences, recursion), +nesting level for the nested ones, elif/else without nesting penalty.
     Returns (total, [(line, increment, reason)])."""
     c = _Cognitive(fn)
-    c._each(fn.body, 0)
+    for stmt in fn.body:
+        c.visit(stmt, 0)
     return c.total, c.items
 
 
@@ -287,23 +289,29 @@ def parse_target(spec: str):
     return _func_target(spec, "/")
 
 
-def functions_in(file: Path):
-    lang = EXT.get(file.suffix)
-    if not lang:
+def _python_functions(file: Path, text: str) -> list:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
         return []
-    text = file.read_text(encoding="utf-8", errors="replace")
-    if lang == "python":
-        try:
-            tree = ast.parse(text)
-        except SyntaxError:
-            return []
-        return [analyse_py(file, cls, fn, lines=text.splitlines()) for cls, fn in iter_functions(tree)]
+    return [analyse_py(file, cls, fn, lines=text.splitlines()) for cls, fn in iter_functions(tree)]
+
+
+def _token_functions(file: Path, text: str, lang: str) -> list:
     out = []
     for m in FUNC_HEAD[lang].finditer(text):
         name = next((g for g in m.groups() if g), None)
         if name and name not in KEYWORDS:
             out.append(analyse_tokens(file, name, m.end() - 1, text, lang))
     return out
+
+
+def functions_in(file: Path):
+    lang = EXT.get(file.suffix)
+    if not lang:
+        return []
+    text = file.read_text(encoding="utf-8", errors="replace")
+    return _python_functions(file, text) if lang == "python" else _token_functions(file, text, lang)
 
 
 _REEXPORT_INDEX = None

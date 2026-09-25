@@ -58,14 +58,13 @@ def run_agent(args):
 
 def run_agents(args):
     """aix agents [NAME... | all] [--list]: which agents the project equips; checklist in a terminal."""
-    import agents, install_skills as inst
+    import agents
     if any(a.startswith("--") and a != "--list" for a in args):
         sys.exit("usage: aix agents [NAME... | all] [--list]   (names: " + ", ".join(agents.AGENTS) + ")")
     names = [a for a in args if not a.startswith("--")]
     changed = agents.run(ROOT, names, "--list" in args)
-    if changed or names:
-        for r in agents.remove_deselected(ROOT, agents.selected(ROOT)):
-            print(f"  removed {r}")
-        inst.install_into(ROOT, copy=False)
-        import gitignore
-        gitignore.ask_and_apply(ROOT, label="aix agents")
+    if not (changed or names):
+        return False
+    for r in agents.remove_deselected(ROOT, agents.selected(ROOT)):
+        print(f"  removed {r}")
+    return True   # aix.py re-applies the installation and the .gitignore step

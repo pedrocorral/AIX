@@ -54,11 +54,16 @@ def skill_group(md: Path, text: str, flat: str, reg: dict) -> str:
     return g or reg.get(flat, "specific")
 
 
-def catalogue():
-    """All leaf skills: dict flat-name -> {path, category, group, description, orchestrator}."""
+def _active_skills() -> dict:
+    """class -> the implementation the layers and the profile chose."""
     import layers
-    out, reg = {}, registry_groups()
     active, _ = layers.resolve(ROOT, layers.active_profile(ROOT))
+    return active
+
+
+def _entries(active: dict) -> dict:
+    """flat-name -> the catalogue record, read from each chosen SKILL.md."""
+    out, reg = {}, registry_groups()
     for flat, info in sorted(active.items()):
         md = info["path"] / "SKILL.md"
         text = md.read_text(encoding="utf-8")
@@ -70,6 +75,11 @@ def catalogue():
             "layer": info["layer"], "shadowed": info["shadowed"], "manual": info["manual"], "id": info["id"], "version": info["version"], "chosen_by": info["chosen_by"],
         }
     return out
+
+
+def catalogue():
+    """All leaf skills: dict flat-name -> {path, category, group, description, orchestrator}."""
+    return _entries(_active_skills())
 
 
 def always_on():

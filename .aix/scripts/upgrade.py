@@ -80,9 +80,9 @@ def section(text: str, header: str) -> str:
 def _kit_text(project: Path, name: str) -> str:
     """The kit's text of a merged file: pointer files come from the layer-resolved template."""
     if name in ("CLAUDE.md", "GEMINI.md"):
-        import install_skills as inst
+        import seed
         agent = payload.AGENT_OF[name]
-        return inst.pointer_text(project, name, inst.POINTERS[agent][1])
+        return seed.pointer_text(project, name, seed.POINTERS[agent][1])
     return (KIT / name).read_text(encoding="utf-8")
 
 
@@ -120,13 +120,17 @@ def _merge_config(kit_text: str, proj_text: str) -> str:
     return out
 
 
-def merged_text(project: Path, name) -> str:
-    name = str(name)
-    kit_text = _kit_text(project, name)
-    proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
+def _merge(name: str, kit_text: str, proj_text: str) -> str:
+    """Pointer files merge by section; everything else by config keys."""
     if name in ("AGENTS.md", "GEMINI.md", "CLAUDE.md"):
         return _merge_sections(kit_text, proj_text)
     return _merge_config(kit_text, proj_text)
+
+
+def merged_text(project: Path, name) -> str:
+    name = str(name)
+    proj_text = (project / name).read_text(encoding="utf-8") if (project / name).exists() else ""
+    return _merge(name, _kit_text(project, name), proj_text)
 
 
 def apply(project: Path, rows):
@@ -310,13 +314,13 @@ def _print_plan(project: Path, rows, edited, dry: bool):
 
 
 def _apply_plan(project: Path, rows, yes: bool):
-    import install_skills as inst, gitignore
+    import manifest, gitignore
     print("\n  WARNING: `aix upgrade` is an experimental feature. Kit-owned files listed above are overwritten;\n"
           "  your git history is the backup. Review the plan before answering.")
     if not yes and not confirm("  Are you sure you want to use this? [y/N] "):
         sys.exit("aborted")
     apply(project, rows)
-    inst.write_manifest(project)
+    manifest.write_manifest(project)
     gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")  # after the files, so the agents line is final
     print(f"  applied {len(rows)} changes; relinking skills in the project")
     subprocess.call([sys.executable, str(project / ".aix" / "scripts" / "aix.py"), "install"], cwd=project, stdout=subprocess.DEVNULL)
@@ -342,8 +346,8 @@ def main(args):
             import gitignore
             gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")
         return
-    import install_skills as inst
-    _print_plan(project, rows, set(inst.modified_kit_files(project) or []), dry)
+    import manifest
+    _print_plan(project, rows, set(manifest.modified_kit_files(project) or []), dry)
     if dry:
         print("  then: relink skills in the project (aix install) and suggest aix doctor + aix docs validate")
         return

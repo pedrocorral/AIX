@@ -3,8 +3,6 @@ set of choices from a layer)."""
 import sys
 from pathlib import Path
 
-from cli_install import cmd_install
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -26,12 +24,12 @@ def _policy_show(pol, pols, wanted: str):
 
 
 def _policy_use(pol, pols, want: str):
-    import layers, install_skills as inst
+    import layers
     if want != pol.ANARCHY and want not in pols:
         sys.exit(f"no policy '{want}' (aix policy list)")
     layers.set_key(ROOT, "policy", want, "the development cycle (aix policy use|off); anarchy = none")
     print(f"policy: {want}; updating AGENTS.md")
-    inst.install_into(ROOT, copy=False)
+    return True   # aix.py re-applies the installation
 
 
 def run_policy(args):
@@ -45,7 +43,7 @@ def run_policy(args):
     elif sub == "show" and rest:
         _policy_show(pol, pols, rest[0])
     elif sub in ("use", "off"):
-        _policy_use(pol, pols, pol.canonical(rest[0]) if sub == "use" and rest else pol.ANARCHY)
+        return _policy_use(pol, pols, pol.canonical(rest[0]) if sub == "use" and rest else pol.ANARCHY)
     else:
         sys.exit("usage: aix policy [list] | show NAME | use NAME | off")
 
@@ -74,7 +72,7 @@ def _profile_use(profs, name: str):
         sys.exit(f"no profile '{name}' (aix profile list)")
     layers.set_key(ROOT, "profile", name or None, "managed by `aix profile use|off`")
     print(f"profile {'set to ' + name if name else 'cleared'}; applying")
-    cmd_install([])
+    return True   # aix.py re-applies the installation
 
 
 def run_profile(args):
@@ -88,6 +86,6 @@ def run_profile(args):
         p = profs.get(rest[0]) or sys.exit(f"no profile '{rest[0]}'")
         print(p["path"].read_text(encoding="utf-8"))
     elif sub in ("use", "off"):
-        _profile_use(profs, rest[0] if sub == "use" and rest else "")
+        return _profile_use(profs, rest[0] if sub == "use" and rest else "")
     else:
         sys.exit("usage: aix profile [list] | show NAME | use NAME | off")
