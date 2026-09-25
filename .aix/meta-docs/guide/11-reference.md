@@ -45,7 +45,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 ## The code
 | Command | Does |
 |---|---|
-| `aix code graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]` | The modularity metric; alias `complexity` |
+| `aix code graph [PATH...] [--functions] [--roles] [--gate] [--max-distance N] [--report] [--selftest]` | The modularity metric; alias `complexity` |
 | `aix code dead [PATH...] [--functions] [--gate]` | Unreachable modules and functions |
 | `aix code clones [PATH...] [--similarity PCT] [--gate]` | Duplicated functions |
 | `aix code style [TARGET...] [--gate] [--all] [--report] [--selftest]` | Readability per function; `FILE:FUNCTION` for one card |

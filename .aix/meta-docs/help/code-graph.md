@@ -1,53 +1,55 @@
-aix code graph [PATH...] [--functions] [--gate] [--max-reducible PCT] [--report] [--selftest]     alias: aix code complexity
+aix code graph [PATH...] [--functions] [--roles] [--gate] [--max-distance N] [--report] [--selftest]     alias: aix code complexity
 
-THE MODULARITY METRIC. Distance between the real dependency graph and its ideal: the lowest complexity that still
-delivers every dependency the code has. The ideal is a baseline, achievable or not; the same baseline for every
-project makes the numbers comparable. 0 % = at the baseline.
+THE MODULARITY METRIC. Two graphs on the same nodes: A, the code as it is, and B, the ideal shape those nodes
+would have under the principle of architecture/modularity.md. The distance A -> B is a list of edits; do them and
+A is B. 0 edits = the code already has the ideal shape.
 
-What it builds
+What A is
   modules (default)   nodes = source files; edges = imports between project files. Python, JavaScript/TypeScript,
                       Rust, Java. External packages ignored; unresolved imports ignored, never guessed.
   --functions         nodes = functions/methods (Python only, stdlib parser); edges = calls resolved by name in the
-                      module, through imported names, and self.method(). Calls through typed objects cannot be
-                      resolved statically: the function graph is a lower bound.
+                      module, through imported names, and self.method(). The report says how many of the calls
+                      that could target project code it matched; the rest are absent from A and from B.
   PATH...             restrict to these folders (default: the `code_roots` of .aix/config.yaml that exist, else the
                       whole project without hidden, docs, dependency and build folders)
-
-Normalisations (all reported)
   facades collapsed   an __init__.py / index.ts / mod.rs that only re-exports its own folder is a name, not a
                       module; edges into it go to what it re-exports.
-  stable nodes        instability I = out / (in + out) (Martin 1994). I <= 0.25 = stable: value types, models,
-                      ports, pure helpers. Depending on a stable node is free reuse (modularity.md); edges into
-                      stable nodes are not complexity. Replaces the naive "leaf = no dependencies" rule.
-  wiring              edges out of composition roots (composition.py, main.py, app.py, index.ts ...) and tests
-                      are never shortcuts: wiring and exercising many modules directly is their job.
 
-The measurement
-  complexity          edges into non-stable nodes.
-  ideal complexity    transitive reduction (Aho, Garey & Ullman 1972) of the graph with each cycle contracted to
-                      one node: the smallest graph with exactly the same reachability. Unique. Every dependency
-                      is kept; only shortcuts go (A -> C while A -> B -> C), and each cycle of k nodes is counted
-                      at its acyclic minimum, k-1 edges.
-  reducible           (complexity - ideal) / ideal in %. THE number. Every counted edge is listed:
-                        SHORTCUT  A -> C  also reached via B      drop A -> C, or route C through B
-                        cycle edges beyond the minimum            break the cycle
-  upward              not part of reducible, listed and gated on their own: an edge into a composition root, or
-                      from a lower layer into a higher one (models/core 1 < adapters/ports 2 < services 3 <
-                      controllers 4, by folder name). Wrong direction is a defect regardless of reachability.
-  cycles              strongly connected components; each listed. Defects.
-  hubs                fan-in >= 3 AND fan-out >= 3; composition roots labelled as hubs by design.
+What B is (ideal.py)
+  the principle       every node is a leaf (does work, calls nothing that changes) or a composer (wires leaves and
+                      lower composers); arcs go only downward; no cycle; no hub.
+  built from A        1. every cycle is broken at the fewest arcs a greedy ordering finds (Eades, Lin & Smyth 1993);
+                      2. every upward arc is cut: into a composition root, or from a lower layer into a higher one
+                         (models/core 1 < adapters/ports 2 < services 3 < controllers 4, by folder name);
+                      3. every node gets a level: leaves are 0, a composer is one above the highest node it calls;
+                      4. a hub (fan-in and fan-out both >= 3, not a composition root) is split into a leaf part that
+                         keeps its callers and a composer part that keeps its calls.
+  the distance        the number of edits, each listed with its reason:
+                        CUT    A -> B  (closes a cycle among 3 nodes: ...)      defect: break the cycle
+                        CUT    A -> B  (upward: layer 1 -> layer 3)              defect: invert through a port
+                        SPLIT  X  (in 5, out 6): keep the work as a leaf, move the calls to a composer above it
+                      A direct arc next to a longer path (A -> C beside A -> B -> C) is NOT an edit: a downward arc
+                      is legitimate however many paths reach it.
+  --roles             every node with its level in B, its role in A (leaf, composer, root, hub), fan-in, fan-out.
+
+The shape numbers (A, for trends)
+  stable nodes        instability I = out / (in + out) (Martin 1994). I <= 0.25 = stable: value types, models,
+                      ports, pure helpers. Depending on a stable node is free reuse; the rest are edges into nodes
+                      that change.
+  cycles, upward      the cuts above, counted. Defects; the gate fails on them.
+  hubs                fan-in >= 3 AND fan-out >= 3; composition roots are hubs by design and never split.
   propagation cost    average share of the graph reachable from a node (MacCormack, Rusnak & Baldwin 2006).
-  NCCD                Lakos' normalised cumulative component dependency: CCD / CCD of a balanced binary tree of
-                      the same size. 1.0 = as coupled as an ideal tree, above = more coupled.
+  NCCD                Lakos' normalised cumulative component dependency: 1.0 = a balanced binary tree.
   modularity Q        Newman-Girvan Q of the folder partition at depths 1, 2, 3: ~0 = folders mean nothing
                       structurally, 0.3-0.7 = real clusters with few edges between them.
 
-How to read the result
-  cycles or upward > 0       fix first; these are facts, not candidates
-  SHORTCUT lines             each is one removable edge; the bypass names the intermediate to route through
-  reducible                  distance from the baseline; compare across time and across projects
-  NCCD, Q                    shape: tree-likeness and folder cohesion; trend indicators
-  a hub that is not a root   split it: keep the stable part, move the rest up to its callers
+What B does not know (printed on every report)
+  unresolved calls    a call the tool could not match (a method on an object it never saw created, a callback, a
+                      dispatch table) is absent from A and therefore from B. The resolved ratio says how much of
+                      the truth the graphs hold. Function graphs exist for Python; the other languages get the
+                      module-level A and B.
+  meaning             roles come from shape. A SPLIT says where the shape breaks; whether that is the right cut,
+                      and which side of the split is the leaf, is the reader's design decision.
 
 Dead code (--dead)
   DEAD MODULES        files no entry module reaches through imports. Entry modules are live by definition:
@@ -83,9 +85,10 @@ Clones (--clones)
 
 Options
   aix code dead         the dead-code report (see above); aix code clones the clone report (--similarity PCT)
-  --gate                exit 1 on any cycle, any upward dependency, or reducible > --max-reducible PCT (CI)
-  --report              also write docs/tests/dependency-graph.md (generated, git-ignored)
-  --selftest            run the built-in cases with known answers (chain, diamond, shortcut, cycle, reuse, layer skip, upward)
+  --gate                exit 1 on any CUT (cycle, upward dependency); --max-distance N also fails past N edits (CI)
+  --report              also write docs/tests/dependency-graph.md
+  --selftest            run the built-in cases with known answers (chain, diamond, direct arc, cycle, reuse, layer
+                        skip, upward, hub, composition root)
 
 Coverage: static analysis. The graph is only as complete as the imports/calls it can resolve; the tool never guesses.
 Used by: review-code-review on every diff (compare before/after), architecture-design-app, the definition of done.

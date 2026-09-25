@@ -13,7 +13,7 @@ The hub is labelled "composition root: a hub by design", or it is `main`/`app`/`
 2. Partition the exports: **stable** (pure functions, types, constants: no upward dependency) vs **behaviour** (touches state, I/O, other domains).
 3. Move the stable set into a leaf module (`<name>_types.py` / `<name>/core.ts`), keep the name of every symbol; update the imports of the callers that only needed the stable set.
 4. The behaviour set stays, or moves up into its single real caller when there is one. Never split by size: split by stability.
-5. `aix code graph`: the HUB line is gone or now has fan-out < 3; no new cycle/shortcut. Tests of the callers' domains.
+5. `aix code graph`: the SPLIT line is gone or the node now has fan-out < 3; no new CUT. Tests of the callers' domains.
 
 ## Outputs
 A leaf module with the stable part, the hub shrunk, report lines before/after.

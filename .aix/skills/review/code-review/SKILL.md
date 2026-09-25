@@ -17,4 +17,4 @@ Checklist (table: item / ok·issue / file:line / fix):
 - Requirement fidelity: no extra behaviour; if found → `core-conflict-resolution`.
 Verdict: approve / request changes with concrete edits. Do not rewrite code unasked; propose.
 
-Every `aix code` finding names its fix: CYCLE/UPWARD → `refactor-cycle`; SHORTCUT → `refactor-shortcut`; HUB → `refactor-hub`; DEAD → `refactor-dead`; EXACT/NEAR → `refactor-clone`; OVER metric → `refactor-readability`; modernise → `refactor-modernise`. Propose the skill, do not apply it inside the review.
+Every `aix code` finding names its fix: CUT (cycle, upward) → `refactor-cycle`; SPLIT (hub) → `refactor-hub`; DEAD → `refactor-dead`; EXACT/NEAR → `refactor-clone`; OVER metric → `refactor-readability`; modernise → `refactor-modernise`. Propose the skill, do not apply it inside the review.

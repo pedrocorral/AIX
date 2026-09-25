@@ -3,26 +3,17 @@
 ```
 Dependency graph (modules) — .aix/scripts, tests
 
-  nodes 88, edges 152, components 7; 0 re-export facades collapsed
-  stable nodes (instability <= 0.25) 27; edges into them, free reuse, not counted: 106
-  complexity        46 edges (into non-stable nodes)
-  ideal complexity  35 edges (transitive reduction: every dependency kept; cycles at their acyclic minimum)
-  reducible         31.4 %  (11 edges: 11 shortcuts, 0 cycle edges; wiring from roots/tests exempt: 2)
-  cycles 0   upward dependencies 0   hubs 2 (fan-in and fan-out both >= 3)
-  propagation cost 3.5 %   NCCD 0.74 (1.0 = balanced binary tree, Lakos)   modularity Q by folder depth 1: 0.31 (2 folders)  depth 2: 0.17 (28 folders)  depth 3: -0.00 (80 folders)
+  A (the code): nodes 90, edges 156, components 7; 0 re-export facades collapsed
+  B (ideal: leaves and composers, arcs downward, no cycle, no hub): nodes 92, arcs 158, depth 5; in A: leaves 20, composers 32, roots 36, hubs 2
+  distance A -> B: 2 edits  (cuts: 0 cycle, 0 upward; splits: 2)
 
-  SHORTCUT  .aix/scripts/aix.py -> .aix/scripts/cli_install.py  also reached via .aix/scripts/cli_instructions.py
-  SHORTCUT  .aix/scripts/aix.py -> .aix/scripts/roadmap.py  also reached via .aix/scripts/cli_policy.py
-  SHORTCUT  .aix/scripts/cli_install.py -> .aix/scripts/codefind.py  also reached via .aix/scripts/agents.py
-  SHORTCUT  .aix/scripts/cli_policy.py -> .aix/scripts/install_skills.py  also reached via .aix/scripts/cli_install.py
-  SHORTCUT  .aix/scripts/doctor.py -> .aix/scripts/catalog.py  also reached via .aix/scripts/extern.py
-  SHORTCUT  .aix/scripts/doctor.py -> .aix/scripts/install_skills.py  also reached via .aix/scripts/extern.py
-  SHORTCUT  .aix/scripts/extern.py -> .aix/scripts/catalog.py  also reached via .aix/scripts/install_skills.py
-  SHORTCUT  .aix/scripts/skills.py -> .aix/scripts/catalog.py  also reached via .aix/scripts/extern.py
-  SHORTCUT  .aix/scripts/skills.py -> .aix/scripts/install_skills.py  also reached via .aix/scripts/extern.py
-  SHORTCUT  .aix/scripts/stats.py -> .aix/scripts/stylemetrics.py  also reached via .aix/scripts/style.py
-  SHORTCUT  .aix/scripts/vulnerabilities.py -> .aix/scripts/codesecurity.py  also reached via .aix/scripts/secrethistory.py
-  HUB       .aix/scripts/install_skills.py  (in 7, out 6)  split it: keep the stable part, move the rest up
-  HUB       .aix/scripts/cli_install.py  (in 3, out 6)  split it: keep the stable part, move the rest up
-  fix with: CYCLE/UPWARD -> skill refactor-cycle; SHORTCUT -> refactor-shortcut; HUB -> refactor-hub (aix skills show NAME)
+  stable nodes (instability <= 0.25) 27; edges into them, free reuse: 108; edges into nodes that change: 48
+  cycles 0   upward dependencies 0   hubs 2 (fan-in and fan-out both >= 3)
+  propagation cost 3.5 %   NCCD 0.74 (1.0 = balanced binary tree, Lakos)   modularity Q by folder depth 1: 0.31 (2 folders)  depth 2: 0.17 (29 folders)  depth 3: -0.00 (82 folders)
+
+  EDITS (do these and A is B; cuts are defects, splits are design):
+  SPLIT  .aix/scripts/cli_install.py  (in 3, out 6): keep the work as a leaf, move the calls to a composer above it
+  SPLIT  .aix/scripts/install_skills.py  (in 7, out 6): keep the work as a leaf, move the calls to a composer above it
+  fix with: CUT -> skill refactor-cycle; SPLIT -> refactor-hub (aix skills show NAME)
+  B does not know: calls A could not resolve (absent from both graphs), and meaning: a SPLIT says where the shape breaks, you decide the cut.
 ```

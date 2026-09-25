@@ -146,34 +146,6 @@ def stable_nodes(nodes, edges):
     return {n for n in nodes if (fi[n] + fo[n]) == 0 or fo[n] / (fi[n] + fo[n]) <= STABLE_MAX}
 
 
-def _contract_cycles(nodes, edges):
-    """(rep, cycle_edges, cycle_minimum): each cycle contracted to one node; cycle_minimum = sum(k-1) over cycles."""
-    scc_of = {n: i for i, comp in enumerate(sccs(nodes, edges)) for n in comp}
-    rep = lambda n: f"<cycle {scc_of[n]}>" if n in scc_of else n
-    cycle_edges = {(a, b) for a, b in edges if a in scc_of and scc_of.get(b) == scc_of[a]}
-    sizes = defaultdict(int)
-    for n in scc_of:
-        sizes[scc_of[n]] += 1
-    return rep, cycle_edges, sum(k - 1 for k in sizes.values())
-
-
-def transitive_reduction(nodes, edges):
-    """On the graph with each cycle contracted to one node: an edge A->C is redundant when C is reachable from A
-    through another successor B (Aho, Garey & Ullman 1972; unique on a DAG). Returns (redundant {A->C: B}, cycle_edges,
-    cycle_minimum) where cycle_minimum = sum(k-1) over cycles, the edges an acyclic version of each cycle needs."""
-    rep, cycle_edges, cycle_min = _contract_cycles(nodes, edges)
-    cnodes = {rep(n) for n in nodes}
-    cedges = {(rep(a), rep(b)) for a, b in edges - cycle_edges}
-    adj, reach = reach_sets(cnodes, cedges)
-    redundant = {}
-    for a, b in sorted(edges - cycle_edges):
-        ra, rb = rep(a), rep(b)
-        via = next((w for w in sorted(adj[ra]) if w != rb and rb in reach[w]), None)
-        if via is not None:
-            redundant[(a, b)] = via
-    return redundant, cycle_edges, cycle_min
-
-
 def upward_edges(edges):
     """Dependencies that point the wrong way regardless of reachability: into a composition root, or from a
     lower layer into a higher one (controllers > services > adapters/ports > models)."""
@@ -222,29 +194,17 @@ def modularity_q(nodes, edges, depth):
     return inside / m - expected, len(set(cluster.values()))
 
 
-def _complexity(nodes, edges, stable):
-    """The counted edges (into non-stable nodes), the shortcuts among them, and the reducible cycle edges."""
-    redundant, cycle_edges, cycle_min = transitive_reduction(nodes, edges)
-    counted = {(a, b) for a, b in edges if b not in stable}                   # complexity: edges into non-stable nodes
-    wiring = {(a, b) for a, b in counted if is_root_or_test(a)}                # roots/tests: wiring, never shortcuts
-    shortcuts = {e: via for e, via in redundant.items() if e in counted and e not in wiring}
-    cyc_reducible = max(0, len(cycle_edges & counted) - cycle_min)
-    return counted, wiring, shortcuts, cyc_reducible
-
-
 def measure(nodes, edges):
+    """The numbers of A after facades are collapsed; `nodes` and `edges` in the result are that collapsed graph."""
     nodes, edges, facades = collapse_facades(set(nodes), set(edges))
     stable = stable_nodes(nodes, edges)
-    counted, wiring, shortcuts, cyc_reducible = _complexity(nodes, edges, stable)
-    complexity = len(counted)
-    ideal = complexity - len(shortcuts) - cyc_reducible
+    complexity = sum(1 for a, b in edges if b not in stable)   # edges into nodes that change
     fi, fo = degrees(edges)
     _, reach = reach_sets(nodes, edges)
     return dict(
+        nodes=nodes, edges=edges,
         n=len(nodes), e=len(edges), p=components(nodes, edges), facades=facades,
-        stable=len(stable), reuse=len(edges) - complexity, wiring=len(wiring),
-        complexity=complexity, ideal=ideal, shortcuts=shortcuts, cyc_reducible=cyc_reducible,
-        reducible=(complexity - ideal), reducible_pct=((complexity - ideal) / ideal * 100 if ideal else 0.0),
+        stable=len(stable), reuse=len(edges) - complexity, complexity=complexity,
         cycles=sccs(nodes, edges), upward=upward_edges(edges),
         hubs=sorted((x for x in nodes if fi[x] >= HUB_FAN and fo[x] >= HUB_FAN), key=lambda x: -(fi[x] + fo[x])),
         fi=fi, fo=fo,

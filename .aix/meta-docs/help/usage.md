@@ -28,11 +28,12 @@ The kit
   aix about | version | help [CMD]    the full story | kit version | detailed help (e.g. aix help code dead)
 
 The code                              (aix code ...; all four: Python, JS/TS, Rust, Java; --report writes docs/tests/)
-  aix code graph [PATH...]            the modularity metric (alias: aix code complexity): real dependency graph
-                                      vs its ideal (transitive reduction) = reducible %, each edge listed with its
-                                      bypass; cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q
-      --functions                     Python call graph (functions and methods) instead of modules
-      --gate [--max-reducible PCT]    CI: exit 1 on any cycle, any upward dependency, or reducible above the limit
+  aix code graph [PATH...]            the modularity metric (alias: aix code complexity): A, the dependency graph
+                                      of the code; B, the ideal shape on the same nodes (leaves and composers, arcs
+                                      downward, no cycle, no hub); the distance = the edits (CUT, SPLIT) with reasons
+      --functions                     Python call graph (functions and methods) instead of modules; says how many
+                                      calls it resolved.  --roles lists every node's level in B and role in A
+      --gate [--max-distance N]       CI: exit 1 on any CUT (cycle, upward dependency), or past N edits
       --selftest                      run the built-in known-answer cases; proves the arithmetic
   aix code dead [PATH...] [--functions] [--gate]
                                       dead code: modules no entry point reaches; with --functions, Python

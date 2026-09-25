@@ -54,7 +54,7 @@ cd my-app && aix doctor && aix docs validate
 | `aix docs validate` | Check IDs, links, indexes, front-matter (exit 1 on errors) |
 | `aix doctor` | Installation health (links, pointer files, always-on wiring, STATE.md, Python, PATH) with a fix per problem. `validate` = the docs; `doctor` = the tooling |
 | `aix docs security [open\|validated] [--gate]` | Vulnerability register: validated vs not-validated rows, audit skills still to run, statuses without evidence; `--gate` is the release check |
-| `aix code graph` / `aix code complexity` `[PATH...] [--functions] [--dead] [--clones] [--gate] [--max-reducible PCT] [--report] [--selftest]` | The modularity metric: real dependency graph vs its ideal (transitive reduction) = reducible %, each edge listed with its bypass; cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q; `--dead` lists dead modules and (Python) never-referenced functions; `--clones` lists duplicated functions (exact groups and near-clones); `--gate` for CI |
+| `aix code graph` / `aix code complexity` `[PATH...] [--functions] [--dead] [--clones] [--roles] [--gate] [--max-distance N] [--report] [--selftest]` | The modularity metric: A (the code's dependency graph) vs B (the ideal shape of the same nodes) = the edits, CUT and SPLIT, with reasons; stable nodes, propagation cost, NCCD, folder Q; `--dead` lists dead modules and (Python) never-referenced functions; `--clones` lists duplicated functions (exact groups and near-clones); `--gate` for CI |
 | `aix docs coverage` | Regenerate `docs/tests/coverage-matrix.md` |
 | `aix task new\|start\|block\|done\|list` | Road-map helper, keeps `STATE.md` in sync |
 | `aix skills [general\|specific] [category]` | Catalogue: group (general = behaviour for every session, specific = one job), level (always / orchestrator / on-demand), state, runtimes. `*` marks always-on; a general skill not always-on shows as inactive. `show`, `enable`, `disable`, `always`, `on-demand NAME` manage them |
@@ -153,21 +153,20 @@ work, and the fact that Cargo and Go refuse to compile dependency cycles.
 
 | Step | What |
 |---|---|
-| real graph | files and their imports (Python, JS/TS, Rust, Java) or Python functions and calls; re-export facades collapsed; unresolved imports ignored, never guessed |
-| stable nodes | Martin's instability `out / (in + out)` ≤ 0.25; edges into them are free reuse and not counted |
-| **ideal complexity** | the transitive reduction of the graph with cycles contracted (Aho, Garey & Ullman 1972): the smallest graph that delivers exactly the same dependencies. A baseline, achievable or not, identical for every project |
-| **reducible %** | `(complexity − ideal) / ideal`. Every counted edge is listed with its bypass (`A -> C also reached via B`) so a human or an agent can confirm it. 0 % = at the baseline |
-| exact findings | cycles; upward dependencies (into a composition root, or against the layer order); hubs |
-| shape | propagation cost, Lakos' NCCD (1.0 = balanced binary tree), Newman modularity Q of the folder tree |
+| A, the code | files and their imports (Python, JS/TS, Rust, Java) or Python functions and calls resolved by name; re-export facades collapsed; unresolved imports and calls ignored, never guessed, and the report says how many calls it matched |
+| **B, the ideal** | the same nodes arranged by the principle: every node a leaf or a composer, arcs only downward, no cycle, no hub. Built from A: cycles broken at the fewest arcs, upward arcs cut, levels assigned, hubs split into a leaf and a composer |
+| **distance A → B** | the edits that turn A into B, each with its reason: `CUT a -> b (closes a cycle among 3 nodes)`, `CUT m -> s (upward: layer 1 -> layer 3)`, `SPLIT x (in 5, out 6)`. A direct arc next to a longer path is not an edit. 0 = the code already has the ideal shape |
+| shape | stable nodes (Martin's instability ≤ 0.25, depending on them is free reuse), propagation cost, Lakos' NCCD, Newman modularity Q of the folder tree |
 
 ```bash
-aix code graph --selftest          # known-answer cases: chain, diamond, shortcut, cycle, reuse, layer skip, upward
-aix code graph                     # the report
-aix code graph --gate              # CI: fails on any cycle or upward dependency (add --max-reducible PCT for a ceiling)
+aix code graph --selftest          # known-answer cases: chain, diamond, direct arc, cycle, reuse, layer skip, upward, hub, root
+aix code graph                     # the report: A, B, the distance, the edits
+aix code graph --gate              # CI: fails on any CUT (cycle, upward dependency); --max-distance N caps the edits
 ```
 
-Read it in this order: cycles and upward dependencies are facts, fix them first; each SHORTCUT line is one edge
-to drop or route through its bypass; reducible % and the shape numbers are for comparing over time and across
-projects. Full method: `aix help graph` and `.aix/meta-docs/architecture/modularity.md`.
+Read it in this order: CUT lines are defects, fix them first; SPLIT lines are design, each names a node that is
+both used everywhere and orchestrating; the shape numbers compare over time and across projects. What B does not
+know is printed on every report: unresolved calls, and meaning. Full method: `aix help graph` and
+`.aix/meta-docs/architecture/modularity.md`.
 
 See `docs/INDEX.md` and `.aix/skills/INDEX.md` to explore. Developing AIX itself (not an app)? Read `AIX-DEVELOPMENT.md` — it is never loaded by app agents. Framework version: see `.aix/config.yaml`. Versioning: majors only for changes that break how a project uses the kit, minors for new functionality and they count past 9 (`x.10`, `x.11`, …), patches for fixes; see `AIX-DEVELOPMENT.md` §10.

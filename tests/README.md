@@ -54,6 +54,7 @@ skipped when git or a tag is missing).
 | `test_registry.py` | download of a classed and a bare registry skill (network only) |
 | `test_dead.py` | nested code roots measured once (no self-clones); Django, Cargo, Maven and tooling conventions live; Java container classes live; re-exports are uses; public dead functions tagged; a plain unused file still reported |
 | `test_hygiene.py`, `hygiene_samples.py` | leftovers, swallowed exceptions and known bugs in Python, JS, Rust and Java: every finding once, every exclusion once (re-export files, `_` names, framework-called and overriding functions, stubs, intent inside a catch, parenthesised assignment), gate counts and card |
+| `test_ideal.py` | the ideal graph B and the distance A -> B: a tree is 0, a direct arc is not an edit, one cycle one cut with its members, one upward arc one cut, one hub one split, a root never split; the report, the gate, `--roles`, the resolved-calls ratio |
 | `test_extended.py` | `aix self-test --extended`: every code tool on twelve real projects (`extended/projects.json`, pinned commits, cloned into `~/.cache/aix/extended/`, never into the repo): no traceback, under 120 s per tool, numbers within 10 % of `extended/expected.json` (`--record` accepts them), the documented vulnerabilities of `extended/known.json` found |
 
 ## Extended tests

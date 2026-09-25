@@ -14,13 +14,13 @@ and the project marker (`pyproject.toml`, `package.json`, `Cargo.toml`, `pom.xml
 `--list` only prints, `--yes` accepts everything. `aix install` runs it at the end.
 
 ## Modularity: `aix code graph` (alias `complexity`)
-Builds the dependency graph between modules and compares it with its ideal, the transitive reduction: the same
-reachability with the fewest edges. The difference is the reducible percentage, and every extra edge is listed with
-the path that already covers it. Also: cycles, upward dependencies (a lower layer importing a higher one), hubs,
-propagation cost, NCCD, and the folder modularity Q. `--functions` does the same for Python functions. `--gate`
-fails on cycles and upward dependencies; `--max-reducible PCT` adds a threshold. `--report` writes
-`docs/tests/dependency-graph.md`. Each finding names the refactor skill that fixes it: `refactor-cycle`,
-`refactor-shortcut`, `refactor-hub`.
+Builds A, the dependency graph between modules, and B, the ideal shape of the same nodes: every node a leaf or a
+composer, arcs only downward, no cycle, no hub. The distance from A to B is a list of edits with reasons: CUT an arc
+that closes a cycle or points upward, SPLIT a node that is both used everywhere and orchestrating. Zero edits means
+the code already has the ideal shape. Also: stable nodes, propagation cost, NCCD, the folder modularity Q.
+`--functions` does the same for Python functions and says how many calls it could resolve; `--roles` lists every
+node's level and role. `--gate` fails on any CUT; `--max-distance N` caps the edits. `--report` writes
+`docs/tests/dependency-graph.md`. Each edit names the refactor skill that does it: `refactor-cycle`, `refactor-hub`.
 
 ## Dead code and clones
 `aix code dead` lists modules no entry point reaches and, with `--functions`, Python functions never referenced.

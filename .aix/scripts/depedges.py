@@ -301,13 +301,27 @@ def _function_defs(trees: dict):
     return nodes, defs
 
 
+RESOLUTION = {"seen": 0, "matched": 0}   # calls that could target project code, and those matched, by the last function_graph
+BUILTINS = set(dir(__builtins__)) if isinstance(__builtins__, dict) is False else set(__builtins__)
+
+
+def _could_be_project_call(func, imported: dict) -> bool:
+    """A plain name that is no builtin, `self.m()`, or `module.f()` through an import: what name resolution can
+    hope to match. `x.strip()` or `re.search()` are outside A by construction, not misses."""
+    if isinstance(func, ast.Name):
+        return func.id not in BUILTINS
+    return isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and (func.value.id == "self" or func.value.id in imported)
+
+
 def _call_edges(f, tree, py_idx, defs) -> set:
     imported = imported_names(tree, f, py_idx)
     edges = set()
     for cls, fn in iter_functions(tree):
         src = defs[(rel(f), f"{cls}.{fn.name}" if cls else fn.name)]
-        for call in (n for n in ast.walk(fn) if isinstance(n, ast.Call)):
+        for call in (n for n in ast.walk(fn) if isinstance(n, ast.Call) and _could_be_project_call(n.func, imported)):
             tgt = resolve_call(call.func, rel(f), cls, imported, defs)
+            RESOLUTION["seen"] += 1
+            RESOLUTION["matched"] += bool(tgt)
             if tgt and tgt != src:
                 edges.add((src, tgt))
     return edges
@@ -321,6 +335,7 @@ def function_graph(roots):
     trees = parse_trees(files)
     nodes, defs = _function_defs(trees)
     edges = set()
+    RESOLUTION.update(seen=0, matched=0)
     for f, tree in trees.items():
         edges |= _call_edges(f, tree, py_idx, defs)
     return nodes, edges

@@ -109,7 +109,7 @@ organised in ten categories:
                  audit-secrets-config, audit-dependencies, audit-web-xss-csrf, audit-data-privacy,
                  audit-logging-monitoring, audit-ai-llm, audit-infra
   review/        code-review, doc-drift-check
-  refactor/      cycle, shortcut, hub, dead, clone, readability, modernise (one per `aix code` finding type)
+  refactor/      cycle, hub, dead, clone, readability, modernise (one per `aix code` finding type)
   workflow/      plan-feature, to-tickets, triage, wayfinder, research, prototype, setup-tracker, wizard
   debug/         diagnose, merge-conflicts
   coach/         grill, grill-me, grill-with-docs, teach, questionnaire, wait-what, scaffold-exercises
@@ -156,13 +156,13 @@ one holding .aix/config.yaml). Commands are grouped by what they act on; `aix he
                             consistent, Python and PATH. Prints a fix per problem.
 
   The code (aix code ...)   Python, JS/TS, Rust, Java; PATH... limits the folders; --report writes docs/tests/
-  aix code graph            the modularity metric (alias: aix code complexity). Real dependency graph vs its ideal,
-                            the transitive reduction with cycles contracted (the lowest complexity delivering the
-                            same dependencies; a baseline, achievable or not): reducible %, each edge listed with
-                            its bypass. Also cycles, upward dependencies, hubs, propagation cost, Lakos NCCD,
-                            folder modularity Q. --functions for the Python call graph; --gate for CI (any cycle,
-                            any upward dependency, or reducible above --max-reducible); --selftest proves the
-                            arithmetic on known-answer cases.
+  aix code graph            the modularity metric (alias: aix code complexity). A, the dependency graph of the
+                            code; B, the ideal shape of the same nodes (every node a leaf or a composer, arcs
+                            only downward, no cycle, no hub); the distance A -> B as edits with reasons: CUT a
+                            cycle or upward arc, SPLIT a hub. Also stable nodes, propagation cost, Lakos NCCD,
+                            folder modularity Q. --functions for the Python call graph (with the resolved-calls
+                            ratio); --roles per node; --gate for CI (any CUT, or more than --max-distance edits);
+                            --selftest proves the arithmetic on known-answer cases.
   aix code dead             dead code: modules no entry point reaches; with --functions, Python functions and
                             methods never referenced by name (decorated, dunder, exported, entry/test code excluded)
   aix code clones           duplicated functions: exact groups (same structure, other names/literals) and

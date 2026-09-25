@@ -69,7 +69,8 @@ AIX/
 │   ├── runtime.py           # leaf: detect target runtimes (Python/JS/Rust/Java) and where they are declared
 │   ├── codefiles.py         # leaf: code roots (`aix code find`), source extensions, the file walk every code tool shares
 │   ├── depedges.py          # leaf: import edges per language and Python call edges (module_graph, function_graph)
-│   ├── graphmetrics.py      # leaf: stability, facades, SCCs, transitive reduction, upward edges, NCCD, modularity (measure)
+│   ├── graphmetrics.py      # leaf: stability, facades, SCCs, upward edges, NCCD, modularity (measure)
+│   ├── ideal.py             # leaf: B, the ideal graph on A's nodes (cycles cut, upward cut, levels, hubs split) and the distance A -> B
 │   ├── deadcode.py, clones.py   # `aix code dead` (unreachable modules and functions), `aix code clones` (exact and near clones)
 │   ├── graph.py             # `aix code graph|dead|clones`: the report, the gate, the selftest over the leaves above
 │   ├── stylemetrics.py      # leaf: cyclomatic, cognitive, nesting, params, names, magic numbers per function (Python by AST; JS/TS, Rust, Java by tokens)

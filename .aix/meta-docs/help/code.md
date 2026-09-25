@@ -2,7 +2,7 @@ aix code graph | complexity | dead | clones | style | security | vulnerabilities
 
 Three tools on one engine (.aix/scripts/graph.py). All read the same dependency graph of the project's source
 (Python, JS/TS, Rust, Java modules; Python functions with --functions); PATH... limits the folders.
-  aix code graph      the modularity metric: real graph vs its ideal (transitive reduction) = reducible %,
+  aix code graph      the modularity metric: A (the code) vs B (the ideal shape on the same nodes) = the edits,
                       cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.  alias: complexity
   aix code dead       dead code: modules no entry point reaches; with --functions, Python functions never referenced
   aix code clones     duplicated functions: exact groups (same structure) and near-clones (--similarity PCT)

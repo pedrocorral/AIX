@@ -8,7 +8,7 @@ disable-model-invocation: true
 Reading budget: `aix code graph --report`, `aix code clones`, `aix code dead --functions`, `aix code stats`; open no source file before step 3.
 
 ## Procedure
-1. Run the four reports; collect candidates: CYCLE/UPWARD (always), HUBs not roots, SHORTCUTs, EXACT clones, DEAD functions, the stats offenders.
+1. Run the four reports; collect candidates: CUT edits (always), SPLIT edits, EXACT clones, DEAD functions, the stats offenders.
 2. Rank by payoff ÷ risk: a cycle in a hot module first; a clone in tests last.
 3. For the top 5, open the files and write one paragraph each: what is wrong, the refactor skill that fixes it, the blast radius (callers).
 4. Present the ranked list; the user accepts or drops each.
