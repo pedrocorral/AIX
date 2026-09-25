@@ -7,6 +7,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SKIP = {"node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".git", "target", ".next", ".aix", "docs", "vendor", "vendors", "third_party", "third-party"}
 MINIFIED = (".min.js", ".min.css", ".bundle.js", "-min.js")   # never the project's code
+LIBRARY = re.compile(r"^(?:jquery|jquery-ui|jquery\.[\w-]+|ace|three|angular|react|react-dom|vue|lodash|underscore|backbone|d3|moment|bootstrap|raphael|morris"
+                     r"|highlight|prism|codemirror|html5shiv|respond|modernizr|dat\.gui|mathjax|tinymce|ckeditor)(?:[.-]\d[\w.-]*|[.-]custom[\w.-]*)?\.(?:js|css)$", re.I)
+# a vendored library dropped into the tree (static/js/libs/ace.js, jquery-1.10.2.min.js): not the project's code either
+
+
+def is_vendored(f: Path) -> bool:
+    return f.name.endswith(MINIFIED) or bool(LIBRARY.match(f.name))
 
 
 def code_roots():
@@ -50,7 +57,7 @@ HUB_FAN = 3
 def _is_source(f: Path, base: Path) -> bool:
     """A non-empty source file whose path below `base` crosses no skipped or hidden folder."""
     inner = f.relative_to(base).parts[:-1] if base.is_dir() else ()
-    return f.is_file() and f.suffix in EXT and not f.name.endswith(MINIFIED) and not any(s in SKIP or s.startswith(".") for s in inner) and f.stat().st_size > 0
+    return f.is_file() and f.suffix in EXT and not is_vendored(f) and not any(s in SKIP or s.startswith(".") for s in inner) and f.stat().st_size > 0
 
 
 def source_files(roots):

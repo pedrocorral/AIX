@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.21 — 2026-09-25
+
+- Precision fixes the engine benchmark exposed (`docs/tests/benchmark-engines.md`): a Java `byte hash[]` or `int... values` parameter is read by its name; functions in a file named `app.py`, `main.py` or `index.js` are no longer tagged `[tests]` in the clones report (tests are tests by path only); minified, bundled and well-known library files (`jquery-1.10.2.min.js`, `static/js/libs/ace.js`, `three.js`, `dat.gui.min.js`) are no tool's input, security included; the cyclomatic count no longer takes `?.`, `x?: T` or a `?` inside a template literal for a branch (`??` is one boolean operator). The benchmark runner reads findings from the modules instead of the report, which lists at most 20 per register row: the express `vhost` finding the document called a miss was there all along, corrected.
+
 ## 2.21.20 — 2026-09-25
 
 - `aix code sbom` and its alias `aix blackduck`: the software bill of materials and the composition policy, what a Black Duck scan gives, from the kit's own tools. Every package the project installs (the inventory of `--cve`: lockfiles, pins and poms resolved through deps.dev) with its purl, its licence from the metadata on disk (as `aix code licenses` reads it) and every OSV advisory with a severity: the CVSS 3.x base score computed from the advisory's vector (`cvss.py`, the specification's arithmetic, `--selftest` proves it on published scores), else the database's label. Written as CycloneDX 1.5 JSON (`docs/security/sbom.cdx.json`) or SPDX 2.3 (`--spdx`). `--gate` (what `aix blackduck` runs) fails on an advisory at or above `sbom_max_severity` (config key, default high, kept by upgrade) or on a licence to decide; the `sbom` step is advised in the release policy. Advisories are cached under ~/.cache/aix/osv for a day. `aix help blackduck` says which of the kit's commands are its Black Duck equivalent.

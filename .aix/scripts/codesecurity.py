@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from codefiles import ROOT, default_roots, SKIP, rel
+from codefiles import ROOT, default_roots, SKIP, is_vendored, rel
 import assembled
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from secretscan import SECRET_ADVICE, secret_findings
@@ -145,7 +145,7 @@ def _files_of(root: str):
         yield base
         return
     for f in base.rglob("*"):
-        if f.is_file() and not any(s in f.relative_to(base).parts for s in SKIP):
+        if f.is_file() and not is_vendored(f) and not any(s in f.relative_to(base).parts for s in SKIP):
             yield f
 
 

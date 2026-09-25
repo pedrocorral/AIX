@@ -3,7 +3,7 @@
 Read this when: deciding whether a code tool should be replaced, wrapped or kept; before changing what a tool covers.
 Skip when: running or writing tests.
 
-Facts only. Every number below was produced by `tests/benchmark/engines.py` on 2026-09-25 (kit 2.21.19) over the twelve extended
+Facts only. Every number below was produced by `tests/benchmark/engines.py` on 2026-09-25 (kit 2.21.21) over the twelve extended
 projects (`tests/extended/projects.json`, cached clones at their pinned commits, never in the repository) and every
 hand verdict names the file and line so anyone can re-read it. Nothing here says which tool is better; it says what each
 one found, what it missed, how long it took and where it was wrong.
@@ -50,8 +50,9 @@ Every disagreement class was read at the source. The file:line is the evidence; 
    `postMessage` with `*`; prototype-pollution loops; `new RegExp(variable)`; JWT literals in code and docs.
 2. **Ours missed, theirs found, in application code**: `express/examples/session/index.js:19` and three more
    `secret: 'keyboard cat'` (semgrep express-session-hardcoded-secret; our secret rule rejects a value with a space);
-   `express/examples/vhost/index.js:30` `res.send('requested ' + req.params.sub)` (semgrep direct-response-write; ours
-   taint does not treat `main = express()` as an app); `NodeGoat/config/env/test.js:6` `zapApiKey: "v9dn..."`
+   `express/examples/vhost/index.js:30` `res.send('requested ' + req.params.sub)` (semgrep direct-response-write): ours
+   had it too, but the report lists at most 20 findings per register row and the first benchmark run read the
+   report; since 2.21.21 the runner reads the modules, and the tables below are from that run; `NodeGoat/config/env/test.js:6` `zapApiKey: "v9dn..."`
    (gitleaks generic-api-key; found by ours since 2.21.18, which carries the gitleaks rules);
    `juice-shop/lib/insecurity.ts:152` `createHmac('sha256', privateKey)` (semgrep hardcoded-hmac-key; ours flags the
    key itself at line 23, so the same root cause, one line less).
@@ -68,9 +69,9 @@ Every disagreement class was read at the source. The file:line is the evidence; 
    tag, Dockerfile without `USER` (semgrep has `missing-user` but reported it only on pygoat, not NodeGoat or excalidraw),
    hard-coded credentials in data files (`juice-shop/data/static/users.yml`, 8), SQL assembled from strings then
    executed (WebGoat 5), secrets in log lines, `Math.random` for a secret, `mark_safe`/`innerHTML` on a non-literal.
-2. **Ours wrong or noisy**: vendored files that our skip list does not catch, `WebGoat/src/main/resources/webgoat/static/js/libs/ace.js`
+2. **Ours wrong or noisy**: vendored files that our skip list did not catch, `WebGoat/src/main/resources/webgoat/static/js/libs/ace.js`
    and `jquery-*.min.js` (19 of 63 non-test findings), `juice-shop/frontend/src/assets/private/dat.gui.min.js` (15 of
-   80); "path assembled from strings, opened below" on a package's own paths (`flask/src/flask/app.py:359,361,381,383`,
+   80): fixed in 2.21.21 (minified, bundled and well-known library files by name are no tool's input); "path assembled from strings, opened below" on a package's own paths (`flask/src/flask/app.py:359,361,381,383`,
    `blueprints.py:126,128`, `config.py:293`: 7 findings, all `os.path.join(self.root_path, ...)`); "HTML marked safe" in
    test files (flask 21, all `[test]`, listed not gated).
 3. **Bandit**: 1000 of its 1029 flask findings are `B101 assert` in tests, 547 of 679 on requests; `B105` on
@@ -91,8 +92,8 @@ Every disagreement class was read at the source. The file:line is the evidence; 
   `if (str1 == str2) { // NOSONARLINT this intentionally uses ==`; ours reports none of them and 7 leftovers in tests,
   e.g. `LockingVisitorsTest.java:55` `startTimeMillis`, used only in a commented-out line 82 (true). `WebGoat` PMD 12
   non-test, ours 25; PMD `UnusedPrivateMethod` on `HintService.java:54` is used as `this::createHint` at line 49 (false);
-  ours "parameter `hash[]` of `toHex` is never read" on `challenge7/MD5.java:555` is false: the C-style declarator
-  `byte hash[]` is misparsed (bug in ours, `hash` is read on the next line).
+  ours "parameter `hash[]` of `toHex` is never read" on `challenge7/MD5.java:555` was false: the C-style declarator
+  `byte hash[]` was misparsed (`hash` is read on the next line); fixed in 2.21.21.
 - Speed: ruff reports 0.0 s on every project (a Rust binary); ours takes 0.3 to 0.6 s for the whole style run.
 
 ### Cyclomatic complexity
@@ -106,8 +107,9 @@ Every disagreement class was read at the source. The file:line is the evidence; 
 - TypeScript/TSX: 53 in common of ours 117 and lizard's 93 on excalidraw, and the values disagree: `renderElement`
   ours 18 / lizard 42, `restoreElement` 25 / 55, `renderEmbeddables` 29 / 11. Hand count of `renderEmbeddables`
   (`src/components/App.tsx:838`, McCabe: `if`, loops, `&&`, `||`, ternaries, `??`, no optional chaining): 14. Ours
-  overcounts (`?.` and `?` inside template strings), lizard undercounts (it names arrow-function class properties
-  `(anonymous)` and loses their bodies). Neither is right on TSX.
+  overcounted (`?.`, `x?: T` and `?` inside template strings; 16 after the 2.21.21 fix, the last two being JSX
+  attribute ternaries the hand count folded), lizard undercounts (it names arrow-function class properties
+  `(anonymous)` and loses their bodies).
 - Both count test fixtures: bat's `tests/benchmarks/highlighting-speed-src/jquery.js` gives 21 of ours 39 and 41 of
   lizard's 63.
 
@@ -130,9 +132,9 @@ construction: commons-lang CPD 807 (749 test-only) vs ours 474; express CPD 139 
 group of ours is listed, CPD pairs the same files in 12 of 20 on flask, 17 of 20 on commons-lang, 0 of 20 on ripgrep
 (CPD has no Rust). PMD's `ecmascript` parser does not read TypeScript: excalidraw 2 duplications, 45 with
 `--language typescript`; juice-shop 109, 406 with typescript. The runner now picks the language per file extension.
-Two mislabels in ours found on the way: functions in a file named `app.py` (flask's `src/flask/app.py`) are tagged
-`[tests]` and not gated because `app` is an entry stem (`is_root_or_test`), and the report lists at most 20 groups
-while counting all.
+Two mislabels in ours found on the way: functions in a file named `app.py` (flask's `src/flask/app.py`) were tagged
+`[tests]` and not gated because `app` is an entry stem (fixed in 2.21.21: tests are tests by path only), and the
+report lists at most 20 groups while counting all.
 
 ### Secrets in git history
 
@@ -189,18 +191,18 @@ Measured twice: before and after 2.21.19, which put osv-scanner's approach insid
 
 | project | ours security+taint: non-test / test | s | semgrep p/default: non-test / test | s | bandit: non-test / test | s | ours also in semgrep (±10) | semgrep also in ours (±10) | in vendored files: ours / semgrep |
 |---|---|---|---|---|---|---|---|---|---|
-| flask | 14 / 30 | 0.8 | 16 / 0 | 4.1 | 13 / 1016 | 0.6 | 7 of 14 | 4 of 16 | 0 / 1 |
-| requests | 8 / 25 | 1.0 | 6 / 0 | 3.2 | 14 / 665 | 0.4 | 4 of 8 | 3 of 6 | 0 / 0 |
-| express | 5 / 24 | 1.8 | 53 / 0 | 3.0 | – | – | 0 of 5 | 0 of 53 | 0 / 0 |
-| excalidraw | 12 / 0 | 5.0 | 41 / 0 | 12.9 | – | – | 1 of 12 | 1 of 41 | 0 / 0 |
-| spring-petclinic | 0 / 0 | 0.3 | 16 / 0 | 3.0 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
-| commons-lang | 4 / 2 | 5.2 | 8 / 0 | 6.9 | – | – | 2 of 4 | 1 of 8 | 0 / 0 |
-| ripgrep | 0 / 0 | 1.3 | 16 / 0 | 3.7 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
-| bat | 0 / 39 | 2.8 | 23 / 0 | 3.0 | – | – | 0 of 0 | 0 of 23 | 0 / 0 |
-| NodeGoat | 16 / 0 | 0.6 | 31 / 4 | 3.7 | – | – | 8 of 16 | 7 of 31 | 0 / 0 |
-| pygoat | 86 / 0 | 0.7 | 135 / 0 | 4.0 | 65 / 0 | 0.3 | 63 of 86 | 64 of 135 | 0 / 0 |
-| WebGoat | 63 / 11 | 9.6 | 208 / 0 | 43.9 | – | – | 18 of 63 | 27 of 208 | 19 / 26 |
-| juice-shop | 80 / 14 | 13.5 | 61 / 3 | 25.1 | – | – | 23 of 80 | 16 of 61 | 15 / 0 |
+| flask | 14 / 30 | 0.7 | 16 / 0 | 3.1 | 13 / 1016 | 0.6 | 7 of 14 | 4 of 16 | 0 / 1 |
+| requests | 8 / 25 | 0.6 | 6 / 0 | 2.6 | 14 / 665 | 0.4 | 4 of 8 | 3 of 6 | 0 / 0 |
+| express | 7 / 24 | 1.1 | 53 / 0 | 2.6 | – | – | 2 of 7 | 2 of 53 | 0 / 0 |
+| excalidraw | 12 / 0 | 4.9 | 41 / 0 | 9.9 | – | – | 1 of 12 | 1 of 41 | 0 / 0 |
+| spring-petclinic | 0 / 0 | 0.3 | 16 / 0 | 2.5 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
+| commons-lang | 4 / 2 | 5.0 | 8 / 0 | 6.5 | – | – | 2 of 4 | 1 of 8 | 0 / 0 |
+| ripgrep | 0 / 0 | 1.0 | 16 / 0 | 3.1 | – | – | 0 of 0 | 0 of 16 | 0 / 0 |
+| bat | 0 / 34 | 1.5 | 23 / 0 | 2.4 | – | – | 0 of 0 | 0 of 23 | 0 / 0 |
+| NodeGoat | 16 / 0 | 0.5 | 31 / 4 | 2.5 | – | – | 8 of 16 | 7 of 31 | 0 / 0 |
+| pygoat | 86 / 0 | 0.5 | 135 / 0 | 3.6 | 65 / 0 | 0.2 | 63 of 86 | 64 of 135 | 0 / 0 |
+| WebGoat | 48 / 11 | 3.6 | 208 / 0 | 43.1 | – | – | 17 of 48 | 23 of 208 | 0 / 26 |
+| juice-shop | 65 / 155 | 5.8 | 61 / 3 | 27.4 | – | – | 23 of 65 | 16 of 61 | 0 / 0 |
 
 ### 2. Recall on the documented vulnerabilities (tests/extended/known.json)
 
@@ -214,18 +216,18 @@ Measured twice: before and after 2.21.19, which put osv-scanner's approach insid
 
 ### 3. Rules with no counterpart on the other side (non-test findings, all projects)
 
-semgrep-only, by rule: github-actions-mutable-action-tag 109, django-no-csrf-token 108, missing-integrity 43, detect-non-literal-regexp 25, unrestricted-request-mapping 12, detected-jwt-token 10, path-join-resolve-traversal 10, dependabot-missing-cooldown 9, direct-response-write 7, plaintext-http-link 7, express-cookie-session-default-name 6, express-cookie-session-no-domain 6, express-cookie-session-no-expires 6, express-cookie-session-no-httponly 6, express-cookie-session-no-path 6, express-cookie-session-no-secure 6, wildcard-postmessage-configuration 6, django-secure-set-cookie 5, cookie-missing-httponly 5, npm-missing-minimum-release-age 4, express-session-hardcoded-secret 4, unsafe-reflection 4, missing-user 4, formatted-sql-string 4, express-path-join-resolve-traversal 4, express-res-sendfile 4, express-check-directory-listing 4, run-shell-injection 3, unsafe-formatstring 3, prototype-pollution-loop 3, detected-bcrypt-hash 3, md5-used-as-password 3, cookie-issecure-false 3, cookie-missing-secure-flag 3, jdbc-sqli 3, template-explicit-unescape 2, using-http-server 2, run-as-non-root 2, allow-privilege-escalation-no-securitycontext 2, dangerous-globals-use 2, express-check-csurf-middleware-usage 2, secure-set-cookie 2, weak-random 2, tainted-sql-string 2, tainted-file-path 2, detect-replaceall-sanitization 2, non-literal-import 1, gha-curl-pipe-shell 1, no-sudo-in-dockerfile 1, spring-actuator-fully-enabled 1, detected-private-key 1, no-new-privileges 1, writable-filesystem-service 1, subprocess-injection 1, avoid_app_run_with_bad_host 1, missing-user-entrypoint 1, avoid-pickle 1, request-data-write 1, tainted-url-host 1, httpservlet-path-traversal 1, hardcoded-hmac-key 1, express-detect-notevil-usage 1, raw-html-format 1, express-libxml-vm-noent 1, express-open-redirect 1, express-insecure-template-usage 1, unknown-value-with-script-tag 1
+semgrep-only, by rule: github-actions-mutable-action-tag 109, django-no-csrf-token 108, missing-integrity 43, detect-non-literal-regexp 27, unrestricted-request-mapping 12, detected-jwt-token 10, path-join-resolve-traversal 10, dependabot-missing-cooldown 9, plaintext-http-link 7, express-cookie-session-default-name 6, express-cookie-session-no-domain 6, express-cookie-session-no-expires 6, express-cookie-session-no-httponly 6, express-cookie-session-no-path 6, express-cookie-session-no-secure 6, wildcard-postmessage-configuration 6, direct-response-write 5, prototype-pollution-loop 5, django-secure-set-cookie 5, cookie-missing-httponly 5, npm-missing-minimum-release-age 4, express-session-hardcoded-secret 4, unsafe-reflection 4, missing-user 4, formatted-sql-string 4, express-path-join-resolve-traversal 4, express-res-sendfile 4, express-check-directory-listing 4, run-shell-injection 3, unsafe-formatstring 3, detected-bcrypt-hash 3, md5-used-as-password 3, cookie-issecure-false 3, cookie-missing-secure-flag 3, jdbc-sqli 3, template-explicit-unescape 2, using-http-server 2, run-as-non-root 2, allow-privilege-escalation-no-securitycontext 2, dangerous-globals-use 2, express-check-csurf-middleware-usage 2, secure-set-cookie 2, weak-random 2, tainted-sql-string 2, tainted-file-path 2, detect-replaceall-sanitization 2, non-literal-import 1, gha-curl-pipe-shell 1, no-sudo-in-dockerfile 1, spring-actuator-fully-enabled 1, detected-private-key 1, no-new-privileges 1, writable-filesystem-service 1, subprocess-injection 1, avoid_app_run_with_bad_host 1, missing-user-entrypoint 1, avoid-pickle 1, request-data-write 1, tainted-url-host 1, httpservlet-path-traversal 1, hardcoded-hmac-key 1, express-detect-notevil-usage 1, raw-html-format 1, express-libxml-vm-noent 1, express-open-redirect 1, express-insecure-template-usage 1, unknown-value-with-script-tag 1
 
 bandit-only, by test id: B105 12, B101 11, B603 5, B404 4, B110 3, B605 2, B607 2, B403 2, B311 2, B324 2, B113 2, B406 2, B106 1, B104 1, B409 1
 
-ours-only, by rule: HTML injected without escaping 47, hard-coded password / secret literal 15, path assembled from strings, opened below 14, secret pattern: generic-api-key 9, input reaches file path 7, container runs as root (no USER) 7, SQL built from strings 7, input reaches SQL statement 7, secret in a log line 6, unpinned dependency 4, input reaches redirect target 4, non-cryptographic randomness for a secret 4, OS command with a shell 3, input reaches shell command 3, unsafe deserialisation 3, private key in repository 3, command assembled from strings, run with a shell below 3, HTML assembled from strings, sent below 2, debug mode on 2, eval / dynamic Function 2, no lockfile next to package.json 2, cloud / API token literal 1, input reaches outbound request URL 1, unbounded dependency range 1, wildcard hosts 1, weak hash for passwords / tokens 1, input reaches eval 1, base image without a pinned tag 1, weak hash 1
+ours-only, by rule: HTML injected without escaping 23, hard-coded password / secret literal 15, path assembled from strings, opened below 14, secret pattern: generic-api-key 9, input reaches file path 7, container runs as root (no USER) 7, SQL built from strings 7, input reaches SQL statement 7, secret in a log line 6, unpinned dependency 4, input reaches redirect target 4, OS command with a shell 3, input reaches shell command 3, unsafe deserialisation 3, command assembled from strings, run with a shell below 3, private key in repository 3, HTML assembled from strings, sent below 2, debug mode on 2, no lockfile next to package.json 2, cloud / API token literal 1, input reaches outbound request URL 1, unbounded dependency range 1, weak hash for passwords / tokens 1, wildcard hosts 1, input reaches eval 1, eval / dynamic Function 1, weak hash 1, base image without a pinned tag 1
 
 ### 4. Hygiene: ours vs ruff (Python projects)
 
 | project | ours hygiene (leftover, swallowed, bug) | s (whole style run) | ruff F401,F841,ARG,B006,E722,S110: non-test / test | s | ruff by rule (non-test) | ours also in ruff (±1) | ruff non-test also in ours (±1) |
 |---|---|---|---|---|---|---|---|
 | flask | 3 | 0.7 | 17 / 161 | 0.0 | ARG001 8, ARG002 8, S110 1 | 1 of 3 | 1 of 17 |
-| requests | 1 | 0.6 | 63 / 15 | 0.0 | F401 59, ARG001 2, ARG002 2 | 0 of 1 | 0 of 63 |
+| requests | 1 | 0.5 | 63 / 15 | 0.0 | F401 59, ARG001 2, ARG002 2 | 0 of 1 | 0 of 63 |
 | pygoat | 59 | 0.3 | 80 / 0 | 0.0 | E722 30, F401 29, F841 7, ARG002 6, S110 4, ARG001 4 | 58 of 59 | 62 of 80 |
 
 ### 5. Cyclomatic complexity over 10: ours vs lizard
@@ -235,73 +237,73 @@ ours-only, by rule: HTML injected without escaping 47, hard-coded password / sec
 | flask | 11 | 0 | 11 / 0 | 0 | 0.2 | 11 | 8 |
 | requests | 14 | 0 | 13 / 0 | 0 | 0.1 | 13 | 11 |
 | express | 3 | 0 | 4 / 0 | 0 | 0.3 | 1 | – |
-| excalidraw | 117 | 0 | 89 / 4 | 0 | 1.1 | 53 | – |
+| excalidraw | 98 | 0 | 89 / 4 | 0 | 1.0 | 50 | – |
 | spring-petclinic | 1 | 0 | 0 / 1 | 0 | 0.1 | 0 | – |
-| commons-lang | 73 | 0 | 58 / 7 | 0 | 1.9 | 44 | – |
-| ripgrep | 46 | 0 | 44 / 0 | 0 | 0.4 | 43 | – |
-| bat | 39 | 21 | 14 / 49 | 47 | 0.7 | 28 | – |
-| NodeGoat | 2 | 0 | 7 / 0 | 7 | 0.2 | 0 | – |
+| commons-lang | 73 | 0 | 58 / 7 | 0 | 2.0 | 44 | – |
+| ripgrep | 45 | 0 | 44 / 0 | 0 | 0.3 | 42 | – |
+| bat | 17 | 0 | 14 / 49 | 47 | 0.6 | 15 | – |
+| NodeGoat | 2 | 0 | 7 / 0 | 7 | 0.1 | 0 | – |
 | pygoat | 1 | 0 | 1 / 0 | 0 | 0.1 | 1 | 1 |
-| WebGoat | 43 | 32 | 170 / 0 | 149 | 1.0 | 17 | – |
-| juice-shop | 46 | 0 | 91 / 0 | 78 | 1.0 | 28 | – |
+| WebGoat | 12 | 1 | 170 / 0 | 149 | 1.0 | 8 | – |
+| juice-shop | 12 | 0 | 91 / 0 | 78 | 1.0 | 4 | – |
 
 ### 6. Dead functions: ours vs vulture (Python projects)
 
 | project | ours dead functions | s | vulture unused function/method (≥ 60 %): non-test / test | s | both (same file:line) | vulture-only (non-test) | ours-only |
 |---|---|---|---|---|---|---|---|
-| flask | 1 | 0.6 | 9 / 245 | 0.2 | 1 | 8 | 0 |
-| requests | 18 | 0.5 | 21 / 4 | 0.1 | 18 | 3 | 0 |
+| flask | 1 | 0.7 | 9 / 245 | 0.2 | 1 | 8 | 0 |
+| requests | 18 | 0.4 | 21 / 4 | 0.1 | 18 | 3 | 0 |
 | pygoat | 4 | 0.3 | 12 / 0 | 0.1 | 4 | 8 | 0 |
 
 ### 7. Clones: ours vs PMD CPD
 
 | project | ours exact clone groups | test-only groups | s | CPD duplications (60 tokens) | test-only | CPD languages | s | ours listed groups that CPD also pairs (same files) |
 |---|---|---|---|---|---|---|---|---|
-| flask | 26 | 5 of 20 listed | 0.3 | 10 | 4 | python | 0.5 | 12 of 20 |
-| requests | 13 | 4 of 13 listed | 0.2 | 5 | 4 | python | 0.6 | 4 of 13 |
-| express | 5 | 3 of 5 listed | 0.3 | 139 | 134 | ecmascript | 0.6 | 4 of 5 |
-| excalidraw | 20 | 6 of 20 listed | 1.5 | 47 | 21 | ecmascript, typescript | 4.8 | 4 of 20 |
-| spring-petclinic | 6 | 5 of 6 listed | 0.1 | 10 | 10 | java | 0.4 | 4 of 6 |
-| commons-lang | 474 | 13 of 20 listed | 13.6 | 807 | 749 | java | 1.0 | 17 of 20 |
+| flask | 26 | 2 of 20 listed | 0.4 | 10 | 4 | python | 0.5 | 12 of 20 |
+| requests | 13 | 4 of 13 listed | 0.2 | 5 | 4 | python | 0.5 | 4 of 13 |
+| express | 5 | 3 of 5 listed | 0.2 | 139 | 134 | ecmascript | 0.5 | 4 of 5 |
+| excalidraw | 20 | 5 of 20 listed | 1.5 | 47 | 21 | ecmascript, typescript | 4.3 | 4 of 20 |
+| spring-petclinic | 6 | 5 of 6 listed | 0.1 | 10 | 10 | java | 0.5 | 4 of 6 |
+| commons-lang | 474 | 13 of 20 listed | 15.0 | 807 | 749 | java | 0.9 | 17 of 20 |
 | ripgrep | 78 | 2 of 20 listed | 0.8 | 0 | 0 | none (Rust unsupported) | 0.0 | 0 of 20 |
-| bat | 43 | 18 of 20 listed | 0.7 | 75 | 74 | ecmascript, java, python, typescript | 2.3 | 4 of 20 |
-| NodeGoat | 0 | 0 of 0 listed | 0.1 | 10 | 0 | ecmascript | 0.6 | 0 of 0 |
-| pygoat | 4 | 0 of 4 listed | 0.2 | 6 | 0 | ecmascript, python | 1.0 | 3 of 4 |
-| WebGoat | 55 | 12 of 20 listed | 1.6 | 190 | 42 | ecmascript, java | 1.4 | 14 of 20 |
-| juice-shop | 35 | 0 of 20 listed | 1.0 | 516 | 172 | ecmascript, python, typescript | 6.7 | 14 of 20 |
+| bat | 43 | 18 of 20 listed | 0.5 | 75 | 74 | ecmascript, java, python, typescript | 1.8 | 4 of 20 |
+| NodeGoat | 0 | 0 of 0 listed | 0.1 | 10 | 0 | ecmascript | 0.5 | 0 of 0 |
+| pygoat | 4 | 0 of 4 listed | 0.1 | 6 | 0 | ecmascript, python | 0.8 | 3 of 4 |
+| WebGoat | 44 | 18 of 20 listed | 1.1 | 190 | 42 | ecmascript, java | 1.5 | 11 of 20 |
+| juice-shop | 30 | 0 of 20 listed | 0.9 | 516 | 172 | ecmascript, python, typescript | 7.3 | 11 of 20 |
 
 ### 8. Secrets in git history: ours vs gitleaks
 
 | project | ours secrets in history | s | gitleaks | s | gitleaks by rule | files flagged by both | files ours | files gitleaks |
 |---|---|---|---|---|---|---|---|---|
-| flask | 3 | 1.0 | 6 | 0.3 | generic-api-key 6 | 2 | 2 | 2 |
-| requests | 4 | 1.0 | 4 | 0.6 | private-key 4 | 4 | 4 | 4 |
-| express | 1 | 0.9 | 0 | 0.3 | – | 0 | 1 | 0 |
-| excalidraw | 3 | 3.0 | 3 | 0.4 | gcp-api-key 2, generic-api-key 1 | 3 | 3 | 3 |
+| flask | 3 | 1.1 | 6 | 0.3 | generic-api-key 6 | 2 | 2 | 2 |
+| requests | 4 | 0.7 | 4 | 0.5 | private-key 4 | 4 | 4 | 4 |
+| express | 1 | 0.8 | 0 | 0.3 | – | 0 | 1 | 0 |
+| excalidraw | 3 | 2.9 | 3 | 0.4 | gcp-api-key 2, generic-api-key 1 | 3 | 3 | 3 |
 | spring-petclinic | 0 | 0.5 | 0 | 0.3 | – | 0 | 0 | 0 |
-| commons-lang | 0 | 4.5 | 0 | 0.5 | – | 0 | 0 | 0 |
-| ripgrep | 0 | 1.6 | 0 | 0.3 | – | 0 | 0 | 0 |
-| bat | 0 | 3.3 | 0 | 0.4 | – | 0 | 0 | 0 |
+| commons-lang | 0 | 4.2 | 0 | 0.4 | – | 0 | 0 | 0 |
+| ripgrep | 0 | 1.3 | 0 | 0.3 | – | 0 | 0 | 0 |
+| bat | 0 | 3.1 | 0 | 0.4 | – | 0 | 0 | 0 |
 | NodeGoat | 5 | 0.5 | 3 | 0.3 | generic-api-key 2, private-key 1 | 3 | 5 | 3 |
-| pygoat | 12 | 0.9 | 10 | 0.4 | generic-api-key 8, jwt 2 | 3 | 4 | 3 |
-| WebGoat | 23 | 3.7 | 24 | 0.6 | jwt 16, generic-api-key 6, private-key 2 | 14 | 16 | 14 |
-| juice-shop | 98 | 5.8 | 50 | 0.8 | generic-api-key 38, jwt 11, private-key 1 | 22 | 52 | 22 |
+| pygoat | 12 | 0.8 | 10 | 0.3 | generic-api-key 8, jwt 2 | 3 | 4 | 3 |
+| WebGoat | 23 | 3.3 | 24 | 0.5 | jwt 16, generic-api-key 6, private-key 2 | 14 | 16 | 14 |
+| juice-shop | 98 | 6.0 | 50 | 0.7 | generic-api-key 38, jwt 11, private-key 1 | 22 | 52 | 22 |
 
 ### 9. Known CVEs: ours vs osv-scanner
 
 | project | ours packages | manifests | transitive | vulnerable | advisories | s | osv-scanner: manifest (vulnerable packages, advisories) | osv advisories | s |
 |---|---|---|---|---|---|---|---|---|---|
-| flask | 20 | 1 | 8 | 4 | 27 | 1.5 | examples/celery/requirements.txt (4, 27) | 27 | 4.7 |
-| requests | 15 | 1 | 14 | 0 | 0 | 0.6 | docs/requirements.txt (1, 2) | 2 | 6.9 |
+| flask | 20 | 1 | 8 | 4 | 27 | 1.5 | examples/celery/requirements.txt (4, 27) | 27 | 15.5 |
+| requests | 15 | 1 | 14 | 0 | 0 | 0.7 | docs/requirements.txt (1, 2) | 2 | 18.4 |
 | express | 0 | 0 | 0 | 0 | 0 | 0.1 | – | 0 | 0.1 |
-| excalidraw | 3190 | 4 | 0 | 190 | 495 | 18.7 | dev-docs/yarn.lock (59, 149); src/packages/excalidraw/yarn.lock (47, 107); src/packages/utils/yarn.lock (19, 34); yarn.lock (65, 205) | 495 | 3.8 |
-| spring-petclinic | 172 | 1 | 145 | 4 | 6 | 1.9 | pom.xml (4, 6) | 6 | 38.7 |
-| commons-lang | 28 | 1 | 21 | 1 | 1 | 2.9 | – | 0 | 4.4 |
+| excalidraw | 3190 | 4 | 0 | 190 | 495 | 9.9 | dev-docs/yarn.lock (59, 149); src/packages/excalidraw/yarn.lock (47, 107); src/packages/utils/yarn.lock (19, 34); yarn.lock (65, 205) | 495 | 3.4 |
+| spring-petclinic | 172 | 1 | 145 | 4 | 6 | 1.9 | pom.xml (4, 6) | 6 | 54.2 |
+| commons-lang | 28 | 1 | 21 | 1 | 1 | 0.9 | – | 0 | 4.3 |
 | ripgrep | 61 | 1 | 0 | 4 | 5 | 1.2 | Cargo.lock (4, 5) | 5 | 0.8 |
-| bat | 247 | 3 | 40 | 17 | 157 | 2.6 | Cargo.lock (13, 23); assets/syntaxes/02_Extra/syntax_test_requirements.txt (3, 79); tests/syntax-tests/source/Requirements.txt/requirements.txt (3, 79) | 181 | 3.2 |
-| NodeGoat | 1091 | 1 | 0 | 130 | 301 | 11.6 | package-lock.json (130, 301) | 301 | 3.9 |
-| pygoat | 59 | 4 | 29 | 22 | 323 | 3.7 | dockerized_labs/broken_auth_lab/requirements.txt (4, 27); dockerized_labs/broken_auth_lab/requirements.txt (3, 26); dockerized_labs/insec_des_lab/requirements.txt (2, 14); dockerized_labs/insec_des_lab/requirements.txt (2, 14); dockerized_labs/sensitive_data_exposure/requirements.txt (2, 35); dockerized_labs/sensitive_data_exposure/requirements.txt (2, 18); requirements.txt (13, 237); requirements.txt (5, 163) | 534 | 10.8 |
-| WebGoat | 239 | 1 | 205 | 43 | 135 | 4.4 | pom.xml (3, 39); pom.xml (38, 89) | 128 | 60.3 |
+| bat | 247 | 3 | 40 | 17 | 157 | 2.7 | Cargo.lock (13, 23); assets/syntaxes/02_Extra/syntax_test_requirements.txt (3, 79); tests/syntax-tests/source/Requirements.txt/requirements.txt (3, 79) | 181 | 4.3 |
+| NodeGoat | 1091 | 1 | 0 | 130 | 301 | 2.6 | package-lock.json (130, 301) | 301 | 4.2 |
+| pygoat | 59 | 4 | 29 | 22 | 323 | 3.1 | dockerized_labs/broken_auth_lab/requirements.txt (4, 27); dockerized_labs/broken_auth_lab/requirements.txt (3, 26); dockerized_labs/insec_des_lab/requirements.txt (2, 14); dockerized_labs/insec_des_lab/requirements.txt (2, 14); dockerized_labs/sensitive_data_exposure/requirements.txt (2, 35); dockerized_labs/sensitive_data_exposure/requirements.txt (2, 18); requirements.txt (13, 237); requirements.txt (5, 163) | 534 | 12.8 |
+| WebGoat | 239 | 1 | 205 | 43 | 135 | 4.7 | pom.xml (3, 39); pom.xml (38, 89) | 128 | 54.7 |
 | juice-shop | 0 | 0 | 0 | 0 | 0 | 0.1 | – | 0 | 0.1 |
 
 

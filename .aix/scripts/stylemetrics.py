@@ -194,7 +194,7 @@ def analyse_py(file: Path, cls, fn, lang="python", lines: list = None):
 
 # ---- other languages: tokens and braces --------------------------------------------------------------------------
 
-TOKEN_RX = re.compile(r"\{|\}|\b(if|for|while|switch|catch|match|loop|else)\b|&&|\|\||\?")
+TOKEN_RX = re.compile(r"\{|\}|\b(if|for|while|switch|catch|match|loop|else)\b|&&|\|\||\?\?|\?(?![.?:])")   # `?.` and `x?: T` are not branches
 BRANCH_WORDS = ("if", "for", "while", "switch", "catch", "match", "loop")
 
 
@@ -237,7 +237,7 @@ def analyse_tokens(file: Path, name: str, header_end: int, text: str, lang: str)
     start_line = text.count("\n", 0, header_end) + 1
     body = brace_block(text, header_end)
     head = text[text.rfind("\n", 0, header_end) + 1:text.find("{", header_end)]  # name line up to the body's brace: the parameters
-    cleaned = re.sub(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", " ", body, flags=re.S)
+    cleaned = re.sub(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`", " ", body, flags=re.S)
     walk = _TokenWalk(start_line)
     for m in TOKEN_RX.finditer(cleaned):
         walk.feed(m.group(0), start_line + cleaned.count("\n", 0, m.start()))

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from codefiles import EXT, rel, source_files
 from depedges import iter_functions
-from graphmetrics import is_root_or_test
+from graphmetrics import is_test
 
 
 MIN_LINES, KGRAM, WINDOW, SIMILARITY = 6, 5, 4, 70
@@ -193,7 +193,7 @@ def find_clones(funcs, similarity):
 
 def _all_tests(group: list) -> bool:
     """A group made only of test functions: tests share a shape by nature (arrange, act, assert); listed, not gated."""
-    return all(is_root_or_test(fx[1]) for fx in group)
+    return all(is_test(fx[1]) for fx in group)
 
 
 def render_clones(roots, similarity):

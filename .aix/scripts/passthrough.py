@@ -70,7 +70,7 @@ def _param_names(head: str, name: str, lang: str) -> list:
         p = re.sub(r"=.*$", "", p.strip())
         if not p or p in ("self", "&self", "&mut self", "mut self", "this"):
             continue
-        names.append(p.split(" ")[-1] if lang == "java" else p.split(":")[0].strip().lstrip("&").replace("mut ", "").strip(".").rstrip("?"))
+        names.append(p.split(" ")[-1].rstrip("[]").lstrip(".") if lang == "java" else p.split(":")[0].strip().lstrip("&").replace("mut ", "").strip(".").rstrip("?"))
     return names
 
 

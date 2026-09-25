@@ -15,7 +15,6 @@ CACHE = Path(os.environ.get("AIX_CACHE") or (Path.home() / ".cache" / "aix")) / 
 PROJECTS = json.loads((KIT / "tests" / "extended" / "projects.json").read_text())
 TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|spec|e2e|it)(/|$)|[._-](test|spec)s?\.|Test\w*\.java|test_")
 CPD_LANG = {".py": "python", ".js": "ecmascript", ".jsx": "ecmascript", ".ts": "typescript", ".tsx": "typescript", ".java": "java"}
-FINDING = r"^{indent}(\S+):(\d+)  (.+?) \(CWE-\d+\)  \[(REVIEW|test)\]"
 
 
 def env() -> dict:
@@ -52,23 +51,34 @@ def prepare(project: dict) -> Path:
 
 # ---- ours ---------------------------------------------------------------------------------------------------------
 
-def _findings(out: str, indent: str) -> list:
-    return [dict(file=m[1], line=int(m[2]), what=m[3], test=m[4] == "test") for m in re.finditer(FINDING.format(indent=indent), out, re.M)]
+MODULE = "import sys, json; sys.path.insert(0, '.aix/scripts'); from codefiles import default_roots; import codesecurity, taint, jstaint; roots = default_roots(); "
+
+
+def _module_findings(tmp: Path, expr: str) -> tuple:
+    """Findings straight from the module (the report lists at most 20 per register row): (items, seconds)."""
+    out, secs = timed([sys.executable, "-c", MODULE + f"print(json.dumps([(f[3], f[4], f[2], f[7]) for f in {expr}]))"], tmp)
+    items = [dict(file=f, line=ln, what=what, test=codesecurity_is_test(f)) for f, ln, what, acc in _json(out) if f and not acc and what != "file skipped by marker"]
+    return items, secs
+
+
+def codesecurity_is_test(path: str) -> bool:
+    parts = Path(path).parts
+    return any(x in ("tests", "test", "__tests__", "fixtures") for x in parts) or Path(path).name.startswith("test_") or ".test." in path or ".spec." in path
 
 
 def ours_security(tmp: Path) -> dict:
-    out, secs = timed([".aix/bin/aix", "code", "security"], tmp)
-    return dict(items=_findings(out, "    "), secs=secs)
+    items, secs = _module_findings(tmp, "codesecurity.scan(roots)")
+    return dict(items=items, secs=secs)
 
 
 def ours_vulnerabilities(tmp: Path) -> tuple:
-    """Taint findings and history findings, one run each (the history walk is timed on its own)."""
-    out, secs = timed([".aix/bin/aix", "code", "vulnerabilities", "--taint"], tmp)
-    taint = dict(items=[f for f in _findings(out, "      ") if "in history" not in f["what"]], secs=secs)
+    """Taint findings and history findings, from the modules (the report lists at most 20 per row)."""
+    items, secs = _module_findings(tmp, "taint.taint(roots) + jstaint.taint(roots)")
+    taint_findings = dict(items=items, secs=secs)
     code = "import sys, json; sys.path.insert(0, '.aix/scripts'); import secrethistory; print(json.dumps(secrethistory.history() or []))"
-    out, secs = timed([sys.executable, "-c", code], tmp)   # the module, not the report: the report lists at most 20
+    out, secs = timed([sys.executable, "-c", code], tmp)
     history = dict(items=[dict(file=f[3], what=f[2].split(" in history")[0], commit=f[2].rsplit("commit ", 1)[-1].rstrip(")")) for f in _json(out)], secs=secs)
-    return taint, history
+    return taint_findings, history
 
 
 def ours_style(tmp: Path) -> tuple:

@@ -21,11 +21,17 @@ LAYER = {  # folder name -> level; an edge from a lower level to a higher one is
 }
 
 
+def is_test(node: str) -> bool:
+    """A test file by its path or name."""
+    p = Path(node)
+    return bool({"tests", "test", "__tests__", "spec", "it"} & set(p.parts)) or p.name.startswith("test_") or ".test." in p.name \
+        or ".spec." in p.name or p.name.endswith("_test.py")
+
+
 def is_root_or_test(node: str) -> bool:
     """Composition roots and tests wire or exercise many modules directly: their out-edges are wiring, not design."""
     p = Path(node)
-    return (p.stem.lower() in ROOT_STEMS and p.name not in FACADE_NAMES) or bool({"tests", "test", "__tests__", "spec", "it"} & set(p.parts)) \
-        or p.name.startswith("test_") or ".test." in p.name or ".spec." in p.name or p.name.endswith("_test.py")
+    return (p.stem.lower() in ROOT_STEMS and p.name not in FACADE_NAMES) or is_test(node)
 
 
 def is_composition_root(node: str) -> bool:
