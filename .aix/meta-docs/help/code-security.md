@@ -21,6 +21,17 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   VUL-INFRA-001      chmod 777, privileged containers, Dockerfile without USER              CWE-732/250
   VUL-DEP-001        unpinned requirements, unbounded npm ranges, missing lockfiles, FROM without tag  CWE-1104
 
+  Infrastructure and frameworks (file-level rules, the categories a semgrep run adds; .github/ and the root's own
+  files are scanned whatever the code roots): GitHub Actions `uses:` pinned to a tag instead of a commit SHA
+  (CWE-829), an outsider-written context (`github.event.pull_request.title`, `head_ref`, `ref_name`, `inputs.*`)
+  pasted into `run:` (CWE-78), `curl | sh` (CWE-494); dependabot updates without `cooldown:` and .npmrc without
+  `min-release-age` (CWE-1104); `RUN sudo` in a Dockerfile, Kubernetes containers without `runAsNonRoot: true` or
+  `allowPrivilegeEscalation: false`, compose services with an image but no `no-new-privileges` or `read_only`
+  (CWE-250/732); express `session({...})` / `cookieSession({...})` without httpOnly, secure, domain, path, maxAge
+  or a name (CWE-614) and with a literal `secret:` (CWE-798); `<script src>` / `<link href>` from another host
+  without `integrity=` (CWE-353); Spring `management.endpoints.web.exposure.include=*` (CWE-16) and a method-level
+  `@RequestMapping` without `method =` (CWE-352); `postMessage(x, "*")` (CWE-345).
+
   Assembled, then used (every language): a variable takes a string built from a literal plus a value (`+`, f-string,
   .format, template literal, String.format, format!, %) and, within the next 40 lines, is the argument of a dangerous
   call. What the literal looks like picks the sinks: an SQL keyword -> query/execute (CWE-89); a path or path.join ->

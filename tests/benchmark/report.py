@@ -158,10 +158,49 @@ def cves(D: dict) -> str:
     return table(["project", "ours packages", "manifests", "transitive", "vulnerable", "advisories", "s", "osv-scanner: manifest (vulnerable packages, advisories)", "osv advisories", "s"], rows)
 
 
+SEMGREP_RULES = {  # semgrep rule -> the words of ours that reproduce it
+    "github-actions-mutable-action-tag": "mutable tag", "run-shell-injection": "shell injection", "gha-curl-pipe-shell": "piped to a shell",
+    "dependabot-missing-cooldown": "cooldown", "npm-missing-minimum-release-age": "release age", "no-sudo-in-dockerfile": "sudo in a Dockerfile",
+    "run-as-non-root": "run as root", "allow-privilege-escalation-no-securitycontext": "privilege escalation", "no-new-privileges": "no-new-privileges",
+    "writable-filesystem-service": "writable root filesystem", "express-cookie-session-no-httponly": "session cookie without", "express-cookie-session-no-secure": "session cookie without",
+    "express-cookie-session-default-name": "session cookie without", "express-cookie-session-no-domain": "session cookie without", "express-cookie-session-no-path": "session cookie without",
+    "express-cookie-session-no-expires": "session cookie without", "express-session-hardcoded-secret": "session secret hard-coded", "missing-integrity": "without integrity",
+    "spring-actuator-fully-enabled": "actuator endpoint", "unrestricted-request-mapping": "@RequestMapping without", "wildcard-postmessage-configuration": "postMessage to any origin",
+}
+
+
+def _near_any(project: str, item: dict, others: list) -> bool:
+    """A finding of `others` (project, finding) in the same project and file within three lines."""
+    return any(p == project and o["file"] == item["file"] and abs(o["line"] - item["line"]) <= 3 for p, o in others)
+
+
+def _semgrep_under(D: dict, rule: str) -> list:
+    return [(n, s) for n, d in D.items() for s in d["theirs"]["semgrep"]["items"] if s["rule"] == rule and not s["file"].startswith("docs/")]
+
+
+def _ours_under(D: dict, words: str) -> list:
+    return [(n, x) for n, d in D.items() for x in security_ours(d) if words in x["what"]]
+
+
+def _rule_row(D: dict, rule: str, words: str) -> list:
+    theirs, ours = _semgrep_under(D, rule), _ours_under(D, words)
+    hit = sum(1 for n, s in theirs if _near_any(n, s, ours))
+    extra = sum(1 for n, x in ours if not _near_any(n, x, theirs))
+    return [rule, len(theirs), hit, extra]
+
+
+def reproduction(D: dict) -> str:
+    """For every semgrep rule ours reproduces since 2.21.22: its findings over all projects and how many ours has within
+    three lines (same file), plus what ours reports under that rule with no semgrep finding nearby (docs/ excluded, ours never reads it)."""
+    return table(["semgrep rule", "semgrep findings (12 projects, docs/ excluded)", "reproduced by ours (±3 lines)", "ours-only under the same rule"],
+                 [_rule_row(D, rule, words) for rule, words in SEMGREP_RULES.items()])
+
+
 SECTIONS = [("Security findings, time and overlap", security), ("Recall on the documented vulnerabilities (tests/extended/known.json)", recall_table),
             ("Rules with no counterpart on the other side (non-test findings, all projects)", only_rules), ("Hygiene: ours vs ruff (Python projects)", hygiene),
             ("Cyclomatic complexity over 10: ours vs lizard", complexity), ("Dead functions: ours vs vulture (Python projects)", dead),
-            ("Clones: ours vs PMD CPD", clones), ("Secrets in git history: ours vs gitleaks", secrets), ("Known CVEs: ours vs osv-scanner", cves)]
+            ("Clones: ours vs PMD CPD", clones), ("Secrets in git history: ours vs gitleaks", secrets), ("Known CVEs: ours vs osv-scanner", cves),
+            ("Semgrep's categories reproduced by ours (2.21.22)", reproduction)]
 
 
 def main():

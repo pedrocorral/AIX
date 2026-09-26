@@ -20,6 +20,7 @@ import assembled
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from secretscan import SECRET_ADVICE, secret_findings
 import secretscan
+import infrarules
 from depscan import scan_dependencies, scan_dockerfile
 
 
@@ -126,15 +127,16 @@ ENV_FILES = (".env", ".env.local", ".env.production")
 
 
 def _scan_target(f: Path):
-    """The findings of one file, by its kind: a Dockerfile, a text file with rules, or nothing."""
+    """The findings of one file, by its kind: a Dockerfile, a text file with rules, a file that is a secret by
+    name; plus the infrastructure and framework rules that apply to it (workflows, manifests, sessions, pages)."""
     if f.name.startswith("Dockerfile") or f.name.endswith(".dockerfile"):
-        return scan_dockerfile(f)
-    if f.name != ".env.example" and (f.suffix in TEXT_EXT or f.name in ENV_FILES):
-        return scan_file(f)
-    by_name = secretscan.path_secret(rel(f))
-    if by_name:
-        return [("VUL-SECRET-001", "CWE-798", f"secret pattern: {by_name[0]}", rel(f), 1, by_name[1], SECRET_ADVICE, None)]
-    return []
+        found = scan_dockerfile(f)
+    elif f.name != ".env.example" and (f.suffix in TEXT_EXT or f.name in ENV_FILES):
+        found = scan_file(f)
+    else:
+        by_name = secretscan.path_secret(rel(f))
+        found = [("VUL-SECRET-001", "CWE-798", f"secret pattern: {by_name[0]}", rel(f), 1, by_name[1], SECRET_ADVICE, None)] if by_name else []
+    return found if found[:1] and found[0][0] == "SKIPPED" else found + infrarules.findings(f)
 
 
 def _files_of(root: str):
@@ -159,7 +161,7 @@ def _dedupe(findings):
 
 
 def scan(paths):
-    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)]
+    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)] + infrarules.root_findings(paths)
     for root in {ROOT} | {(ROOT / r) for r in paths if (ROOT / r).is_dir()}:
         findings += scan_dependencies(root)
     return _dedupe(findings)

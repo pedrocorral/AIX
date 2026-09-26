@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.22 — 2026-09-25
+
+- `aix code security` covers the categories the engine benchmark showed only semgrep had (`infrarules.py`, file-level rules): GitHub Actions `uses:` on a mutable tag, an outsider-written context pasted into `run:`, `curl | sh`; dependabot without a cooldown, .npmrc without a minimum release age; `RUN sudo`, Kubernetes containers without `runAsNonRoot` / `allowPrivilegeEscalation: false`, compose services without `no-new-privileges` / `read_only`; express and cookie-session cookies without their flags and with a literal secret; external scripts and stylesheets without integrity; Spring actuator fully exposed and method-level `@RequestMapping` without a method; `postMessage` to any origin. `.github/` and the root's own files are scanned whatever the code roots. On the twelve extended projects every semgrep finding in these rules is reproduced at its line (`docs/tests/benchmark-engines.md`, table 10); ours adds cookie-session secrets, which semgrep's express rule does not read.
+
 ## 2.21.21 — 2026-09-25
 
 - Precision fixes the engine benchmark exposed (`docs/tests/benchmark-engines.md`): a Java `byte hash[]` or `int... values` parameter is read by its name; functions in a file named `app.py`, `main.py` or `index.js` are no longer tagged `[tests]` in the clones report (tests are tests by path only); minified, bundled and well-known library files (`jquery-1.10.2.min.js`, `static/js/libs/ace.js`, `three.js`, `dat.gui.min.js`) are no tool's input, security included; the cyclomatic count no longer takes `?.`, `x?: T` or a `?` inside a template literal for a branch (`??` is one boolean operator). The benchmark runner reads findings from the modules instead of the report, which lists at most 20 per register row: the express `vhost` finding the document called a miss was there all along, corrected.

@@ -3,7 +3,7 @@
   "clones": 0,
   "dead": 6,
   "graph": 32,
-  "security": 11,
+  "security": 20,
   "style": 38,
   "vulnerabilities": 5
  },
@@ -11,7 +11,7 @@
   "clones": 44,
   "dead": 30,
   "graph": 820,
-  "security": 48,
+  "security": 96,
   "style": 1265,
   "vulnerabilities": 0
  },
@@ -19,7 +19,7 @@
   "clones": 43,
   "dead": 2,
   "graph": 85,
-  "security": 0,
+  "security": 23,
   "style": 1109,
   "vulnerabilities": 0
  },
@@ -27,7 +27,7 @@
   "clones": 474,
   "dead": 18,
   "graph": 1263,
-  "security": 4,
+  "security": 6,
   "style": 9339,
   "vulnerabilities": 0
  },
@@ -35,7 +35,7 @@
   "clones": 20,
   "dead": 14,
   "graph": 2594,
-  "security": 9,
+  "security": 46,
   "style": 1261,
   "vulnerabilities": 3
  },
@@ -43,7 +43,7 @@
   "clones": 5,
   "dead": 1,
   "graph": 161,
-  "security": 3,
+  "security": 23,
   "style": 144,
   "vulnerabilities": 24
  },
@@ -51,7 +51,7 @@
   "clones": 26,
   "dead": 1,
   "graph": 565,
-  "security": 12,
+  "security": 17,
   "style": 836,
   "vulnerabilities": 2
  },
@@ -59,7 +59,7 @@
   "clones": 30,
   "dead": 7,
   "graph": 858,
-  "security": 43,
+  "security": 57,
   "style": 869,
   "vulnerabilities": 22
  },
@@ -67,7 +67,7 @@
   "clones": 4,
   "dead": 7,
   "graph": 29,
-  "security": 74,
+  "security": 109,
   "style": 184,
   "vulnerabilities": 12
  },
@@ -75,7 +75,7 @@
   "clones": 13,
   "dead": 0,
   "graph": 104,
-  "security": 8,
+  "security": 9,
   "style": 596,
   "vulnerabilities": 0
  },
@@ -83,7 +83,7 @@
   "clones": 78,
   "dead": 7,
   "graph": 71,
-  "security": 0,
+  "security": 14,
   "style": 2709,
   "vulnerabilities": 0
  },
@@ -91,7 +91,7 @@
   "clones": 6,
   "dead": 5,
   "graph": 91,
-  "security": 0,
+  "security": 19,
   "style": 174,
   "vulnerabilities": 0
  }
