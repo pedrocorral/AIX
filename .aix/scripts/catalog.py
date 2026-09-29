@@ -16,8 +16,6 @@ MANIFEST = ROOT / ".aix" / "config.yaml"
 AGENTS = ROOT / "AGENTS.md"
 import agents
 TARGETS = [a["skills"] for a in agents.AGENTS.values() if a["skills"]]
-RUNTIME = {".opencode/skills": "opencode", ".claude/skills": "claude", ".github/skills": "copilot",
-           ".agents/skills": "agents", ".cursor/skills": "cursor"}   # agents = agentskills.io dir: Antigravity, Gemini CLI, VS Code
 
 
 def front_matter(text: str, key: str) -> str:
@@ -103,7 +101,8 @@ def set_disabled(names):
 
 
 def installed_in(flat: str):
-    return [RUNTIME[t] for t in agents.skill_dirs(ROOT) if (ROOT / t / flat).exists()]
+    """The selected agents whose skills folder holds this skill (a shared folder names every agent reading it)."""
+    return [n for t in agents.skill_dirs(ROOT) if (ROOT / t / flat).exists() for n in agents.agents_of_dir(t, ROOT)]
 
 
 def unlink_everywhere(flat, project=None, targets=None):

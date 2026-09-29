@@ -1,11 +1,11 @@
 """11. aix agents: the fixed list, names and aliases, only the selected agents' folders and pointer files, deselection
 removes AIX files and keeps a person's, --agents at install, upgrade keeps the line, the checklist through a pty."""
-import os, re, unittest
+import os, unittest
 from helpers import Terminal, assert_healthy, config, install, previous_kit, project_cmd, temp_home, upgrade
 
 FILES = {"claude": [".claude/skills/core-sdd-workflow", "CLAUDE.md"], "copilot": [".github/skills/core-sdd-workflow", ".github/copilot-instructions.md"],
          "cursor": [".cursor/skills/core-sdd-workflow", ".cursor/rules/aix.mdc"], "gemini": [".agents/skills/core-sdd-workflow", "GEMINI.md"],
-         "opencode": [".opencode/skills/core-sdd-workflow"]}
+         "opencode": [".opencode/skills/core-sdd-workflow"], "codex": [".agents/skills/core-sdd-workflow"]}
 
 
 def present(project, agent):
@@ -33,13 +33,29 @@ class AgentsSelection(unittest.TestCase):
         self.assertRegex(config(self.project), r"(?m)^agents: \[claude, copilot\]")
         for agent in ("claude", "copilot"):
             self.assertEqual(present(self.project, agent), FILES[agent], agent)
-        for agent in ("cursor", "gemini", "opencode"):
+        for agent in ("cursor", "gemini", "opencode", "codex"):
             self.assertEqual(present(self.project, agent), [], f"{agent} files must be gone")
         self.assertFalse((self.project / ".cursor").exists(), "empty folders are removed")
         self.assertTrue((self.project / "AGENTS.md").exists())
         doctor = assert_healthy(self, self.project, self.home)
         self.assertIn("agents: claude, copilot", doctor)
         self.assertIn("for claude, copilot", project_cmd(self.project, self.home, "install").stdout)
+
+    def test_codex_shares_the_agents_folder_with_gemini(self):
+        """Codex reads .agents/skills (its repository skill scope) and AGENTS.md natively: no pointer file. The folder
+        is linked once and stays while either agent is selected."""
+        r = project_cmd(self.project, self.home, "agents", "codex")
+        self.assertIn("agents: ['codex']", r.stdout)
+        self.assertEqual(present(self.project, "codex"), FILES["codex"])
+        self.assertFalse((self.project / "GEMINI.md").exists(), "the Gemini pointer goes, the shared folder stays")
+        self.assertEqual(present(self.project, "claude"), [])
+        out = project_cmd(self.project, self.home, "agents", "--list").stdout
+        self.assertRegex(out, r"codex .*\[x\].*\.agents/skills \(AGENTS\.md read natively\)")
+        project_cmd(self.project, self.home, "agents", "gemini", "codex")
+        self.assertTrue((self.project / "GEMINI.md").exists())
+        project_cmd(self.project, self.home, "agents", "claude")
+        self.assertFalse((self.project / ".agents").exists(), "nobody selected reads it any more")
+        self.assertIn("agents: ['codex']", project_cmd(self.project, self.home, "agents", "openai").stdout, "openai is an alias of codex")
 
     def test_a_persons_pointer_file_is_never_removed(self):
         gem = self.project / "GEMINI.md"

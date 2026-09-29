@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.23 — 2026-09-29
+
+- Codex (OpenAI): equipped like every other agent instead of "reads AGENTS.md only". Codex reads its repository skills from `.agents/skills` (its documented REPO scope, scanned from the working folder up to the repository root), the folder Gemini already reads: AIX links it once and keeps it while either agent is selected; deselecting one no longer removes the other's skills. AGENTS.md is read natively (32 KiB limit, AIX writes about 4 KiB), so no pointer file. Aliases openai, codex-cli, chatgpt. `aix agents --list` says which folders each agent reads and that Codex reads AGENTS.md by itself; `aix skills` names both agents where a shared folder holds a skill. Fact for the help page: Codex's initial skill list is capped at 2 % of the context window or 8,000 characters, the kit's 71 skills need about 17,000, so Codex shortens descriptions first.
+
 ## 2.21.22 — 2026-09-25
 
 - `aix code security` covers the categories the engine benchmark showed only semgrep had (`infrarules.py`, file-level rules): GitHub Actions `uses:` on a mutable tag, an outsider-written context pasted into `run:`, `curl | sh`; dependabot without a cooldown, .npmrc without a minimum release age; `RUN sudo`, Kubernetes containers without `runAsNonRoot` / `allowPrivilegeEscalation: false`, compose services without `no-new-privileges` / `read_only`; express and cookie-session cookies without their flags and with a literal secret; external scripts and stylesheets without integrity; Spring actuator fully exposed and method-level `@RequestMapping` without a method; `postMessage` to any origin. `.github/` and the root's own files are scanned whatever the code roots. On the twelve extended projects every semgrep finding in these rules is reproduced at its line (`docs/tests/benchmark-engines.md`, table 10); ours adds cookie-session secrets, which semgrep's express rule does not read.

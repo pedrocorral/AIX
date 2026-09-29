@@ -14,10 +14,10 @@ AGENTS = {  # name -> label, skills folder, pointer files, rendered folders, com
     "cursor":   {"label": "Cursor", "skills": ".cursor/skills", "pointers": [".cursor/rules/aix.mdc"], "rendered": [".cursor/rules"], "detect": ["cursor"]},
     "gemini":   {"label": "Gemini CLI, Antigravity", "skills": ".agents/skills", "pointers": ["GEMINI.md"], "rendered": [], "detect": ["gemini", "antigravity"]},
     "opencode": {"label": "OpenCode", "skills": ".opencode/skills", "pointers": [], "rendered": [], "detect": ["opencode"]},
-    "codex":    {"label": "Codex (reads AGENTS.md only)", "skills": None, "pointers": [], "rendered": [], "detect": ["codex"]},
-}
+    "codex":    {"label": "Codex CLI, Codex desktop, ChatGPT (AGENTS.md native)", "skills": ".agents/skills", "pointers": [], "rendered": [], "detect": ["codex"]},
+}   # gemini and codex share .agents/skills, the cross-agent skills folder: linked once, kept while either is selected
 ALIASES = {"vscode": "copilot", "vs-code": "copilot", "github": "copilot", "claude-code": "claude", "claude-desktop": "claude",
-           "antigravity": "gemini", "gemini-cli": "gemini", "open-code": "opencode"}
+           "antigravity": "gemini", "gemini-cli": "gemini", "open-code": "opencode", "openai": "codex", "codex-cli": "codex", "chatgpt": "codex"}
 POINTER_MARK = "Read and follow `AGENTS.md`"   # every pointer file AIX writes starts with this sentence
 
 
@@ -60,8 +60,13 @@ def set_agents(project: Path, names) -> list:
 
 
 def skill_dirs(project: Path = ROOT) -> list:
-    """The skills folders (project-relative) of the selected agents, in the kit's order."""
-    return [AGENTS[n]["skills"] for n in selected(project) if AGENTS[n]["skills"]]
+    """The skills folders (project-relative) of the selected agents, in the kit's order, a shared folder once."""
+    return list(dict.fromkeys(AGENTS[n]["skills"] for n in selected(project) if AGENTS[n]["skills"]))
+
+
+def agents_of_dir(folder: str, project: Path = ROOT) -> list:
+    """The selected agents that read this skills folder (gemini and codex both read .agents/skills)."""
+    return [n for n in selected(project) if AGENTS[n]["skills"] == folder]
 
 
 def pointer_files(project: Path = ROOT) -> list:
@@ -86,9 +91,16 @@ def is_aix_pointer(path: Path) -> bool:
         return False
 
 
-def _remove_links(project: Path, a: dict, removed: list):
-    d = project / a["skills"] if a["skills"] else None
-    if not d or not d.is_dir():
+def _still_read(folder: str, keep: list) -> bool:
+    """A skills folder another selected agent reads (gemini and codex share .agents/skills)."""
+    return any(AGENTS[k]["skills"] == folder for k in keep)
+
+
+def _remove_links(project: Path, a: dict, removed: list, keep: list):
+    if not a["skills"] or _still_read(a["skills"], keep):
+        return
+    d = project / a["skills"]
+    if not d.is_dir():
         return
     known = _indexed(project) if (project / ".aix" / "index.json").exists() else set()
     for p in d.iterdir():
@@ -124,7 +136,7 @@ def remove_deselected(project: Path, keep: list) -> list:
     for n, a in AGENTS.items():
         if n in keep:
             continue
-        _remove_links(project, a, removed)
+        _remove_links(project, a, removed, keep)
         _remove_pointers(project, a, removed)
         _remove_rendered(project, a, removed)
     return removed
@@ -155,7 +167,7 @@ def rows(project: Path = ROOT) -> list:
     out = []
     for n, a in AGENTS.items():
         on = (n in conf) if conf else (n in det if det else True)
-        files = ", ".join(x for x in [a["skills"], *a["pointers"]] if x) or "AGENTS.md"
+        files = ", ".join(x for x in [a["skills"], *a["pointers"]] if x) + ("" if a["pointers"] else " (AGENTS.md read natively)")
         out.append({"name": n, "label": a["label"], "files": files, "status": _row_status(n, conf, det), "on": on})
     return out
 

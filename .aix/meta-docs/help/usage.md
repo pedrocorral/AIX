@@ -80,7 +80,7 @@ The road-map                          (aix task ...)
 
 The instructions                      (aix instructions ...)
   aix agents [NAME...|all|--list]     which agents this project equips (claude, copilot, cursor, gemini, opencode,
-                                      codex): a checklist, detected ones preselected; writes agents: to config;
+                                      codex, i.e. OpenAI): a checklist, detected ones preselected; writes agents: to config;
                                       install links folders and pointer files only for those. No line = all
   aix agent claim|release|whoami|list  a seat (agent-001 ...) for this session when several agents share the repo;
       set total N | get total         how many seats; set lease 4h | get lease
