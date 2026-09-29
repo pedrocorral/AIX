@@ -10,3 +10,4 @@ Ordered by priority (top = next). Each becomes a `TASK-*` file when it has requi
 | Scripts for the seven audit skills without one | authorisation on `{id}` routes is the real gap |
 | Skill trigger evals; measure "navigate, never scan" | the kit's claims are unmeasured |
 | Multi-agent STATE.md; scaffolds; INDEX generation; multi-repo | earlier backlog |
+| Codex skill list budget: verify on a real Codex session (2.21.23) | Codex caps the initial skill list at 2 % of the context window or 8,000 characters; the kit's 71 skills need about 17,000. Unverified whether Codex trims here: watch for its "omitted skills" warning the first time Codex runs in an AIX project; if it does, shorten descriptions or disable unused skills with `aix skills` |

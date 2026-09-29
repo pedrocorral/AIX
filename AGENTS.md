@@ -30,6 +30,7 @@ Project built on **AIX**. Keep this file in context; load everything else on dem
 | Where code goes | `.aix/meta-docs/architecture/project-layout.md` |
 | Skills | `.aix/skills/INDEX.md` |
 | Kit commands (`aix docs validate/coverage/task/skills`) | `.aix/meta-docs/conventions/cli.md` |
+| An organisation's own layer in this repository (`.aix/org/`): what goes where, what is kit-owned | `.aix/meta-docs/conventions/org-layer.md` (`aix help org`) |
 
 ## Session
 Start: `core-session-resume`. Work: `core-sdd-workflow`. `core-session-handoff` after every completed task or workflow step, on stop/save, or at ~60 % context used, whichever first.

@@ -13,3 +13,4 @@ A layer (`.aix/org/meta-docs/help/`, `.aix/custom/meta-docs/help/`) overrides a 
 | `agent.md`, `agents.md`, `policy.md`, `profile.md`, `instructions.md`, `skills.md`, `task.md`, `guide.md`, `help.md`, `version.md` | The project commands | Daily use |
 | `code.md`, `code-find.md`, `code-graph.md`, `code-style.md`, `code-stats.md`, `code-security.md`, `code-vulnerabilities.md`, `code-licenses.md`, `code-sbom.md`, `refactor.md` | The code tools and the fix skills | Measuring code |
 | `docs.md`, `docs-validate.md`, `docs-coverage.md`, `docs-security.md` | The documentation tools | Closing a task, releasing |
+| `org.md` | The organisation layer in one screen; the contract is `conventions/org-layer.md` | Building an internal AIX repository |

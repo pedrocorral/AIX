@@ -17,3 +17,4 @@ section: "Navigation"
 | Where code goes | `.aix/meta-docs/architecture/project-layout.md` |
 | Skills | `.aix/skills/INDEX.md` |
 | Kit commands (`aix docs validate/coverage/task/skills`) | `.aix/meta-docs/conventions/cli.md` |
+| An organisation's own layer in this repository (`.aix/org/`): what goes where, what is kit-owned | `.aix/meta-docs/conventions/org-layer.md` (`aix help org`) |

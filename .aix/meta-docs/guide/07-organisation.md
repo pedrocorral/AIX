@@ -17,6 +17,9 @@ Later wins:
 | project | `.aix/custom/` | the project | with the project (unless `.aix/` is ignored) |
 
 ## Rolling AIX out to a company
+The contract an agent follows inside the organisation's own AIX repository (what is kit-owned, where every kind
+of content goes, how upstream merges work) is `conventions/org-layer.md`, also `aix help org`.
+
 1. Fork the kit repository. Fill `.aix/org/` with your skills (each with `class:` and an `id`), your instructions
    (blocks to replace, standards with `applyTo`), your profiles, and optionally `templates/docs/` (files overlaid on
    the documentation every project receives) and `templates/pointers/` (your text for `CLAUDE.md` and the others).

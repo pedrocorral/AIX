@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.24 — 2026-09-30
+
+- `.aix/meta-docs/conventions/org-layer.md` (`aix help org`): the organisation layer as a contract for an internal AIX repository, written for the agent that works there. What the repository is (kit-owned `.aix/` plus `.aix/org/`), the one rule (same path replaces, new path adds, `DISABLED` removes, names match character by character), a table of where every kind of organisation content goes with its file shape (skills with class and id, AGENTS.md blocks and scoped standards, the AGENTS.md fragment, profiles, policies and `defaults.yaml`, help pages and meta-docs, seeded documents and pointer texts), what is never edited and why, how to fork the kit or merge it into a company repository that already exists, what the layer must not carry, and the three checks before a commit. Linked from AGENTS.md's navigation table, the conventions index and the guide's organisation chapter.
+
 ## 2.21.23 — 2026-09-29
 
 - Codex (OpenAI): equipped like every other agent instead of "reads AGENTS.md only". Codex reads its repository skills from `.agents/skills` (its documented REPO scope, scanned from the working folder up to the repository root), the folder Gemini already reads: AIX links it once and keeps it while either agent is selected; deselecting one no longer removes the other's skills. AGENTS.md is read natively (32 KiB limit, AIX writes about 4 KiB), so no pointer file. Aliases openai, codex-cli, chatgpt. `aix agents --list` says which folders each agent reads and that Codex reads AGENTS.md by itself; `aix skills` names both agents where a shared folder holds a skill. Fact for the help page: Codex's initial skill list is capped at 2 % of the context window or 8,000 characters, the kit's 71 skills need about 17,000, so Codex shortens descriptions first.
