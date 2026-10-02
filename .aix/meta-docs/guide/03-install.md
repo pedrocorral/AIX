@@ -48,7 +48,9 @@ Run inside the project, it brings the project's kit to the version of the `aix` 
   the managed sections, `## Project notes`, and your config keys (agents, profile, enabled instructions, chosen
   skills, code folders, sources, style limits, disabled skills);
 - `docs/` is never touched;
-- `org/` and `custom/` are refreshed when their source has them;
+- `org/` and `custom/` are refreshed when their source has them: `org/` is replaced whole (`--merge-org` merges),
+  `custom/` is merged, the source's files over yours, yours kept (`--override-custom` replaces it); the lessons
+  in `custom/` are named when they hold any;
 - a kit file you edited locally is flagged before it is overwritten;
 - a 1.x layout (a root `framework.yaml`) is migrated into `.aix/` first.
 

@@ -15,10 +15,12 @@ class FreshInstall(unittest.TestCase):
     def test_payload_arrives_exactly(self):
         for rel, mode in payload.items(KIT):
             if mode == payload.LAYER:
-                self.assertFalse((self.project / rel).exists(), f"{rel}: the kit has no {rel}, the project must not either")
+                files = [p for p in (self.project / rel).rglob("*") if p.is_file()]
+                lessons = self.project / ".aix/custom/skills/core/lessons-learnt-notes/SKILL.md"
+                self.assertEqual(files, [lessons] if rel == ".aix/custom" else [], f"{rel}: the kit has no {rel}; only the lessons are created")
             else:
                 self.assertTrue((self.project / rel).exists(), f"{rel} ({mode}) missing")
-        for rel in ("tests", "examples", "AIX-DEVELOPMENT.md", "CHANGELOG.md", ".aix/org", ".aix/custom"):
+        for rel in ("tests", "examples", "AIX-DEVELOPMENT.md", "CHANGELOG.md", ".aix/org"):
             self.assertFalse((self.project / rel).exists(), f"{rel} must never travel")
 
     def test_manifest_hashes_owned_files_only(self):

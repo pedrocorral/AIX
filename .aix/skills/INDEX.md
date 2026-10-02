@@ -3,7 +3,7 @@ Skill name = folder path joined with `-` (e.g. `security/audit-injection` → `s
 
 | Category | Skills | Purpose |
 |---|---|---|
-| `core/` | `sdd-workflow` (orchestrator), `session-resume`, `session-handoff`, `conflict-resolution`, `roadmap-task`, `find-doc`, `which-skill` (manual router) | Running the loop, sessions, navigation |
+| `core/` | `sdd-workflow` (orchestrator), `session-resume`, `session-handoff`, `conflict-resolution`, `roadmap-task`, `find-doc`, `lessons-learnt` (the agents' lessons: record, merge, prune, promote), `which-skill` (manual router) | Running the loop, sessions, navigation, lessons |
 | `spec/` | `write-requirement`, `write-adr`, `review`, `write-skill`, `write-for-agents`, `plain-language` | Producing/reviewing ground truth |
 | `architecture/` | `design-app`, `design-persistence`, `structure-project`, `trace`, `deep-modules`, `domain-model`, `improve` (manual) | Whole-app and data-layer design |
 | `implement/` | `feature` (orchestrator), `orm-model`, `repository`, `endpoint`, `ui`, `code-python`, `code-typescript` | Writing code in the right layer |

@@ -81,7 +81,8 @@ class BareLayerSources(unittest.TestCase):
         r = install(self.home, project)
         self.assertNotIn("layer org", r.stdout)
         self.assertFalse((project / ".aix" / "org").exists())
-        self.assertFalse((project / ".aix" / "custom").exists())
+        custom = [p.relative_to(project).as_posix() for p in (project / ".aix" / "custom").rglob("*") if p.is_file()]
+        self.assertEqual(custom, [".aix/custom/skills/core/lessons-learnt-notes/SKILL.md"], "only the lessons, created empty")
 
 
 if __name__ == "__main__":

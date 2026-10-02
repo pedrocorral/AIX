@@ -23,7 +23,7 @@ Original brief (verbatim intent, condensed):
 | Requirement from the brief | Where it is satisfied |
 |---|---|
 | Skills + docs in nested hierarchy; agent finds the path with minimum tokens | `.aix/skills/<cat>/<name>/SKILL.md`; `INDEX.md` in every docs folder; `AGENTS.md` navigation table; `.aix/meta-docs/conventions/token-economy.md` |
-| Skills split per task (Google-style) | 71 skills in 7 categories, orchestrators chain sub-skills |
+| Skills split per task (Google-style) | 72 skills in 7 categories, orchestrators chain sub-skills |
 | MVC best practices; Python web / data-science / AI apps | `.aix/meta-docs/architecture/mvc.md`; `.aix/meta-docs/stacks/python/{webapp-general,data-science-app,ai-app,tooling}.md` |
 | `.aix/meta-docs/` complete enough to design a new app | `.aix/meta-docs/INDEX.md` prescribes a reading order; `architecture-design-app` skill executes it |
 | Frontend/backend differentiation | `architecture/frontend-backend-separation.md` + ownership matrix |
@@ -91,6 +91,7 @@ AIX/
 │   ├── linkfs.py, agentsmd.py, sections.py, manifest.py   # leaves: skill links per agent folder; AGENTS.md and instruction files rendered; the managed sections as text; the kit-file manifest
 │   ├── seed.py              # leaf: `--into` copies the payload (collision dialogue, .bak), seeds docs/ layer by layer, pointer texts
 │   ├── layers.py, yamlmini.py   # leaves: the layer resolution (skills, instructions, profiles, orphans) and the YAML subset it reads
+│   ├── lessons.py           # leaf: the project's lessons in .aix/custom/skills/core/lessons-learnt-notes (created, never copied), `aix lessons index|check`
 │   ├── validate.py          # front-matter, skill name==path, INDEX completeness, links, TS covers, VUL statuses, field dictionary
 │   ├── coverage_matrix.py   # FR/NFR/API → TS → @implements/@tests/@mitigates markers → gaps; writes docs/tests/coverage-matrix.md
 │   └── roadmap.py           # new | start | block | done | list ; keeps STATE.md in sync
@@ -313,4 +314,4 @@ Details and consequences: `.aix/meta-docs/conventions/cli.md`, ".gitignore and b
 
 ## 13. Numbers to remember
 
-Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 71 skills, 24 seeded VUL rows, 4 example requirements/TS.
+Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 72 skills, 24 seeded VUL rows, 4 example requirements/TS.

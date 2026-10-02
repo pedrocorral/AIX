@@ -5,8 +5,12 @@ A source is a path or a git URL. `--from SRC` names the ORIGIN: a kit checkout (
 payload and whose `.aix/org/` and `.aix/custom/` are the layers; or a bare LAYER FOLDER (has `skills/`,
 `instructions/`, `profiles/` or `templates/` at its top), taken as the org layer with the payload from the running kit.
 `--from-org SRC` / `--from-custom SRC` point one layer elsewhere (a kit checkout's `.aix/<layer>/` or a bare folder).
-Both layers follow one rule: copied on install when the source has the folder, replaced on upgrade when it has it,
-left alone when it does not. Sources are recorded in config.yaml (`source:`, `source_org:`, `source_custom:`).
+Both layers follow one rule: copied on install when the source has the folder, refreshed on upgrade when it has it,
+left alone when it does not. The refresh differs by owner (ADR-0008): org/ is the company repository's, so it is
+OVERRIDDEN (replaced whole; `--merge-org` merges instead); custom/ is written in the project, so it is MERGED (the
+source's files replace the same paths, files only the project has are kept; `--override-custom` replaces it whole).
+The project's lessons (`lessons.py`) are named whenever a refresh touches them.
+Sources are recorded in config.yaml (`source:`, `source_org:`, `source_custom:`).
 Git URLs are cloned shallow into ~/.cache/aix/sources/<slug> and refreshed with `git pull` on upgrade."""
 import os, re, subprocess
 from pathlib import Path
@@ -79,14 +83,43 @@ def resolve_layers(origin_kit: Path, sources: dict, refresh: bool = False):
     return out
 
 
-def install_layers(project: Path, resolved: dict, dry: bool = False):
-    """Apply resolve_layers(): replace each layer the source has; say what happened."""
-    for layer, (src, folder) in resolved.items():
-        if folder is None:
-            continue
-        if not dry:
-            install_layer(project, layer, folder)
-        print(f"  layer {layer}: {'from ' + src if src else 'from the origin'} -> .aix/{layer}/" + (" (dry run)" if dry else ""))
+DEFAULT_MODES = {"org": "override", "custom": "merge"}   # who owns the layer: the company repository / the project
+
+
+def install_layers(project: Path, resolved: dict, dry: bool = False, modes: dict = None):
+    """Apply resolve_layers(): refresh each layer the source has (override or merge, DEFAULT_MODES); say what happened."""
+    modes = {**DEFAULT_MODES, **(modes or {})}
+    done = [layer for layer, (src, folder) in resolved.items() if _refresh_one(project, layer, (src, folder), modes[layer], dry)]
+    if not dry and "custom" in done:
+        import lessons
+        lessons.write_index(project)  # merged lesson files from two sides: the index is rebuilt from what is on disk
+
+
+def _refresh_one(project: Path, layer: str, entry: tuple, mode: str, dry: bool) -> bool:
+    """One layer, entry = (source label, folder): skipped without a folder or when the project is its own origin; True when refreshed."""
+    src, folder = entry
+    if folder is None or folder.resolve() == (project / ".aix" / layer).resolve():
+        return False
+    if layer == "custom":
+        _say_lessons(project, folder, mode)
+    if not dry:
+        install_layer(project, layer, folder, mode)
+    print(f"  layer {layer}: {'from ' + src if src else 'from the origin'} -> .aix/{layer}/ ({mode})" + (" (dry run)" if dry else ""))
+    return True
+
+
+def _say_lessons(project: Path, folder: Path, mode: str):
+    """Name the project's lessons when they exist and are not empty, with what the refresh does to them."""
+    import lessons
+    ours = lessons.lesson_files(lessons.notes_dir(project))
+    if not ours:
+        return
+    theirs = lessons.lesson_files(folder / lessons.NOTES_REL.relative_to(".aix/custom"))
+    if mode == "override":
+        fate = f"replaced by the source's {len(theirs)}" if theirs else "DELETED (the source has none; an empty file is created)"
+    else:
+        fate = f"merged with the source's {len(theirs)} (same file names take the source's)" if theirs else "kept (the source has none)"
+    print(f"  !! {lessons.NOTES_REL.as_posix()} holds {len(ours)} lesson(s): {fate}")
 
 
 def record(project: Path, source: str, key: str = "source"):
@@ -118,11 +151,12 @@ def layer_sources(project: Path, overrides: dict = None):
     return out
 
 
-def install_layer(project: Path, layer: str, folder: Path):
-    """Replace the project's .aix/<layer>/ with the source's folder."""
+def install_layer(project: Path, layer: str, folder: Path, mode: str = "override"):
+    """Refresh the project's .aix/<layer>/ from the source's folder: override replaces it whole, merge copies the
+    source's files over it and keeps the files only the project has."""
     import shutil
     dst = project / ".aix" / layer
-    if dst.exists():
+    if mode == "override" and dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(folder, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+    shutil.copytree(folder, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"), dirs_exist_ok=True)
     return dst

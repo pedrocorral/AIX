@@ -10,7 +10,7 @@ those that do not read AGENTS.md by themselves, a pointer file:
 Codex: it reads AGENTS.md at the repository root by itself (up to project_doc_max_bytes, 32 KiB by default; AIX
 writes about 4 KiB) and its repository skills from `.agents/skills`, the cross-agent folder Gemini reads too:
 linked once, kept while either agent is selected. Codex lists every skill's name, description and path to the
-model within 2 % of the context window (8,000 characters when unknown); with the kit's 71 skills that list is
+model within 2 % of the context window (8,000 characters when unknown); with the kit's 72 skills that list is
 about 17,000 characters, so Codex shortens descriptions first and may leave some out of the initial list (a skill
 it selects is still read in full). `aix skills` disables what a project does not need. Nothing is written under
 ~/.codex; a user's own skills live in ~/.agents/skills.

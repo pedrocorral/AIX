@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 USER_DIR = Path(os.environ.get("AIX_USER_DIR") or (Path.home() / ".config" / "aix"))
 LAYER_NAMES = ("kit", "org", "user", "project")
 from yamlmini import front_matter, parse_yaml
+from lessons import NOTES_CLASS
 
 
 
@@ -280,7 +281,8 @@ def drift(project: Path = ROOT):
     idx = read_index(project)
     if idx is None:
         return None
-    return [cls for cls, rec in idx["skills"].items() if Path(rec["path"]).is_dir() and content_hash(Path(rec["path"])) != rec["hash"]]
+    return [cls for cls, rec in idx["skills"].items()
+            if cls != NOTES_CLASS and Path(rec["path"]).is_dir() and content_hash(Path(rec["path"])) != rec["hash"]]  # lessons change by design
 
 
 if __name__ == "__main__":
@@ -300,7 +302,7 @@ def _orphan_skills(project: Path, cutoff: float) -> list:
     kit_classes = sorted(c for c, impls in found.items() if any(i["layer"] == "kit" for i in impls))
     out = []
     for cls, impls in sorted(found.items()):
-        if cls in kit_classes:
+        if cls in kit_classes or cls == NOTES_CLASS:  # every project has its lessons (lessons.py); they override nothing by design
             continue
         near = near_miss(cls, kit_classes, "-", cutoff)
         out += [("skill", cls, i["layer"], i["path"], near) for i in impls]

@@ -13,6 +13,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_install.py` | exactly the payload arrives, manifest, links and pointers, idempotence, `--copy`, collisions |
 | `test_upgrade.py` | upgrade from the previous release keeps the project's choices, adds files, flags local edits |
 | `test_layers.py` | `org/` and `custom/`: fork install, fork edit reaching a project, `--from`, `--from-org`, `--from-custom` |
+| `test_lessons.py` | the lessons: created empty and linked, never in the kit checkout, index and check (stale, fields, cap), `custom/` merged and `org/` overridden on upgrade, `--override-custom`, `--merge-org` |
 | `test_instructions.py` | enable/disable, rendered files, AGENTS.md blocks, profiles, `aix rules` |
 | `test_skills.py` | list, info, `use`/`default`, disable/enable, registry listing |
 | `test_code.py` | `aix code find` and the code tools, hidden folders, the checklist through a pty |

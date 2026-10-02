@@ -204,6 +204,7 @@ def _commands():
         "code": run_code, "docs": run_docs, "task": cmd_task, "skills": lambda a: __import__("skills").main(a),
         "profile": run_profile, "policy": run_policy, "check": run_check, "instructions": run_instructions,
         "agents": run_agents, "agent": run_agent, "guide": run_guide, "newie": run_newie,
+        "lessons": lambda a: __import__("lessons").main(a),
     }
 
 

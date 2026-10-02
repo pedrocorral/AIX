@@ -41,6 +41,7 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 | `aix skills use NAME ID` / `use NAME default` | Pick which implementation of a class is linked; recorded in `.aix/config.yaml` `use:`; `default` returns to profile then layer precedence | An organisation ships two implementations of one class |
 | `aix skills registry` / `add NAME [--on-demand\|--always] [--extra a,b]` / `remove` / `update` | Third-party skills (below) | Adopting caveman, ponytail, … |
 | `aix skills always\|on-demand NAME` | Add/remove the always-on wiring for any skill | Making a behaviour permanent |
+| `aix lessons [index\|check]` | The agents' lessons, `.aix/custom/skills/core/lessons-learnt-notes/`: one file per lesson under `lessons/`, the SKILL.md index generated from them; `check` reports missing fields, a stale index, more than 20 lessons. Created empty by `aix install` when missing, never copied | After `core-lessons-learnt` adds, merges or prunes a lesson |
 
 `aix help COMMAND` (or `aix COMMAND --help`) prints the detailed help of one command; read it before using a command for the first time.
 
@@ -130,7 +131,7 @@ never leaves the kit checkout and is never touched by an upgrade.
 | owned | `.aix/bin scripts templates meta-docs instructions profiles policies`, `.aix/skills/<category>/`, `.aix/skills/INDEX.md`, `.aix/skills/extern/registry.json`, `CLAUDE.md` | copied; hashed in `.aix/manifest.json` | overwritten, removed if gone from the kit; a local edit is reported by `aix doctor` and marked in the plan first |
 | merged | `AGENTS.md`, `GEMINI.md`, `.aix/config.yaml` | copied | kit text plus the project's parts: `## Always-on skills`, `## Project notes`, the managed sections; `disabled_skills`, `instructions`, `disabled_instructions`, `profile`, `use`, `source`, `style:` |
 | seeded | `docs/` from `.aix/templates/docs/`, overlaid file by file by `org/templates/docs/` then `custom/templates/docs/`; pointer texts from `templates/pointers/` the same way | copied when absent | never touched |
-| layer | `.aix/org/`, `.aix/custom/` (skills, instructions, profiles, `templates/docs/`, `templates/pointers/`) | copied when the origin has the folder | replaced when the origin (or `--from-org SRC` / `--from-custom SRC`, recorded as `source_org:` / `source_custom:`) has it, left alone when it does not |
+| layer | `.aix/org/`, `.aix/custom/` (skills, instructions, profiles, `templates/docs/`, `templates/pointers/`) | copied when the origin has the folder | refreshed when the origin (or `--from-org SRC` / `--from-custom SRC`, recorded as `source_org:` / `source_custom:`) has it, left alone when it does not: `org/` replaced whole (`--merge-org` merges), `custom/` merged, files only the project has kept (`--override-custom` replaces it); ADR-0008 |
 
 Not in the list, therefore the project's: `.aix/skills/extern/<downloads>`, runtime folders, your code.
 Project-specific agent instructions therefore go in a `## Project notes` section of `AGENTS.md`, never elsewhere in that file.

@@ -7,7 +7,8 @@ What may change is decided by payload.py, the same list `aix install` copies (no
   merged  AGENTS.md, GEMINI.md (kit text + project's "## Always-on skills" and "## Project notes" sections)
           .aix/config.yaml (kit text + project's disabled_skills, instructions, profile, use, source, paths.code_roots lines and style: block)
   seeded  docs/ (never touched)
-  layer   .aix/org/, .aix/custom/: replaced when the origin (or --from-org / --from-custom SRC) has the folder, else left
+  layer   .aix/org/, .aix/custom/: refreshed when the origin (or --from-org / --from-custom SRC) has the folder, else left;
+          org/ is overridden (--merge-org merges), custom/ merged (--override-custom replaces it whole); see source.py
   Unlisted, therefore never touched: .aix/skills/extern downloads, runtime folders, code.
   1.x layout  a root framework.yaml: kit-owned folders are moved under .aix/ first (migrate_layout)
 Runs from the KIT's scripts (not the project's), so it always carries the newest logic."""
@@ -268,7 +269,16 @@ def _find_target(args) -> Path:
     return project
 
 
-def _refresh_layers(project: Path, layer_src: dict, dry: bool):
+def _layer_modes(args) -> dict:
+    """--merge-org / --override-custom taken out of args (in place): the refresh mode against the layer's default."""
+    out = {}
+    for flag, layer, mode in (("--merge-org", "org", "merge"), ("--override-custom", "custom", "override")):
+        if flag in args:
+            out[layer] = mode; args.remove(flag)
+    return out
+
+
+def _refresh_layers(project: Path, layer_src: dict, dry: bool, modes: dict = None):
     """Follow the recorded origin (a fork may replace the kit) and refresh org/ and custom/."""
     global KIT
     import source as srcmod
@@ -281,7 +291,10 @@ def _refresh_layers(project: Path, layer_src: dict, dry: bool):
         else:
             layer_src["org"] = layer_src.get("org") or src
         print(f"  origin: {src} ({kind})")
-    srcmod.install_layers(project, srcmod.resolve_layers(origin, srcmod.layer_sources(project, layer_src), refresh=not dry), dry=dry)
+    srcmod.install_layers(project, srcmod.resolve_layers(origin, srcmod.layer_sources(project, layer_src), refresh=not dry), dry=dry, modes=modes)
+    if not dry:
+        import lessons
+        lessons.ensure(project)  # an override without the source's lessons leaves none: the empty notes come back
 
 
 def _migrate_if_old(project: Path, yes: bool, dry: bool) -> bool:
@@ -330,9 +343,9 @@ def _apply_plan(project: Path, rows, yes: bool):
 def main(args):
     yes, dry = "--yes" in args, "--dry-run" in args
     args = [a for a in args if a not in ("--yes", "--dry-run")]
-    layer_src = _layer_flags(args)
+    layer_src, modes = _layer_flags(args), _layer_modes(args)
     project = _find_target(args)
-    _refresh_layers(project, layer_src, dry)
+    _refresh_layers(project, layer_src, dry, modes)
     if _migrate_if_old(project, yes, dry):
         return
     if project == KIT:

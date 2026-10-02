@@ -12,6 +12,7 @@ import argparse, shutil, sys
 from pathlib import Path
 
 KIT_ROOT = Path(__file__).resolve().parents[2]
+import lessons
 import agents  # which agents (Claude, Copilot, Cursor, Gemini, OpenCode, Codex) the project equips: folders and pointer files
 from agentsmd import render_instructions
 from linkfs import link_or_copy
@@ -40,6 +41,7 @@ def _prepare(project: Path):
     """What must be in place before the links: the seeded docs, the foreign files backed up, dangling links gone."""
     if not (project / "AIX-DEVELOPMENT.md").exists():
         seed_project(project)  # a project without docs/ (e.g. installed before the seed existed) gets it now
+        lessons.ensure(project)  # created when missing, never copied: no upgrade can overwrite the project's lessons
     for rel, bak in agents.backup_foreign(project):
         print(f"  {rel} was not AIX's: kept as {bak}")
     prune_dangling(project)

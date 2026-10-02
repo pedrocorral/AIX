@@ -24,6 +24,9 @@ The kit
   aix upgrade [PROJECT] [--dry-run] [--yes]
                                       bring a project's kit files up to this checkout: overwrites kit-owned paths,
                                       merges AGENTS.md and .aix/config.yaml, never touches your docs, code or extern skills
+      --merge-org | --override-custom   refresh mode against the default (org/ overridden, custom/ merged)
+  aix lessons [index|check]           the agents' lessons (.aix/custom/skills/core/lessons-learnt-notes): rebuild the
+                                      index from the lesson files | check fields, staleness and the cap of 20
   aix doctor                          is the INSTALL right? skill links, pointer files, always-on wiring, STATE.md,
                                       Python, PATH. Each problem comes with its fix
   aix about | version | help [CMD]    the full story | kit version | detailed help (e.g. aix help code dead)

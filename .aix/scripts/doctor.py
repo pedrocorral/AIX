@@ -150,6 +150,17 @@ def check_layers():
     _report_overrides(idx)
 
 
+def check_lessons():
+    """The project's lessons exist (created by install) and their index matches the lesson files."""
+    import lessons
+    if lessons.is_kit_checkout(ROOT):
+        return
+    if not (lessons.notes_dir(ROOT) / "SKILL.md").exists():
+        return problem(f"{lessons.NOTES_REL.as_posix()}/SKILL.md missing (the agents have no lessons to read)", "run `aix install`")
+    for p in lessons.problems(ROOT):
+        problem(f"lessons: {p}", "core-lessons-learnt says how; then `aix lessons index`")
+
+
 def _owner_of(task_file) -> str:
     import re
     m = re.search(r"^owner:\s*(agent-\d+)", task_file.read_text(encoding="utf-8"), re.M)
@@ -210,7 +221,7 @@ def inst_headers(blocks):
 
 
 def main():
-    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_seats, check_agents_blocks):
+    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_lessons, check_seats, check_agents_blocks):
         check()
     for what, fix in problems:
         print(f"PROBLEM {what}\n        fix: {fix}")

@@ -5,7 +5,7 @@ title: Skills
 # 5. Skills
 
 ## What the kit ships
-71 skills in ten categories: core (the session loop, finding documents, tasks), spec, architecture, implement,
+72 skills in ten categories: core (the session loop, finding documents, tasks), spec, architecture, implement,
 testing, security (an orchestrator and ten audits), review, refactor (one per finding of the code tools), workflow,
 coach, debug. `aix skills` lists them with their state. `aix skills info NAME` explains one; `aix skills show NAME`
 prints it.

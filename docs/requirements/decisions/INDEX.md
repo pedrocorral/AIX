@@ -10,3 +10,4 @@ Accepted ADRs are settled; a change needs a superseding ADR. Read this when: ask
 | `ADR-0005-kit-docs-and-seed-split.md` | `docs/` is the kit's own; projects are seeded from `.aix/templates/docs/`, overlayable by layers | accepted |
 | `ADR-0006-seats-for-several-agents.md` | Seats (agent-001 ...) for several agents in one repository; claims, scopes, one state per seat | accepted |
 | `ADR-0007-policies-for-the-cycle.md` | The development cycle as an opt-in policy; anarchy by default; a layer sets its default | accepted |
+| `ADR-0008-lessons-and-layer-refresh-by-owner.md` | The agents' lessons in `custom/` (created, never copied); `org/` overridden, `custom/` merged on upgrade | accepted |

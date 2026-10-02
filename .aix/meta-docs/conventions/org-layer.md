@@ -25,6 +25,11 @@ There are four layers, later wins, and this page is about the second:
 | person | `~/.config/aix/` | one developer, terminal sessions only | never committed |
 | project | `.aix/custom/` in a project | that project | committed with it |
 
+On upgrade the two layers a source can carry are refreshed differently, by owner (ADR-0008): a project's `.aix/org/`
+is replaced whole, because this repository is its only author, so a hand edit there is lost; a project's
+`.aix/custom/` is merged, because the project writes it (its lessons included). Never ship lessons in `.aix/org/`:
+a lesson the whole organisation needs is a skill or an instruction (section 3).
+
 `examples/acme/` in the kit is a complete fictional organisation layer (37 skills, 8 instructions, 2 profiles): copy
 its shapes, not its content.
 
