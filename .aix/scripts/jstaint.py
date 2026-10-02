@@ -53,6 +53,11 @@ def _statements(lines: list, first: int = 1) -> list:
 STRINGS = re.compile(r"`(?:[^`\\]|\\.)*`|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", re.S)
 
 
+def strip_comments(text: str) -> str:
+    """Comments out, strings kept whole: the `//` of `"http://x"` is not a comment."""
+    return re.sub(STRINGS.pattern + "|" + COMMENTS.pattern, lambda m: " " if m.group(0).startswith(("//", "/*")) else m.group(0), text, flags=re.S)
+
+
 def _code_only(expr: str) -> str:
     """The expression without the text of its string literals; a template literal keeps its `${...}` parts."""
     return STRINGS.sub(lambda m: " ".join(re.findall(r"\$\{([^}]*)\}", m.group(0))) if m.group(0).startswith("`") else '""', expr)
@@ -83,6 +88,18 @@ def _names_of(destructured: str) -> list:
     return [n for n in names if n]
 
 
+class Rules:
+    """What one language's taint walk looks for: JS/TS here (JS_RULES), Java in javataint.py. `head_sources(text)`
+    names the parameters a statement declares as input (a `@RequestParam` in a Java method head); `assembled`
+    says whether an expression builds a string."""
+    def __init__(self, spec: dict):
+        """spec: sources, sinks, assign_sinks, assign, loop, sanitised; optional jsx_sink, head_sources, assembled."""
+        self.sources, self.sinks, self.assign_sinks = spec["sources"], spec["sinks"], spec["assign_sinks"]
+        self.assign, self.loop, self.sanitised = spec["assign"], spec["loop"], spec["sanitised"]
+        self.jsx_sink, self.head_sources = spec.get("jsx_sink"), spec.get("head_sources") or (lambda text: {})
+        self.assembled = spec.get("assembled") or (lambda expr, clean: "${" in expr or "+" in clean)
+
+
 class _Taint:
     """A tainted variable: where the input came from, the brace depth it lives at, whether it was assembled (`+`, `${`)."""
     def __init__(self, source: str, depth: int, assembled: bool):
@@ -91,14 +108,17 @@ class _Taint:
 
 class _Walk:
     """One pass over statements, with the tainted variables in scope, collecting sink hits."""
-    def __init__(self, file: Path, lines: list, funcs: dict, findings: list, follow: bool = True):
-        self.file, self.lines, self.funcs, self.findings, self.follow = file, lines, funcs, findings, follow
+    def __init__(self, file: Path, lines: list, funcs: dict, findings: list, rules=None):
+        self.file, self.lines, self.funcs, self.findings = file, lines, funcs, findings
+        self.rules, self.follow = rules or JS_RULES, True   # follow: walk a local function called with tainted arguments (once)
         self.tainted, self.depth = {}, 0
 
     def run(self, statements: list, initial: dict = None):
         self.tainted = {k: _Taint(v, 0, False) for k, v in (initial or {}).items()}
         for lineno, raw in statements:
-            text = COMMENTS.sub(" ", raw)
+            text = strip_comments(raw)
+            for name, source in self.rules.head_sources(text).items():   # parameters declared as input live in the body that opens here
+                self.tainted[name] = _Taint(f"{name}: {source} (line {lineno})", self.depth + 1, False)
             self._assignments(text, lineno)
             self._sinks(text, raw, lineno)
             if self.follow:
@@ -107,9 +127,9 @@ class _Walk:
 
     def taint_of(self, expr: str):
         """(source description, assembled) of an expression, or (None, False); sanitiser calls count as clean."""
-        clean = SANITISED.sub("SAFE", _code_only(expr))
-        m = SOURCES.search(clean)
-        assembled = "${" in expr or "+" in clean
+        clean = self.rules.sanitised.sub("SAFE", _code_only(expr))
+        m = self.rules.sources.search(clean)
+        assembled = self.rules.assembled(expr, clean)
         if m:
             return m.group(0), assembled
         for name in IDENT.findall(clean):
@@ -118,10 +138,10 @@ class _Walk:
         return None, False
 
     def _assignments(self, text: str, lineno: int):
-        m = LOOP.search(text)
+        m = self.rules.loop.search(text)
         if m:
             self._bind([m.group(1)], m.group(2), lineno); return
-        m = ASSIGN.match(text)
+        m = self.rules.assign.match(text)
         if not m or (m.group(2) and "." in m.group(2)):
             return
         self._bind(_names_of(m.group(1)) if m.group(1) else [m.group(2)], m.group(3), lineno)
@@ -135,14 +155,14 @@ class _Walk:
                 self.tainted.pop(name, None)
 
     def _sinks(self, text: str, raw: str, lineno: int):
-        for head, vul, cwe, kind, which in SINKS:
+        for head, vul, cwe, kind, which in self.rules.sinks:
             for m in re.finditer(head, text):
                 self._check_call(text, m, (vul, cwe, kind, which), raw, lineno)
-        for rx, vul, cwe, kind in ASSIGN_SINKS:
+        for rx, vul, cwe, kind in self.rules.assign_sinks:
             m = re.search(rx, text)
             if m:
                 self._report(text[m.end():], (vul, cwe, kind), raw, lineno + text.count("\n", 0, m.start()), text[m.start():m.end()].strip())
-        for m in JSX_SINK.finditer(text):
+        for m in (self.rules.jsx_sink.finditer(text) if self.rules.jsx_sink else []):
             self._report(m.group(1), ("VUL-WEB-001", "CWE-79", "HTML sink"), raw, lineno + text.count("\n", 0, m.start()), "dangerouslySetInnerHTML")
 
     def _check_call(self, text: str, m, rule: tuple, raw: str, lineno: int):
@@ -170,12 +190,17 @@ class _Walk:
             for m in re.finditer(rf"(?<![\w$.]){re.escape(name)}\(", text):
                 passed = {p: f"argument of {name}: {self.taint_of(a)[0]}" for p, a in zip(params, _args_of(text, m.end())) if self.taint_of(a)[0]}
                 if passed:
-                    _Walk(self.file, self.lines, self.funcs, self.findings, follow=False).run(statements, passed)
+                    inner = _Walk(self.file, self.lines, self.funcs, self.findings, rules=self.rules)
+                    inner.follow = False
+                    inner.run(statements, passed)
 
     def _leave_scope(self, text: str):
         stripped = re.sub(r"`[^`]*`|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", "", text)
         self.depth += stripped.count("{") - stripped.count("}")
         self.tainted = {k: v for k, v in self.tainted.items() if v.depth <= self.depth}
+
+
+JS_RULES = Rules(dict(sources=SOURCES, sinks=SINKS, assign_sinks=ASSIGN_SINKS, assign=ASSIGN, loop=LOOP, sanitised=SANITISED, jsx_sink=JSX_SINK))
 
 
 def _accepted(raw: str):
@@ -184,21 +209,28 @@ def _accepted(raw: str):
     return (m.group(2).strip() or "accepted") if m else None
 
 
+def body_statements(text: str, lines: list, head_end: int, split=None) -> list:
+    """The statements of the brace block that opens after `head_end`, with their line numbers; `split` turns lines
+    into statements (the JS joiner by default, Java's in javataint)."""
+    start = text.count("\n", 0, head_end) + 1
+    body_start = text.find("{", head_end)
+    if body_start < 0:
+        return []
+    depth, end = 0, body_start
+    for end in range(body_start, len(text)):
+        depth += (text[end] == "{") - (text[end] == "}")
+        if depth == 0:
+            break
+    return (split or _statements)(lines[start:text.count("\n", 0, end) + 1], start + 1)
+
+
 def _local_functions(text: str, lines: list) -> dict:
     """name -> (parameter names, statements of its body) for the named functions of a file."""
     funcs = {}
     for m in FUNC.finditer(text):
         name, params = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
-        start = text.count("\n", 0, m.start()) + 1
-        body_start = text.find("{", m.end())
-        depth, end = 0, body_start
-        for end in range(body_start, len(text)):
-            depth += (text[end] == "{") - (text[end] == "}")
-            if depth == 0:
-                break
-        end_line = text.count("\n", 0, end) + 1
         names = [p.split("=")[0].split(":")[0].strip().lstrip(".") for p in params.split(",") if p.strip()]
-        funcs[name] = (names, _statements(lines[start:end_line], start + 1)) if body_start >= 0 else (names, [])
+        funcs[name] = (names, body_statements(text, lines, m.end()))
     return funcs
 
 

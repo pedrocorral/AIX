@@ -30,6 +30,7 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_sbom.py` | the bill of materials offline: CVSS arithmetic on published scores, purls, CycloneDX and SPDX shapes, severity from vector or label, licences from disk, the gate threshold, `aix blackduck` end to end |
 | `test_cve.py` | known CVEs offline: every manifest kind read (yarn v1/berry, Pipfile, Gemfile, composer, go.sum, pom with properties, management, parent, exclusions), resolution through a fake deps.dev with the disk cache, OSV batches of 1000, the version sort, the report note |
 | `test_secrets.py` | the gitleaks rule set inside the kit: every rule compiles, keyword gate, entropy floor, allowlists, files that are secrets by name, one finding per line, whole-history walk with `--commits` as a bound, `[docs]` tag |
+| `test_java_taint.py` | Java taint: binding annotations and servlet getters as sources, JDBC, exec, file, redirect, deserialisation and outbound sinks, sanitisers, multi-line heads and assignments, one call deep, PreparedStatement clean, the accepted marker, tags and gate |
 | `test_js_taint.py` | JS/TS taint: 40 marked sinks found across five frameworks, the negatives clean, tags and gate |
 | `test_two_line.py` | a string assembled on one line and used by a dangerous call later is found, in four languages; the negatives stay clean |
 | `test_registry.py` | registry downloads (network) |

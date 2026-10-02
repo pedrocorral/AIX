@@ -50,6 +50,20 @@ JavaScript/TypeScript (.js .jsx .ts .tsx .mjs) is followed without a parser, sta
               res.send of assembled HTML (CWE-79); fetch, axios, http.get with an input URL (CWE-918)
   What it is not: no types, no middleware (a validator in a middleware is invisible: the finding stays), no cross-file.
 
+Java (.java) is followed the same way, statement by statement, scoped by braces. Sources: the parameters a method
+head binds from the request (`@RequestParam`, `@PathVariable`, `@RequestBody`, `@RequestHeader`, `@CookieValue`,
+`@ModelAttribute`, JAX-RS `@QueryParam` and friends) and servlet getters (`request.getParameter`, `getHeader`,
+`getQueryString`, `getCookies`, `getInputStream`, `getReader`, `getRequestURI`). Taint follows `=`, `+=`, `+`
+concatenation, `String.format` and `StringBuilder`, `for (T x : ...)`, and a method of the same file called with a
+tainted argument (one level). Sinks: JDBC and JPA execution (`executeQuery`, `execute`, `prepareStatement` on an
+assembled string, `createQuery`, `createNativeQuery`, JdbcTemplate `query*`/`update`), `Runtime.exec` and
+`ProcessBuilder`, `new File`/`Paths.get`/`Files.*` (any argument), `sendRedirect`/`RedirectView`,
+`ObjectInputStream`/`XMLDecoder`/`readObject`, `Class.forName`, `new URL`/`openConnection`/RestTemplate/HttpClient,
+`getWriter().print*`, `ScriptEngine.eval`/SpEL. Sanitisers clear it: `Integer.parseInt` and the other parsers,
+`UUID.fromString`, `URLEncoder.encode`, `HtmlUtils`, `StringEscapeUtils`, OWASP `Encode`, `ESAPI.encoder()`, Jsoup,
+`FilenameUtils`, `.matches(...)`, `.normalize()`. Not seen: a value reaching a method in another file (a servlet base
+class), filters and validators, the type system.
+
 Every finding names the VUL row and the CWE. Test code is listed, not gated (--strict gates it). A taint sink reviewed
 and accepted carries `# aix: accepted VUL-… <why>` on its line, as for aix code security: listed with the reason, never gated.
 --audit writes docs/security/audits/AUDIT-<date>-vulnerabilities.md with the evidence table filled: the input

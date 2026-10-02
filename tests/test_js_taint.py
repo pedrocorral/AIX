@@ -245,7 +245,7 @@ class JsTaint(unittest.TestCase):
         self.assertRegex(self.out, r"\.\.\. \d+ more \(narrow the path", "a register row shows 20 findings and says how many it hides")
         self.assertRegex(self.out, r"server\.js:\d+  [^\n]*\[accepted: demo of the marker\]")
         self.check("app.py")
-        self.assertIn("taint paths (Python, JS/TS)", self.out)
+        self.assertIn("taint paths (Python, JS/TS, Java)", self.out)
 
     def test_gate_counts_only_live_findings(self):
         r = project_cmd(self.project, self.home, "code", "vulnerabilities", "--taint", "--gate", "src", check=False)

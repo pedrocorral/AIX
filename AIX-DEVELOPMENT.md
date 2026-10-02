@@ -81,7 +81,7 @@ AIX/
 │   ├── infrarules.py   # leaf: file-level rules over workflows, manifests, compose, sessions, pages, Spring (the categories semgrep adds)
 │   ├── securityrules.py, depscan.py, assembled.py   # leaves: the per-line rules (VUL rows, CWEs), the dependency hygiene and Dockerfile scan, the assembled-then-used rule
 │   ├── codesecurity.py      # `aix code security`: scan, report, audit evidence
-│   ├── taint.py, jstaint.py, cvecheck.py, secrethistory.py   # leaves: taint paths (Python by AST; JS/TS by statements), OSV lookups, secrets in git history
+│   ├── taint.py, jstaint.py, javataint.py, cvecheck.py, secrethistory.py   # leaves: taint paths (Python by AST; JS/TS and Java by statements on one walker), OSV lookups, secrets in git history
 │   ├── sbom.py, cvss.py   # the bill of materials (CycloneDX/SPDX) and the composition policy, `aix blackduck`; the CVSS 3.x arithmetic
 │   ├── manifests.py, depsdev.py   # leaves: every lockfile and manifest read into (ecosystem, name, version, file); resolution through deps.dev, cached
 │   ├── pushscan.py   # leaf: every tracked file read as a push-protection scanner reads it (`aix code security --push`)

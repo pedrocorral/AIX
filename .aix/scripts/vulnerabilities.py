@@ -24,6 +24,7 @@ from codefiles import ROOT, default_roots
 from codesecurity import is_docs, is_test, register_rows
 from taint import taint
 import jstaint
+import javataint
 from cvecheck import cve, dependencies
 from secrethistory import history
 import secretrules
@@ -153,7 +154,7 @@ def _selftest_run():
     with tempfile.TemporaryDirectory() as d:
         base = Path(d)
         _selftest_project(base)
-        return taint([str(base)]) + jstaint.taint([str(base)]), dependencies(base), history(50, base)
+        return taint([str(base)]) + jstaint.taint([str(base)]) + javataint.taint([str(base)]), dependencies(base), history(50, base)
 
 
 def _selftest_checks(taints, deps, history) -> list:
@@ -194,7 +195,7 @@ def _sections(modes, paths, commits):
     """The report sections for the chosen modes; unreachable = OSV could not be queried."""
     sections, unreachable = [], False
     if "--taint" in modes:
-        sections.append(("taint paths (Python, JS/TS)", taint(paths) + jstaint.taint(paths), "input sources followed to sinks, one call deep, per file"))
+        sections.append(("taint paths (Python, JS/TS, Java)", taint(paths) + jstaint.taint(paths) + javataint.taint(paths), "input sources followed to sinks, one call deep, per file"))
     if "--cve" in modes:
         found, stats = cve()
         unreachable = found is None
