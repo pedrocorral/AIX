@@ -79,7 +79,7 @@ def py_module_edges(f: Path, idx):
     return [t for t in out if t and t.resolve() != f.resolve()]
 
 
-JS_IMPORT = re.compile(r"""(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)|import\(\s*['"]([^'"]+)['"]\s*\)""")
+JS_IMPORT = re.compile(r"""(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)|import\(\s*['"]([^'"]+)['"]\s*\)|^[ \t]*import\s*['"]([^'"]+)['"]""", re.M)   # the last: `import 'app/config/dayjs';`, a side-effect import
 
 
 JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs")
@@ -154,7 +154,7 @@ def _alias_bases(spec: str, f: Path) -> list:
 
 
 def _resolve_js(base: Path):
-    cands = [base] + [base.with_suffix(e) for e in JS_SUFFIXES] + [base / f"index{e}" for e in JS_SUFFIXES]
+    cands = [base] + [base.with_name(base.name + e) for e in JS_SUFFIXES] + [base / f"index{e}" for e in JS_SUFFIXES]   # `./activate.service` + `.ts`: with_suffix would replace `.service`
     return next((c for c in cands if c.is_file()), None)
 
 

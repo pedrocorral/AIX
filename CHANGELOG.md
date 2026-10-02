@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.31 — 2026-10-02
+
+- Dead modules on an Angular + Spring application (JHipster sample, 117 reported, 2 now, both read): a dotted module name (`import './activate.service'`) was resolved by replacing its "extension", so it pointed at `activate.ts` and the service, model, route and constants files of the whole frontend went unreached (`depedges._resolve_js`); a side-effect import (`import './config/dayjs';`) was not an import. Live by convention since: `package-info.java`, a Spring Data `XImpl` next to its interface `X`, a `SpringBootServletInitializer` subclass, Angular `environment.*.ts`.
+
 ## 2.21.30 — 2026-10-02
 
 - Three more extended projects (`tests/extended/projects.json`, cloned on demand, never in the repository): the OWASP Benchmark (2,740 Java servlet cases with a ground-truth CSV), the JHipster sample application (a layered Spring Boot app) and its Gradle variant. `tests/benchmark/owasp.py` scores the Java taint and the security rules per Benchmark category (TPR, FPR, score) and semgrep the same way; the result is table 11 of `docs/tests/benchmark-engines.md`.

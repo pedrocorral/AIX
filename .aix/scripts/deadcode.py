@@ -20,7 +20,8 @@ ENTRY_FOLDERS = {"migrations", "benches", "examples", "scripts", "bin", "it", "c
 
 JAVA_ENTRY = re.compile(r"static\s+void\s+main\s*\(|@(?:SpringBootApplication|SpringBootTest|SpringBootConfiguration|Test|ParameterizedTest|RepeatedTest|TestConfiguration|"
                         r"Configuration|WebMvcTest|WebFluxTest|DataJpaTest|Controller|RestController|ControllerAdvice|RestControllerAdvice|Component|Service|Repository|Entity|"
-                        r"Aspect|Named|ApplicationScoped|Path|Provider|WebFilter|WebServlet|WebListener|Scheduled|EventListener|KafkaListener|RabbitListener|JmsListener)\b")
+                        r"Aspect|Named|ApplicationScoped|Path|Provider|WebFilter|WebServlet|WebListener|Scheduled|EventListener|KafkaListener|RabbitListener|JmsListener)\b"
+                        r"|extends\s+SpringBootServletInitializer\b")
 # the container instantiates these itself: Spring, Jakarta CDI, JAX-RS, servlets, JUnit
 
 
@@ -34,11 +35,18 @@ def has_main_guard(node: str) -> bool:
     return '__name__ == "__main__"' in text if f.suffix == ".py" else bool(JAVA_ENTRY.search(text))
 
 
+def _fragment_impl(p: Path) -> bool:
+    """Spring Data picks `XImpl` next to the interface `X` by name: a `*Impl.java` with that sibling is live."""
+    return p.suffix == ".java" and p.stem.endswith("Impl") and (ROOT / p).with_name(p.stem[:-4] + ".java").exists()
+
+
 def is_entry_module(node: str) -> bool:
-    """Modules nothing needs to import for them to be alive: entry points, tests, framework/tool config, scripts."""
+    """Modules nothing needs to import for them to be alive: entry points, tests, framework/tool config, scripts,
+    Java package-info files, Spring Data fragment implementations, Angular environment files."""
     p = Path(node)
     return is_root_or_test(node) or p.stem.lower() in ENTRY_STEMS or p.name.endswith(ENTRY_SUFFIX) or p.name in FACADE_NAMES \
-        or p.name.startswith(".") or bool(ENTRY_FOLDERS & set(p.parts[:-1])) or has_main_guard(node)
+        or p.name.startswith(".") or bool(ENTRY_FOLDERS & set(p.parts[:-1])) or has_main_guard(node) \
+        or p.name == "package-info.java" or p.name.startswith("environment.") or _fragment_impl(p)
 
 
 PATH_LITERAL = re.compile(r"""['"](?:\./)?((?=[\w.@/-]*/)[\w@][\w.@-]*(?:/[\w.@-]+)*/?)['"]""")   # a literal with a slash: a path

@@ -162,3 +162,34 @@ class TokenLanguages(unittest.TestCase):
         self.assertIn("public", dict(found)["src/glob.rs:Glob.multi"], "a multi-line pub fn head too")
         self.assertEqual(dict(found)["src/glob.rs:Glob.caller"], "", "caller is private: it calls, nobody calls it")
         self.assertEqual(dict(found)["src/main/java/com/a/Thing.java:Thing.privateUnused"], "", "a Java candidate is private by rule, no public tag")
+
+
+class AngularAndSpringConventions(unittest.TestCase):
+    """What the JHipster application taught (117 modules reported, 19 after): a dotted module name (`./activate.service`)
+    resolves to `activate.service.ts`, not to `activate.ts`; a side-effect import (`import './config/dayjs';`) is an
+    import; package-info.java, a Spring Data `XImpl` next to its interface, a SpringBootServletInitializer subclass
+    and Angular `environment.*.ts` files are live by convention."""
+    def setUp(self):
+        self.home = temp_home(self); self.project = self.home / "app"
+        for name, src in {
+            "src/main/webapp/main.ts": "import { AppComponent } from './app/app.component';\nimport './app/config/dayjs';\n",
+            "src/main/webapp/app/app.component.ts": "import { ActivateService } from './activate.service';\nexport class AppComponent { constructor(private s: ActivateService) {} }\n",
+            "src/main/webapp/app/activate.service.ts": "export class ActivateService {}\n",
+            "src/main/webapp/app/activate.ts": "export const unused = 1;\n",
+            "src/main/webapp/app/config/dayjs.ts": "export const d = 1;\n",
+            "src/main/webapp/environments/environment.development.ts": "export const env = {};\n",
+            "src/main/java/com/a/package-info.java": "package com.a;\n",
+            "src/main/java/com/a/OperationRepository.java": "package com.a;\n@Repository\npublic interface OperationRepository extends OperationRepositoryWithBag {}\n",
+            "src/main/java/com/a/OperationRepositoryWithBag.java": "package com.a;\npublic interface OperationRepositoryWithBag {}\n",
+            "src/main/java/com/a/OperationRepositoryWithBagImpl.java": "package com.a;\npublic class OperationRepositoryWithBagImpl implements OperationRepositoryWithBag {}\n",
+            "src/main/java/com/a/ApplicationWebXml.java": "package com.a;\npublic class ApplicationWebXml extends SpringBootServletInitializer {}\n",
+            "src/main/java/com/a/Orphan.java": "package com.a;\npublic class Orphan {}\n",
+        }.items():
+            (self.project / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.project / name).write_text(src, encoding="utf-8")
+        install(self.home, self.project)
+
+    def test_only_the_two_orphans_are_dead(self):
+        out = project_cmd(self.project, self.home, "code", "dead", "src").stdout
+        dead = sorted(re.findall(r"^    (\S+)$", out.split("DEAD MODULES")[1].split("Every line")[0], re.M))
+        self.assertEqual(dead, ["src/main/java/com/a/Orphan.java", "src/main/webapp/app/activate.ts"], out)

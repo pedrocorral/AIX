@@ -33,7 +33,7 @@
  },
  "commons-lang": {
   "clones": 475,
-  "dead": 18,
+  "dead": 0,
   "graph": 1263,
   "security": 7,
   "style": 9292,
@@ -41,8 +41,8 @@
  },
  "excalidraw": {
   "clones": 20,
-  "dead": 14,
-  "graph": 2594,
+  "dead": 10,
+  "graph": 2601,
   "security": 46,
   "style": 1261,
   "vulnerabilities": 3
@@ -65,24 +65,24 @@
  },
  "jhipster-sample-app": {
   "clones": 44,
-  "dead": 117,
-  "graph": 599,
+  "dead": 2,
+  "graph": 1412,
   "security": 13,
   "style": 1175,
   "vulnerabilities": 0
  },
  "jhipster-sample-app-gradle": {
   "clones": 42,
-  "dead": 119,
-  "graph": 596,
+  "dead": 2,
+  "graph": 1427,
   "security": 15,
   "style": 1154,
   "vulnerabilities": 0
  },
  "juice-shop": {
   "clones": 30,
-  "dead": 7,
-  "graph": 858,
+  "dead": 6,
+  "graph": 1447,
   "security": 57,
   "style": 869,
   "vulnerabilities": 22
@@ -113,7 +113,7 @@
  },
  "spring-petclinic": {
   "clones": 6,
-  "dead": 5,
+  "dead": 0,
   "graph": 91,
   "security": 19,
   "style": 183,
