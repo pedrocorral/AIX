@@ -8,7 +8,8 @@ ADVICE = {"leftover": "delete it, or use it: a name nothing reads is a lie to th
           "swallowed": "handle it, log it, re-raise it, or say in a comment why nothing is the right thing to do",
           "bug": "fix it now: this shape is never intended"}
 COMMENTS = r"//[^\n]*|/\*.*?\*/"
-STRINGS = r"\br#*\"[^\"]*\"#*|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`(?:[^`\\]|\\.)*`"   # Rust raw strings first: a backslash is literal there
+STRINGS = r"\br#*\"[^\"]*\"#*|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])'|`(?:[^`\\]|\\.)*`"   # Rust raw strings first: a backslash is literal there;
+# a single quote holds one character (a Rust or Java char literal), never a string: `'de` and `'a` are lifetimes
 STRINGS_COMMENTS = re.compile(COMMENTS + "|" + STRINGS, re.S)
 STRINGS_JS = r"\"(?:\\.|[^\"\\\n])*\"|`(?:[^`\\]|\\.)*`"   # no single quotes: an apostrophe in JSX text is not a string start
 STRINGS_COMMENTS_JS = re.compile(COMMENTS + "|" + STRINGS_JS, re.S)

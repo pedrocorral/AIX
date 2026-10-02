@@ -132,7 +132,9 @@ Every disagreement class was read at the source. The file:line is the evidence; 
 - requests: ours 18, vulture 25, the same 18; vulture's extra 7 are `setup.py:run_tests` (a `cmdclass`), `api.delete`,
   `sessions.delete` (public API) and 4 test helpers.
 - pygoat: ours 4, vulture 12, the same 4; vulture's extra 8 are Django `handle` commands and Flask routes.
-- Ours reports dead functions for Python only; PMD `UnusedPrivateMethod` covers Java and was wrong on its one hit.
+- Ours reported dead functions for Python only at the time of the run; since 2.21.27 it covers JS/TS, Rust and Java by
+  tokens (private Java methods only, as PMD does; PMD `UnusedPrivateMethod` was wrong on its one hit, ours reports
+  nothing on WebGoat or commons-lang and twelve unreferenced functions on ripgrep, each verified by name search).
 
 ### Clones
 

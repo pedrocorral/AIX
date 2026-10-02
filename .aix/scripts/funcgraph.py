@@ -27,7 +27,7 @@ IDENT = re.compile(r"[A-Za-z_$][\w$]*")
 DESTRUCTURED = re.compile(r"\b(?:const|let|var)\s*[\[{]([^}\]]*)[}\]]\s*=")   # `const { t } = useI18n()`: t holds a value
 SELF = {"this", "self", "Self"}
 CLASS_HEAD = {"js": re.compile(r"\bclass\s+(\w+)"), "java": re.compile(r"\b(?:class|interface|enum|record)\s+(\w+)"),
-              "rust": re.compile(r"\bimpl(?:<[^>]*>)?\s+(?:[\w:<>]+\s+for\s+)?(\w+)")}
+              "rust": re.compile(r"^[ \t]*impl(?:<[^>]*>)?\s+(?:[\w:<>'&\[\]() ,]+?\s+for\s+)?(\w+)", re.M)}   # at line start: `impl AsRef<Path>` in a parameter is a type   # `impl<'de> Deserialize<'de> for Glob`
 ANON_PARAMS = re.compile(r"\bfunction\s*\*?\s*\(([^()]*)\)|\(([^()]*)\)\s*(?::[^=]*)?=>|\|([^|]*)\|")   # callbacks and closures: their parameters are values
 DEFAULT_EXPORT = re.compile(r"module\.exports\s*=\s*require\(\s*['\"]([^'\"]+)['\"]\s*\)|module\.exports\s*=\s*(?:exports\s*=\s*)?(\w+)|export\s+default\s+(?:function\s+)?(\w+)")   # the re-export form first
 JS_IMPORT_NAMES = re.compile(r"^[ \t]*import\s+(?:type\s+)?(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\}|\*\s+as\s+(\w+))?\s*from\s*['\"]([^'\"]+)['\"]"

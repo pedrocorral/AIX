@@ -133,3 +133,32 @@ class DeadFunctions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TokenLanguages(unittest.TestCase):
+    """Dead functions in JS/TS, Rust and Java (deadtokens.py): never referenced by name, unless something we cannot
+    see calls it: an export, an annotation, a page, a React or serialization hook, an object-literal method, a Rust
+    trait impl, a non-private Java method."""
+    def setUp(self):
+        self.home = temp_home(self); self.project = self.home / "app"
+        for name, src in {
+            "src/util.ts": "export function used() { return helper(); }\nfunction helper() { return 1; }\nfunction orphan() { return 2; }\nexport const Button = <T,>({\n  value,\n}: {\n  value: T;\n}) => {\n  return value;\n};\n",
+            "src/page.js": "function doVote() { }\nfunction never() { }\nconst cfg = {\n  beforeSend(event) { return event; },\n};\nclass View extends Component {\n  componentDidMount() { }\n  helperMethod() { }\n}\n",
+            "src/page.html": "<button onclick=\"doVote()\">vote</button>\n",
+            "src/glob.rs": "pub struct Glob;\nimpl<'de> Deserialize<'de> for Glob {\n    fn deserialize(d: D) -> Self { Glob }\n}\nimpl Glob {\n    pub fn public_unused(&self) {}\n    fn private_unused(&self) {}\n    fn called(&self) {}\n    fn caller(&self) { self.called(); }\n    pub fn multi(\n        &self,\n        f: impl AsRef<str>,\n    ) -> bool { true }\n}\n#[test]\n/// a doc line between the attribute and the fn\nfn checks() {}\n",
+            "src/main/java/com/a/Thing.java": "package com.a;\npublic class Thing {\n    public Thing() { }\n    public void publicUnused() { }\n    private void privateUnused() { }\n    private void privateUsed() { }\n    private Object readResolve() { return this; }\n    @SuppressWarnings(\"unused\")\n    private void tick() { }\n    public void go() { privateUsed(); }\n    public String getName() { return null; }\n}\n",
+        }.items():
+            (self.project / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.project / name).write_text(src, encoding="utf-8")
+        install(self.home, self.project)
+
+    def test_only_the_unreachable_are_reported(self):
+        out = project_cmd(self.project, self.home, "code", "dead", "--functions", "src").stdout
+        block = out.split("DEAD FUNCTIONS")[1].split("Every line")[0]
+        found = sorted(re.findall(r"^    (\S+)  \(line \d+\)(.*)$", block, re.M))
+        self.assertEqual([f for f, _ in found], ["src/glob.rs:Glob.caller", "src/glob.rs:Glob.multi", "src/glob.rs:Glob.private_unused", "src/glob.rs:Glob.public_unused",
+                                                 "src/main/java/com/a/Thing.java:Thing.privateUnused", "src/page.js:View.helperMethod", "src/page.js:never", "src/util.ts:orphan"], block)
+        self.assertIn("public", dict(found)["src/glob.rs:Glob.public_unused"], "a Rust pub fn is tagged public")
+        self.assertIn("public", dict(found)["src/glob.rs:Glob.multi"], "a multi-line pub fn head too")
+        self.assertEqual(dict(found)["src/glob.rs:Glob.caller"], "", "caller is private: it calls, nobody calls it")
+        self.assertEqual(dict(found)["src/main/java/com/a/Thing.java:Thing.privateUnused"], "", "a Java candidate is private by rule, no public tag")

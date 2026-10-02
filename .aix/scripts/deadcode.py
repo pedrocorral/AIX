@@ -7,6 +7,7 @@ from pathlib import Path
 from codefiles import ROOT, rel, source_files
 from depedges import iter_functions, parse_trees
 from graphmetrics import FACADE_NAMES, ROOT_STEMS, is_root_or_test, reach_sets
+import deadtokens
 
 
 ENTRY_STEMS = ROOT_STEMS | {"manage", "wsgi", "asgi", "cli", "conftest", "setup", "settings", "config", "lib", "build", "apps", "admin", "urls",
@@ -118,7 +119,7 @@ def dead_functions(roots):
     for f, tree in trees.items():
         for cls, fn in iter_functions(tree):
             if not _live_by_rule(rel(f), fn, exported) and used[fn.name] == 0:  # a def is not an ast.Name, so any count is a real reference
-                dead.append((f"{rel(f)}:{cls + '.' if cls else ''}{fn.name}", fn.lineno))
+                dead.append((f"{rel(f)}:{cls + '.' if cls else ''}{fn.name}", fn.lineno, not fn.name.startswith("_")))
     return sorted(dead)
 
 
@@ -131,11 +132,11 @@ def render_dead(nodes, edges, paths, functions):
     lines.append(f"  DEAD MODULES {len(dead)}  (no entry module reaches them through imports)")
     lines += [f"    {n}" for n in dead[:40]]
     if functions:
-        df = dead_functions(paths)
-        lines += [f"  DEAD FUNCTIONS {len(df)}  (Python: name never referenced outside its definition; decorated, dunder, exported and entry/test code excluded)"]
-        lines += [f"    {q}  (line {ln})" + ("" if q.rsplit(".", 1)[-1].split(":")[-1].startswith("_") else "  (public: the API of a library, or dead in an application)") for q, ln in df[:60]]
+        df = sorted(dead_functions(paths) + deadtokens.dead_functions(paths, is_entry_module))
+        lines += [f"  DEAD FUNCTIONS {len(df)}  (name never referenced outside its definition: Python by AST, JS/TS, Rust and Java by tokens; annotated, exported, entry/test code excluded)"]
+        lines += [f"    {q}  (line {ln})" + ("  (public: the API of a library, or dead in an application)" if public else "") for q, ln, public in df[:60]]
     else:
-        lines.append("  (add --functions for Python dead functions and methods)")
+        lines.append("  (add --functions for dead functions and methods: Python, JS/TS, Rust, Java)")
     lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting. Fix with: skill refactor-dead")
     lines.append("  Live by convention: tests, main/lib/build, Django migrations/admin/apps/commands, Cargo benches/examples/bin, Maven src/it, scripts/, public/,")
     lines.append("  dot-files, *.config.*, container-managed Java classes (@Controller, @Service, @Entity, ...), folders named by a string in code.")
