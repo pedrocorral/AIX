@@ -12,8 +12,8 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
                      provider patterns and a generic one: keyword gate, regex, entropy floor, allowlists for
                      placeholders and example values; secrets by file name such as .p12); TLS verification off;
                      DEBUG on; ALLOWED_HOSTS *                                          CWE-798/295/489/16
-  VUL-AUTHN-001/002  md5/sha1 for passwords, random for tokens; JWT unverified / alg none; cookies without
-                     Secure/HttpOnly                                                       CWE-328/338/347/614
+  VUL-AUTHN-001/002  md5/sha1 for passwords; java.util.Random / Math.random; DES, RC4 and ECB ciphers; JWT
+                     unverified / alg none; cookies without Secure/HttpOnly, setSecure(false)  CWE-328/338/327/347/614
   VUL-WEB-001/002/003 innerHTML/dangerouslySetInnerHTML/mark_safe; CSRF disabled; CORS *; open redirect
                                                                                           CWE-79/352/942/601
   VUL-LOG-001        credentials in log/print lines                                        CWE-532

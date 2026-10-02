@@ -17,6 +17,9 @@ YARN_VERSION = re.compile(r'^\s+version:?\s*"?([^"\s]+)"?\s*$')
 GEM_SPEC = re.compile(r"^    ([A-Za-z0-9_.\-]+) \(([^)\s]+)\)", re.M)
 GO_SUM = re.compile(r"^(\S+) v([^\s/]+) h1:", re.M)
 PROPERTY = re.compile(r"\$\{([^}]+)\}")
+GRADLE_DEP = re.compile(r"^\s*(?:implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly|annotationProcessor|developmentOnly)\s*\(?\s*['\"]([\w.-]+):([\w.-]+)(?::([\w.-]+))?['\"]", re.M)
+TOML_SECTION = re.compile(r"^\[(\w+)\]\s*$", re.M)
+TOML_LIB = re.compile(r"^([\w-]+)\s*=\s*(?:\"([^\"]+)\"|\{([^}]*)\})\s*$", re.M)
 
 
 def manifest_files(root: Path, pattern: str) -> list:
@@ -192,4 +195,53 @@ def lockfile_dependencies(root: Path) -> list:
     for d in [*toml_locks(root), *npm_locks(root), *other_locks(root)]:
         if d not in seen:
             seen.add(d); out.append(d)
+    return out
+
+
+# ---- Gradle: the version catalog and the build scripts -----------------------------------------------------------------
+
+def _toml_sections(text: str) -> dict:
+    """{section: text} of a flat TOML file (gradle/libs.versions.toml has versions, libraries, bundles, plugins)."""
+    parts = TOML_SECTION.split(text)
+    return {parts[i]: parts[i + 1] for i in range(1, len(parts) - 1, 2)}
+
+
+def _catalog_entry(body: str, versions: dict) -> tuple:
+    """(group:artifact, version) of one `{ module = "g:a", version = "1" }` / `version.ref = "v"` / `group =, name =` entry."""
+    fields = dict(re.findall(r"([\w.]+)\s*=\s*\"([^\"]*)\"", body))
+    name = fields.get("module") or (f"{fields.get('group')}:{fields.get('name')}" if fields.get("group") else "")
+    version = fields.get("version") or versions.get(fields.get("version.ref", ""), "")
+    return name, version
+
+
+def version_catalog(f: Path) -> tuple:
+    """(libraries [(name, version)], plugins {id: version}) of a Gradle version catalog."""
+    sections = _toml_sections(_text(f))
+    versions = dict(re.findall(r"^([\w-]+)\s*=\s*\"([^\"]+)\"", sections.get("versions", ""), re.M))
+    libraries, plugins = [], {}
+    for alias, literal, body in TOML_LIB.findall(sections.get("libraries", "")):
+        name, version = (literal.rsplit(":", 1)[0], literal.rsplit(":", 1)[1]) if literal and literal.count(":") == 2 else _catalog_entry(body or "", versions)
+        if name:
+            libraries.append((name, version))
+    for alias, literal, body in TOML_LIB.findall(sections.get("plugins", "")):
+        fields = dict(re.findall(r"([\w.]+)\s*=\s*\"([^\"]*)\"", body or ""))
+        if fields.get("id"):
+            plugins[fields["id"]] = fields.get("version") or versions.get(fields.get("version.ref", ""), "")
+    return libraries, plugins
+
+
+def read_gradle(root: Path) -> list:
+    """[(file, dependencies, managed, parent)] shaped like read_pom, one per Gradle project root: the catalog's
+    libraries and every `implementation "g:a[:v]"` of its build scripts as direct dependencies; a version left ''
+    is managed by the Spring Boot plugin's BOM when the catalog or a script names that plugin."""
+    out = []
+    for build in manifest_files(root, "build.gradle") + manifest_files(root, "build.gradle.kts"):
+        base = build.parent
+        catalog = base / "gradle" / "libs.versions.toml"
+        libraries, plugins = version_catalog(catalog) if catalog.exists() else ([], {})
+        scripts = "\n".join(_text(g) for g in list(base.glob("*.gradle")) + list(base.glob("gradle/*.gradle")) + list(base.glob("*.gradle.kts")))
+        boot = plugins.get("org.springframework.boot") or next(iter(re.findall(r"id\s*\(?['\"]org\.springframework\.boot['\"]\)?\s*version\s*['\"]([\w.-]+)['\"]", scripts)), "")
+        deps = [(name, version, "", []) for name, version in libraries] + [(f"{g}:{a}", v or "", "", []) for g, a, v in GRADLE_DEP.findall(scripts)]
+        if deps:
+            out.append((rel(build), deps, {}, ("org.springframework.boot:spring-boot-dependencies", boot) if boot else None))
     return out

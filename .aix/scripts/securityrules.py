@@ -79,11 +79,15 @@ RULES = [
      "secrets.token_bytes / token_urlsafe / SystemRandom"),
     ("VUL-AUTHN-001", "CWE-338", "non-cryptographic randomness for a secret", {"js"},
      r"(?i:token|secret|password|salt|nonce|otp|session)[^\n]*Math\.random\(", "crypto.randomBytes / crypto.getRandomValues"),
-    ("VUL-AUTHN-001", "CWE-338", "non-cryptographic randomness for a secret", {"java"},
-     r"new\s+Random\(\)[^\n]*(?i:token|secret|password|salt|nonce|otp|session)|(?i:token|secret|password|salt|nonce|otp|session)[^\n]*new\s+Random\(\)", "SecureRandom"),
+    ("VUL-AUTHN-001", "CWE-338", "non-cryptographic randomness", {"java"},
+     r"\bnew\s+(?:java\.util\.)?Random\(|\bMath\.random\(|\bThreadLocalRandom\.current\(", "java.util.Random is predictable: SecureRandom for anything a user must not guess (tokens, salts, ids, keys)"),
+    ("VUL-AUTHN-001", "CWE-327", "weak or ECB cipher", {"java"},
+     r"(?i:(?:Cipher|KeyGenerator)\.getInstance\(\s*\"(?:DES|DESede|TripleDES|RC2|RC4|ARCFOUR|Blowfish)(?:/|\")|Cipher\.getInstance\(\s*\"[^\"]*/ECB/)", "AES/GCM/NoPadding (or ChaCha20-Poly1305); DES, RC4 and ECB leak or break"),
     ("VUL-AUTHN-002", "CWE-347", "JWT signature not verified / alg none", {"*"},
      r"(?:verify_signature['\"]?\s*:\s*False|verify\s*=\s*False[^\n]*jwt|jwt\.decode\([^)]*verify\s*=\s*False|algorithms?\s*[:=]\s*\[?\s*['\"]none['\"]|\.decode\([^)]*\)\s*#\s*noverify)",
      "always verify with the expected algorithm list; reject alg=none"),
+    ("VUL-AUTHN-002", "CWE-614", "cookie marked not secure", {"java"},
+     r"\.setSecure\(\s*false\s*\)|\.setHttpOnly\(\s*false\s*\)", "setSecure(true) and setHttpOnly(true) on every cookie that carries a session or a token"),
     ("VUL-AUTHN-002", "CWE-614", "cookie without Secure / HttpOnly", {"py", "js"},
      r"(?:set_cookie\([^)]*(?:secure\s*=\s*False|httponly\s*=\s*False)|cookie\([^)]*(?:secure\s*:\s*false|httpOnly\s*:\s*false)|SESSION_COOKIE_SECURE\s*=\s*False|SESSION_COOKIE_HTTPONLY\s*=\s*False)",
      "Secure, HttpOnly and SameSite on session cookies"),
@@ -126,7 +130,7 @@ LANG = {".py": "py", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs
 
 
 # taint advice per CWE, shared by the Python and JS/TS taint leaves
-ADVICE = {"CWE-470": "never load a class named by input; an allowlist of class names", "CWE-78": "argument list without a shell; validate each argument", "CWE-95": "never eval input; a dispatch table or ast.literal_eval",
+ADVICE = {"CWE-470": "never load a class named by input; an allowlist of class names", "CWE-501": "validate before storing in the session: what sits there is trusted by every later read", "CWE-90": "escape the LDAP filter value (ESAPI encodeForLDAP) or bind it as a parameter", "CWE-643": "an XPathVariableResolver for the value, never a concatenated expression", "CWE-78": "argument list without a shell; validate each argument", "CWE-95": "never eval input; a dispatch table or ast.literal_eval",
           "CWE-89": "parameterised query: execute(sql, params)", "CWE-22": "resolve against a base directory and reject anything outside it",
           "CWE-601": "allow-list targets or relative paths only", "CWE-1336": "render a file template with a context",
           "CWE-502": "json / yaml.safe_load; never deserialise input", "CWE-918": "allow-list hosts; block private ranges and redirects",

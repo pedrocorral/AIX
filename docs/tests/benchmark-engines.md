@@ -4,7 +4,7 @@ Read this when: deciding whether a code tool should be replaced, wrapped or kept
 Skip when: running or writing tests.
 
 Facts only. Every number below was produced by `tests/benchmark/engines.py` on 2026-09-25 (kit 2.21.22) over the twelve extended
-projects (`tests/extended/projects.json`, cached clones at their pinned commits, never in the repository) and every
+projects (`tests/extended/projects.json`; fifteen since 2.21.30, the OWASP Benchmark and two JHipster applications added, cached clones at their pinned commits, never in the repository) and every
 hand verdict names the file and line so anyone can re-read it. Nothing here says which tool is better; it says what each
 one found, what it missed, how long it took and where it was wrong.
 
@@ -165,6 +165,30 @@ Measured twice: before and after 2.21.18, which put the gitleaks rule set inside
   prose; `express/examples/auth/index.js:50` `password: 'foobar'`.
 - Time: ours walks the whole history in Python, 0.6 to 6.5 s per project here (shallow clones, one commit); gitleaks
   under 1 s everywhere.
+
+### OWASP Benchmark (table 11, added with 2.21.30)
+
+- Before 2.21.30 the Java taint scored sqli -1, cmdi 1, pathtraver 1, xss 5 (half the SQL cases, almost nothing
+  else). Four things the Benchmark's code does that the walker did not: a variable declared outside a block and
+  reassigned inside it (`String p = ""; if (c) { p = request.getHeader(x); }`) lost its taint when the block closed;
+  a one-line `if (c) bar = param; else bar = "x";` was not read as an assignment, and the `else` branch cleared the
+  taint the `if` branch had set; a method whose parameters carry `@RequestParam("x")` was not a method; qualified
+  names (`new java.io.FileInputStream(`) did not match the sinks. Plus missing sinks and rules: `.command(` on a
+  ProcessBuilder, `exec` on a Runtime variable, a response writer kept in a variable, session attributes, LDAP and
+  XPath filters, `java.util.Random`, DES and ECB ciphers, `setSecure(false)`.
+- After: true positive rates of 83 to 93 percent on the injection categories and 100 percent on cookies, ciphers
+  and random, against semgrep's 82 to 96. False positive rates are lower than semgrep's on commands (66 vs 87),
+  paths (65 vs 79), LDAP (53 vs 88) and SQL by taint (64 vs 73), higher on XPath; the Benchmark score (TPR minus
+  FPR) is higher than semgrep's on cmdi, pathtraver, ldapi, equal on securecookie, hash, crypto and weakrand, lower on
+  sqli, xss, xpathi and trustbound.
+- Where the false positives come from, read in the cases: the Benchmark's "false" cases are flows a static tool
+  must evaluate to clear, `bar = (7 * 18) + num > 200 ? "safe" : param` (arithmetic that always picks the constant),
+  a value put in a map under one key and read back under another, a list where the parameter is added and a
+  different index read. No tool in this document folds those; the walker is name-based by design and keeps the
+  taint, which is the conservative side.
+- The 40 hash cases both tools miss use an algorithm name read from a properties file (`getProperty("hashAlg1",
+  "SHA512")` with the file saying MD5): invisible to a static read. The cipher cases of the same shape are caught by
+  the `KeyGenerator.getInstance("DES")` line next to them, on both sides.
 
 ### Known CVEs
 
@@ -345,6 +369,69 @@ ours-only, by rule: HTML injected without escaping 23, hard-coded password / sec
 | wildcard-postmessage-configuration | 6 | 6 | 0 |
 
 
+### 11. OWASP Benchmark 1.2 (BenchmarkJava): the Java taint and rules against the ground truth
+
+2,740 servlet test cases, 1,415 of them real vulnerabilities, with the Benchmark's own CSV saying which; scored the
+way the Benchmark scores a tool, per category: true positive rate, false positive rate, score = TPR - FPR. "ours,
+taint" is `aix code vulnerabilities --taint`, "ours, rules" is `aix code security`, "taint + rules" the union; semgrep
+is `p/default` with its CWE metadata. Produced by `tests/benchmark/owasp.py --semgrep` (kit 2.21.30).
+
+| category | cases | TP | FP | FN | TN | TPR | FPR | score (ours, taint) |
+|---|---|---|---|---|---|---|---|---|
+| sqli | 504 | 225 | 149 | 47 | 83 | 83% | 64% | 18 |
+| cmdi | 251 | 110 | 83 | 16 | 42 | 87% | 66% | 21 |
+| pathtraver | 268 | 114 | 88 | 19 | 47 | 86% | 65% | 21 |
+| xss | 455 | 211 | 121 | 35 | 88 | 86% | 58% | 28 |
+| ldapi | 59 | 24 | 17 | 3 | 15 | 89% | 53% | 36 |
+| xpathi | 35 | 14 | 15 | 1 | 5 | 93% | 75% | 18 |
+| trustbound | 126 | 33 | 13 | 50 | 30 | 40% | 30% | 10 |
+| securecookie | 67 | 0 | 0 | 36 | 31 | 0% | 0% | 0 |
+| hash | 236 | 0 | 0 | 129 | 107 | 0% | 0% | 0 |
+| crypto | 246 | 0 | 0 | 130 | 116 | 0% | 0% | 0 |
+| weakrand | 493 | 0 | 0 | 218 | 275 | 0% | 0% | 0 |
+
+| category | cases | TP | FP | FN | TN | TPR | FPR | score (ours, rules) |
+|---|---|---|---|---|---|---|---|---|
+| sqli | 504 | 119 | 108 | 153 | 124 | 44% | 47% | -3 |
+| cmdi | 251 | 0 | 0 | 126 | 125 | 0% | 0% | 0 |
+| pathtraver | 268 | 0 | 0 | 133 | 135 | 0% | 0% | 0 |
+| xss | 455 | 0 | 0 | 246 | 209 | 0% | 0% | 0 |
+| ldapi | 59 | 0 | 0 | 27 | 32 | 0% | 0% | 0 |
+| xpathi | 35 | 0 | 0 | 15 | 20 | 0% | 0% | 0 |
+| trustbound | 126 | 0 | 0 | 83 | 43 | 0% | 0% | 0 |
+| securecookie | 67 | 36 | 0 | 0 | 31 | 100% | 0% | 100 |
+| hash | 236 | 89 | 0 | 40 | 107 | 69% | 0% | 69 |
+| crypto | 246 | 130 | 0 | 0 | 116 | 100% | 0% | 100 |
+| weakrand | 493 | 218 | 0 | 0 | 275 | 100% | 0% | 100 |
+
+| category | cases | TP | FP | FN | TN | TPR | FPR | score (ours, taint + rules) |
+|---|---|---|---|---|---|---|---|---|
+| sqli | 504 | 237 | 183 | 35 | 49 | 87% | 79% | 8 |
+| cmdi | 251 | 110 | 83 | 16 | 42 | 87% | 66% | 21 |
+| pathtraver | 268 | 114 | 88 | 19 | 47 | 86% | 65% | 21 |
+| xss | 455 | 211 | 121 | 35 | 88 | 86% | 58% | 28 |
+| ldapi | 59 | 24 | 17 | 3 | 15 | 89% | 53% | 36 |
+| xpathi | 35 | 14 | 15 | 1 | 5 | 93% | 75% | 18 |
+| trustbound | 126 | 33 | 13 | 50 | 30 | 40% | 30% | 10 |
+| securecookie | 67 | 36 | 0 | 0 | 31 | 100% | 0% | 100 |
+| hash | 236 | 89 | 0 | 40 | 107 | 69% | 0% | 69 |
+| crypto | 246 | 130 | 0 | 0 | 116 | 100% | 0% | 100 |
+| weakrand | 493 | 218 | 0 | 0 | 275 | 100% | 0% | 100 |
+
+| category | cases | TP | FP | FN | TN | TPR | FPR | score (semgrep) |
+|---|---|---|---|---|---|---|---|---|
+| sqli | 504 | 253 | 170 | 19 | 62 | 93% | 73% | 20 |
+| cmdi | 251 | 117 | 109 | 9 | 16 | 93% | 87% | 6 |
+| pathtraver | 268 | 120 | 106 | 13 | 29 | 90% | 79% | 12 |
+| xss | 455 | 202 | 108 | 44 | 101 | 82% | 52% | 30 |
+| ldapi | 59 | 26 | 28 | 1 | 4 | 96% | 88% | 9 |
+| xpathi | 35 | 14 | 13 | 1 | 7 | 93% | 65% | 28 |
+| trustbound | 126 | 43 | 18 | 40 | 25 | 52% | 42% | 10 |
+| securecookie | 67 | 36 | 0 | 0 | 31 | 100% | 0% | 100 |
+| hash | 236 | 89 | 0 | 40 | 107 | 69% | 0% | 69 |
+| crypto | 246 | 130 | 0 | 0 | 116 | 100% | 0% | 100 |
+| weakrand | 493 | 218 | 0 | 0 | 275 | 100% | 0% | 100 |
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
@@ -352,7 +439,8 @@ ours-only, by rule: HTML injected without escaping 23, hard-coded password / sec
   It needs `BENCH_DIR` (default `~/.cache/aix/bench`) with `venv/bin` (`pip install semgrep bandit ruff lizard vulture`),
   `bin/` (gitleaks, osv-scanner release binaries) and `pmd-bin-<version>/`; an engine that is missing is skipped and
   its column is empty.
-- `tests/benchmark/report.py` prints the tables above from those files. Table 10 (added with 2.21.22) counts, for
+- `tests/benchmark/report.py` prints tables 1 to 10 from those files; `tests/benchmark/owasp.py` prints table 11 from the
+  Benchmark's CSV and the modules. Table 10 (added with 2.21.22) counts, for
   every semgrep rule ours reproduces, semgrep's findings and how many ours has within three lines; `docs/` is left
   out because ours never reads it; ours-only under a rule is what ours reports with no semgrep finding nearby
   (cookie-session secrets, which semgrep's express rule does not read).

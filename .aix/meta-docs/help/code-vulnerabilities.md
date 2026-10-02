@@ -59,7 +59,11 @@ tainted argument (one level). Sinks: JDBC and JPA execution (`executeQuery`, `ex
 assembled string, `createQuery`, `createNativeQuery`, JdbcTemplate `query*`/`update`), `Runtime.exec` and
 `ProcessBuilder`, `new File`/`Paths.get`/`Files.*` (any argument), `sendRedirect`/`RedirectView`,
 `ObjectInputStream`/`XMLDecoder`/`readObject`, `Class.forName`, `new URL`/`openConnection`/RestTemplate/HttpClient,
-`getWriter().print*`, `ScriptEngine.eval`/SpEL. Sanitisers clear it: `Integer.parseInt` and the other parsers,
+`getWriter().print*` (a writer kept in a variable too), `session.setAttribute` (trust boundary), LDAP `search` and
+XPath `evaluate`/`compile` on an assembled filter, `ScriptEngine.eval`/SpEL; qualified names (`new java.io.File(`)
+match. Flows the OWASP Benchmark exercises are read: a variable reassigned inside a block keeps its taint after
+it, a one-line `if`/`else` branch adds taint and never clears it, a list or map that receives a tainted value is
+tainted, `+=` assembles. Sanitisers clear it: `Integer.parseInt` and the other parsers,
 `UUID.fromString`, `URLEncoder.encode`, `HtmlUtils`, `StringEscapeUtils`, OWASP `Encode`, `ESAPI.encoder()`, Jsoup,
 `FilenameUtils`, `.matches(...)`, `.normalize()`. A call into a method of another file under the same paths is
 followed one level too, the callee found by name and arity (a controller's parameter into a service's SQL; no types,

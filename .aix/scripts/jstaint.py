@@ -32,7 +32,9 @@ SINKS = [  # (call head, VUL row, CWE, kind, which argument is dangerous)
 ASSIGN_SINKS = [(r"\.(?:innerHTML|outerHTML)\s*=(?!=)", "VUL-WEB-001", "CWE-79", "HTML sink"),
                 (r"\b(?:window\.|document\.)?location(?:\.href)?\s*=(?!=)", "VUL-WEB-003", "CWE-601", "redirect target")]
 JSX_SINK = re.compile(r"dangerouslySetInnerHTML=\{\{\s*__html:\s*([^}]+)\}")
-ASSIGN = re.compile(r"^\s*(?:export\s+)?(?:(?:const|let|var)\s+)?(?:\{([^}]+)\}|([\w$]+))(?::\s*[^=]+?)?\s*=(?!=)\s*(.+?);?\s*$", re.S)
+ASSIGN = re.compile(r"^\s*(?:export\s+)?((?:const|let|var)\s+)?(?:\{([^}]+)\}|([\w$]+))(?::\s*[^=]+?)?\s*=(?!=)\s*(.+?);?\s*$", re.S)
+CONDITION = re.compile(r"^\s*(?:(?:else\s+)?if\s*\((?:[^()]|\([^()]*\))*\)\s*|else\s+)")
+COLLECT = re.compile(r"^\s*([\w$]+)\.(?:add|addAll|put|putAll|set|append|push|unshift|offer|insert)\((.*)\)\s*;?\s*$", re.S)   # `list.add(param)`: the list is tainted
 LOOP = re.compile(r"\bfor\s*\(\s*(?:const|let|var)\s+([\w$]+)\s+(?:of|in)\s+(.+?)\)")
 FUNC = re.compile(r"(?:^|\n)\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s+([\w$]+)\s*\(([^)]*)\)|(?:const|let|var)\s+([\w$]+)\s*=\s*(?:async\s*)?\(([^)]*)\)\s*(?::[^=]+)?=>)")
 COMMENTS = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
@@ -93,11 +95,22 @@ class Rules:
     names the parameters a statement declares as input (a `@RequestParam` in a Java method head); `assembled`
     says whether an expression builds a string."""
     def __init__(self, spec: dict):
-        """spec: sources, sinks, assign_sinks, assign, loop, sanitised; optional jsx_sink, head_sources, assembled."""
+        """spec: sources, sinks, assign_sinks, assign, loop, sanitised; optional jsx_sink, head_sources, assembled,
+        parse_assign (an assign match -> (declared, names, expr)), aliases ([(regex on the assigned expression,
+        sink rule, method names)]: a variable holding a response writer makes `w.println(x)` a sink)."""
         self.sources, self.sinks, self.assign_sinks = spec["sources"], spec["sinks"], spec["assign_sinks"]
         self.assign, self.loop, self.sanitised = spec["assign"], spec["loop"], spec["sanitised"]
         self.jsx_sink, self.head_sources = spec.get("jsx_sink"), spec.get("head_sources") or (lambda text: {})
         self.assembled = spec.get("assembled") or (lambda expr, clean: "${" in expr or "+" in clean)
+        self.parse_assign = spec.get("parse_assign") or _parse_js_assign
+        self.aliases = spec.get("aliases") or []
+
+
+def _parse_js_assign(m) -> tuple:
+    """(declared, names, expr) of a JS assignment match; a dotted target (`obj.x = ...`) is nobody's variable."""
+    if m.group(3) and "." in m.group(3):
+        return False, [], ""
+    return bool(m.group(1)), (_names_of(m.group(2)) if m.group(2) else [m.group(3)]), m.group(4)
 
 
 class _Taint:
@@ -113,6 +126,7 @@ class _Walk:
         self.rules, self.follow = rules or JS_RULES, True   # follow: walk a local function called with tainted arguments (once)
         self.index = {}   # (name, arity) -> [(file, lines, params, statements)] in other files: the cross-file step (javataint)
         self.tainted, self.depth = {}, 0
+        self.declared, self.alias = {}, {}   # name -> depth it was declared at; name -> sink rule it stands for (a writer)
 
     def run(self, statements: list, initial: dict = None):
         self.tainted = {k: _Taint(v, 0, False) for k, v in (initial or {}).items()}
@@ -141,19 +155,36 @@ class _Walk:
     def _assignments(self, text: str, lineno: int):
         m = self.rules.loop.search(text)
         if m:
-            self._bind([m.group(1)], m.group(2), lineno); return
-        m = self.rules.assign.match(text)
-        if not m or (m.group(2) and "." in m.group(2)):
+            self._bind([m.group(1)], m.group(2), lineno, True); return
+        conditional = CONDITION.match(text)
+        if conditional:
+            text = text[conditional.end():]   # `if (c) x = input;` / `else x = "";`: a branch adds taint, never clears it
+        m = COLLECT.match(text)
+        if m and self.taint_of(m.group(2))[0]:
+            source, _ = self.taint_of(m.group(2))
+            self.tainted[m.group(1)] = _Taint(f"{m.group(1)} holds {source} (line {lineno})", self.declared.get(m.group(1), self.depth), True)
             return
-        self._bind(_names_of(m.group(1)) if m.group(1) else [m.group(2)], m.group(3), lineno)
+        m = self.rules.assign.match(text)
+        if m:
+            declared, names, expr = self.rules.parse_assign(m)
+            self._bind(names, expr, lineno, declared, keep=bool(conditional))
 
-    def _bind(self, names: list, expr: str, lineno: int):
+    def _bind(self, names: list, expr: str, lineno: int, declared: bool, keep: bool = False):
+        """Taint the names from the expression; a reassignment keeps the depth the variable was declared at, so
+        `String p = ""; if (c) { p = request.getParameter(x); }` stays tainted after the block closes; `keep` (a
+        conditional assignment) never clears what another branch may have tainted."""
         source, assembled = self.taint_of(expr)
         for name in names:
+            if declared:
+                self.declared[name] = self.depth
+            depth = self.declared.get(name, self.depth)
             if source:
-                self.tainted[name] = _Taint(f"{name} = ... from {source} (line {lineno})", self.depth, assembled)
-            else:
+                self.tainted[name] = _Taint(f"{name} = ... from {source} (line {lineno})", depth, assembled)
+            elif not keep:
                 self.tainted.pop(name, None)
+            for rx, rule, methods in self.rules.aliases:
+                if rx.search(expr):
+                    self.alias[name] = (rule, methods, depth)
 
     def _sinks(self, text: str, raw: str, lineno: int):
         for head, vul, cwe, kind, which in self.rules.sinks:
@@ -165,6 +196,9 @@ class _Walk:
                 self._report(text[m.end():], (vul, cwe, kind), raw, lineno + text.count("\n", 0, m.start()), text[m.start():m.end()].strip())
         for m in (self.rules.jsx_sink.finditer(text) if self.rules.jsx_sink else []):
             self._report(m.group(1), ("VUL-WEB-001", "CWE-79", "HTML sink"), raw, lineno + text.count("\n", 0, m.start()), "dangerouslySetInnerHTML")
+        for name, (rule, methods, _depth) in self.alias.items():
+            for m in re.finditer(rf"\b{re.escape(name)}\.(?:{methods})\(", text):
+                self._check_call(text, m, rule, raw, lineno)
 
     def _check_call(self, text: str, m, rule: tuple, raw: str, lineno: int):
         vul, cwe, kind, which = rule
@@ -173,7 +207,7 @@ class _Walk:
             return
         if which == "string" and re.match(r"^(?:\(|function\b|async\b|[\w$]+\s*=>)", args[0]):
             return
-        expr = " , ".join(args) if which in ("any", "shell") else args[0]
+        expr = " , ".join(args) if which in ("any", "shell", "assembled") else args[0]   # an assembled string may be any argument (`search(base, filter)`)
         source, assembled = self.taint_of(expr)
         if source and (which != "assembled" or assembled):
             at = lineno + text.count("\n", 0, m.start())
@@ -213,6 +247,8 @@ class _Walk:
         stripped = re.sub(r"`[^`]*`|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", "", text)
         self.depth += stripped.count("{") - stripped.count("}")
         self.tainted = {k: v for k, v in self.tainted.items() if v.depth <= self.depth}
+        self.declared = {k: d for k, d in self.declared.items() if d <= self.depth}
+        self.alias = {k: v for k, v in self.alias.items() if v[2] <= self.depth}
 
 
 JS_RULES = Rules(dict(sources=SOURCES, sinks=SINKS, assign_sinks=ASSIGN_SINKS, assign=ASSIGN, loop=LOOP, sanitised=SANITISED, jsx_sink=JSX_SINK))

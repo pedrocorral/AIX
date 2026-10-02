@@ -38,8 +38,8 @@ its own HOME, no prompts, the real launcher as a subprocess. Details: `tests/REA
 | `test_hygiene.py` | leftovers, swallowed exceptions and known bugs found, the legitimate shapes left alone, in four languages |
 | `test_ideal.py` | B built from A with known answers; the distance and its edits in the report and the gate |
 | `test_funcgraph.py` | function-level graphs for JS/TS, Rust and Java with known answers |
-| `benchmark/engines.py`, `benchmark/report.py` | not in the suite: the benchmark of the code tools against external engines on the extended projects (`docs/tests/benchmark-engines.md`); needs the engines on disk and the network |
-| `test_extended.py` | the code tools on twelve real projects from a cache outside the repo (`aix self-test --extended`): no crash, time limits, recorded numbers, documented vulnerabilities found |
+| `benchmark/engines.py`, `benchmark/report.py`, `benchmark/owasp.py` | not in the suite: the benchmark of the code tools against external engines on the extended projects (`docs/tests/benchmark-engines.md`); needs the engines on disk and the network |
+| `test_extended.py` | the code tools on fifteen real projects from a cache outside the repo (`aix self-test --extended`): no crash, time limits, recorded numbers, documented vulnerabilities found |
 
 Not covered: planted findings for `code security|vulnerabilities|dead|clones`; `aix task`; the docs gates; always-on
 wiring; the person layer; macOS and Windows (never run); the agents actually reading the files.

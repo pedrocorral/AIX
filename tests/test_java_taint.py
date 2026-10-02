@@ -75,6 +75,37 @@ public class OrderService {
   }
 }
 """,
+    "src/main/java/com/a/Flows.java": """package com.a;
+public class Flows extends HttpServlet {
+  public void doPost(HttpServletRequest request, HttpServletResponse response) {
+    String param = "";
+    if (request.getHeader("X-Name") != null) {
+      param = request.getHeader("X-Name");
+    }
+    java.io.PrintWriter out = response.getWriter();
+    out.println(param);
+    String bar;
+    if (param.length() > 3) bar = param;
+    else bar = "constant";
+    java.util.List<String> argList = new java.util.ArrayList<String>();
+    argList.add("ls");
+    argList.add(bar);
+    java.lang.ProcessBuilder pb = new java.lang.ProcessBuilder(argList);
+    String fileName = "";
+    fileName += param;
+    java.io.FileInputStream fis = new java.io.FileInputStream(new java.io.File(fileName));
+    javax.servlet.http.HttpSession session = request.getSession();
+    session.setAttribute("name", param);
+    String filter = "(uid=" + param + ")";
+    ctx.search("ou=people", filter, sc);
+    String expr = "/users/user[@name='" + param + "']";
+    xp.evaluate(expr, doc);
+    java.util.Random r = new java.util.Random();
+    javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("DES/CBC/PKCS5PADDING");
+    cookie.setSecure(false);
+  }
+}
+""",
     "src/test/java/com/a/SqlLessonTest.java": """package com.a;
 public class SqlLessonTest {
   void t(@RequestParam String x) { statement.executeQuery("SELECT " + x); }
@@ -108,6 +139,17 @@ class JavaTaint(unittest.TestCase):
         walked once; `count(q)` has one argument and `count(String, int)` two, so it is not followed."""
         self.assertEqual(self.hits("OrderService.java"), [(4, "SQL statement")], self.out)
         self.assertRegex(self.out, r"OrderService\.java:4 .*\n.*argument of search in src/main/java/com/a/OrderService\.java: q: @RequestParam")
+
+    def test_flows_the_benchmark_uses(self):
+        """A reassignment inside a block keeps the taint after it; a one-line `if` or `else` branch adds taint and
+        never clears it; a tainted collection taints the ProcessBuilder it feeds; `+=` assembles; a writer variable
+        and a session variable are sinks; qualified names; LDAP and XPath filters; `.exec` on a Runtime variable."""
+        self.assertEqual(self.hits("Flows.java"), [(9, "HTML response"), (16, "shell command"), (19, "file path"), (21, "session attribute"), (23, "LDAP query"), (25, "XPath query")], self.out)
+
+    def test_java_rules_from_the_benchmark(self):
+        out = project_cmd(self.project, self.home, "code", "security", "src/main").stdout
+        for title in ("non-cryptographic randomness", "weak or ECB cipher", "cookie marked not secure"):
+            self.assertRegex(out, rf"Flows\.java:\d+  {title}", out)
 
     def test_tests_listed_not_gated_and_gate(self):
         self.assertRegex(self.out, r"SqlLessonTest\.java:3 .*\[test\]")

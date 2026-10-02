@@ -1,4 +1,12 @@
 {
+ "BenchmarkJava": {
+  "clones": 469,
+  "dead": 12,
+  "graph": 23,
+  "security": 937,
+  "style": 7533,
+  "vulnerabilities": 1644
+ },
  "NodeGoat": {
   "clones": 0,
   "dead": 6,
@@ -11,9 +19,9 @@
   "clones": 44,
   "dead": 30,
   "graph": 820,
-  "security": 96,
-  "style": 1265,
-  "vulnerabilities": 16
+  "security": 103,
+  "style": 1318,
+  "vulnerabilities": 20
  },
  "bat": {
   "clones": 43,
@@ -24,11 +32,11 @@
   "vulnerabilities": 0
  },
  "commons-lang": {
-  "clones": 474,
+  "clones": 475,
   "dead": 18,
   "graph": 1263,
-  "security": 6,
-  "style": 9339,
+  "security": 7,
+  "style": 9292,
   "vulnerabilities": 0
  },
  "excalidraw": {
@@ -45,7 +53,7 @@
   "graph": 161,
   "security": 23,
   "style": 144,
-  "vulnerabilities": 24
+  "vulnerabilities": 25
  },
  "flask": {
   "clones": 26,
@@ -54,6 +62,22 @@
   "security": 17,
   "style": 836,
   "vulnerabilities": 2
+ },
+ "jhipster-sample-app": {
+  "clones": 44,
+  "dead": 117,
+  "graph": 599,
+  "security": 13,
+  "style": 1175,
+  "vulnerabilities": 0
+ },
+ "jhipster-sample-app-gradle": {
+  "clones": 42,
+  "dead": 119,
+  "graph": 596,
+  "security": 15,
+  "style": 1154,
+  "vulnerabilities": 0
  },
  "juice-shop": {
   "clones": 30,
@@ -92,7 +116,7 @@
   "dead": 5,
   "graph": 91,
   "security": 19,
-  "style": 174,
+  "style": 183,
   "vulnerabilities": 0
  }
 }

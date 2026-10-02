@@ -8,7 +8,7 @@ from pathlib import Path
 from codefiles import ROOT
 import cvss
 import depsdev
-from manifests import lockfile_dependencies, pinned_requirements, poms
+from manifests import lockfile_dependencies, pinned_requirements, poms, read_gradle
 
 BATCH = 1000   # OSV's querybatch limit
 OSV_CACHE = Path(os.environ.get("AIX_CACHE") or (Path.home() / ".cache" / "aix")) / "osv"
@@ -35,10 +35,11 @@ class _Declared:
 
 
 def _pom_direct(root: Path, stats: dict) -> list:
-    """The direct Maven dependencies of every pom.xml with a version, managed ones resolved through the parent;
-    each carries the pom's managed versions (its own and the inherited ones), which override transitives."""
+    """The direct Maven dependencies of every pom.xml and Gradle build with a version, managed ones resolved through
+    the parent (a Gradle build's parent is the Spring Boot BOM its plugin brings); each carries the managed versions,
+    which override transitives."""
     out, parents = [], {}
-    for file, deps, own, parent in poms(root):
+    for file, deps, own, parent in poms(root) + read_gradle(root):
         stats["manifests"].add(file)
         if parent and parent not in parents:
             parents[parent] = depsdev.managed(*parent)

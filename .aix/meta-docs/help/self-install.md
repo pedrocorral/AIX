@@ -17,9 +17,10 @@ Then: open a new terminal (or export PATH as printed) and `aix install --into <p
 aix self-update pulls the clone (git, fast-forward only) and reminds you to `aix upgrade` each project.
 aix self-test runs the kit's own suite (tests/, stdlib unittest, temporary folders only): all files, or the named
 ones (agents = tests/test_agents.py); --network adds the two registry downloads; -q hides the per-test lines.
---extended runs every code tool on twelve real projects (Flask, requests, Express, Excalidraw, Spring PetClinic,
-commons-lang, ripgrep, bat, and the vulnerable-by-design NodeGoat, PyGoat, WebGoat, Juice Shop), cloned shallow at
-a pinned commit into ~/.cache/aix/extended/ on the first run (about 200 MB, network) and never into the repository.
+--extended runs every code tool on fifteen real projects (Flask, requests, Express, Excalidraw, Spring PetClinic,
+commons-lang, ripgrep, bat, the JHipster sample application and its Gradle variant, the vulnerable-by-design
+NodeGoat, PyGoat, WebGoat, Juice Shop and the OWASP Benchmark), cloned shallow at a pinned commit into
+~/.cache/aix/extended/ on the first run (about 450 MB, network) and never into the repository.
 It checks: no crash, each tool under 120 s, every recorded number within 10 % of tests/extended/expected.json, and
 every documented vulnerability of tests/extended/known.json found. --record accepts the current numbers after you
 reviewed the change. Run it before a release and after touching a code tool; delete the cache to re-clone.

@@ -14,19 +14,31 @@ from securityrules import SKIP_FILE, MARKER_LINES
 SOURCES = re.compile(r"\b(?:request|req|httpRequest|servletRequest)\.(?:getParameter(?:Values|Map|Names)?|getHeader(?:s|Names)?|getQueryString|getCookies|getInputStream|getReader|getRequestUR[IL]|getPathInfo|getPart)\("
                      r"|\bgetParameter\(|\bgetHeader\(")
 BINDING = re.compile(r"@(?:RequestParam|PathVariable|RequestBody|RequestHeader|CookieValue|ModelAttribute|MatrixVariable|RequestPart|FormParam|QueryParam|PathParam|HeaderParam)\b")
+Q = r"(?:[\w$]+\.)*"   # a fully qualified name: `new java.io.File(`, `javax.crypto.Cipher.getInstance(`
 SINKS = [  # (call head, VUL row, CWE, kind, which argument is dangerous)
-    (r"\.(?:executeQuery|executeUpdate|execute|executeLargeUpdate|prepareStatement|prepareCall|createQuery|createNativeQuery|createSQLQuery|queryForList|queryForObject|queryForMap|update|batchUpdate)\(", "VUL-INJ-001", "CWE-89", "SQL statement", "assembled"),
-    (r"\bRuntime\.getRuntime\(\)\.exec\(|\bnew\s+ProcessBuilder\(", "VUL-INJ-002", "CWE-78", "shell command", "any"),
-    (r"\bnew\s+(?:File|FileInputStream|FileOutputStream|FileReader|FileWriter|RandomAccessFile)\(|\bPaths\.get\(|\bPath\.of\(|\bFiles\.(?:read\w*|write\w*|newInputStream|newOutputStream|delete\w*|copy|move|lines|exists)\(", "VUL-INJ-002", "CWE-22", "file path", "any"),   # `new File(dir, name)`: the name is the second argument
-    (r"\.sendRedirect\(|\bnew\s+RedirectView\(", "VUL-WEB-003", "CWE-601", "redirect target", "first"),
-    (r"\bnew\s+ObjectInputStream\(|\bXMLDecoder\(|\.readObject\(|\bXStream\(\)\.fromXML\(", "VUL-INPUT-002", "CWE-502", "deserialisation", "any"),
-    (r"\bClass\.forName\(|\.loadClass\(", "VUL-INJ-002", "CWE-470", "class loading", "first"),
-    (r"\bnew\s+URL\(|\.openConnection\(|\bHttpRequest\.newBuilder\(|\bRestTemplate\(\)\.\w+\(|\brestTemplate\.(?:getForObject|getForEntity|exchange|postForObject)\(", "VUL-INPUT-001", "CWE-918", "outbound request URL", "first"),   # a URI object alone requests nothing
-    (r"\.getWriter\(\)\.(?:print|println|write|append)\(|\.getOutputStream\(\)\.(?:print|println|write)\(", "VUL-WEB-001", "CWE-79", "HTML response", "any"),
-    (r"\.eval\(|\bScriptEngine\b[^;]*\.eval\(|\bnew\s+SpelExpressionParser\(\)\.parseExpression\(|\.parseExpression\(", "VUL-INJ-002", "CWE-95", "eval", "any"),
+    (r"\.(?:executeQuery|executeUpdate|execute|executeLargeUpdate|prepareStatement|prepareCall|createQuery|createNativeQuery|createSQLQuery|queryForList|queryForObject|queryForMap|update|batchUpdate|addBatch|nativeQuery)\(", "VUL-INJ-001", "CWE-89", "SQL statement", "assembled"),
+    (rf"\b{Q}Runtime\.getRuntime\(\)\.exec\(|\b[\w$]+\.exec\(|\bnew\s+{Q}ProcessBuilder\(|\.command\(", "VUL-INJ-002", "CWE-78", "shell command", "any"),
+    (rf"\bnew\s+{Q}(?:File|FileInputStream|FileOutputStream|FileReader|FileWriter|RandomAccessFile|PrintWriter|FileSystemResource)\(|\b{Q}Paths\.get\(|\b{Q}Path\.of\(|\b{Q}Files\.(?:read\w*|write\w*|newInputStream|newOutputStream|newBufferedReader|newBufferedWriter|delete\w*|copy|move|lines|exists|createFile|createDirectory)\(", "VUL-INJ-002", "CWE-22", "file path", "any"),   # `new File(dir, name)`: the name is the second argument
+    (r"\.sendRedirect\(|\bnew\s+(?:[\w$]+\.)*RedirectView\(", "VUL-WEB-003", "CWE-601", "redirect target", "first"),
+    (rf"\bnew\s+{Q}ObjectInputStream\(|\bnew\s+{Q}XMLDecoder\(|\.readObject\(|\bXStream\(\)\.fromXML\(", "VUL-INPUT-002", "CWE-502", "deserialisation", "any"),
+    (rf"\b{Q}Class\.forName\(|\.loadClass\(", "VUL-INJ-002", "CWE-470", "class loading", "first"),
+    (rf"\bnew\s+{Q}URL\(|\.openConnection\(|\b{Q}HttpRequest\.newBuilder\(|\bRestTemplate\(\)\.\w+\(|\brestTemplate\.(?:getForObject|getForEntity|exchange|postForObject)\(", "VUL-INPUT-001", "CWE-918", "outbound request URL", "first"),   # a URI object alone requests nothing
+    (r"\.getWriter\(\)\.(?:print|println|printf|format|write|append)\(|\.getOutputStream\(\)\.(?:print|println|write)\(", "VUL-WEB-001", "CWE-79", "HTML response", "any"),
+    (rf"\.eval\(|\bScriptEngine\b[^;]*\.eval\(|\bnew\s+{Q}SpelExpressionParser\(\)\.parseExpression\(|\.parseExpression\(", "VUL-INJ-002", "CWE-95", "eval", "any"),
+    (r"(?:\.getSession\(\)|\bsession)\.setAttribute\(", "VUL-INPUT-001", "CWE-501", "session attribute", "any"),   # trust boundary: input stored as if trusted
+    (r"\.search\(", "VUL-INJ-001", "CWE-90", "LDAP query", "assembled"),
+    (r"\b\w*[xX][pP]ath\w*\.(?:evaluate|compile)\(|\bxp\.(?:evaluate|compile)\(", "VUL-INJ-001", "CWE-643", "XPath query", "assembled"),
 ]
+WRITER = re.compile(r"\.getWriter\(\)|\.getOutputStream\(\)|\bnew\s+(?:[\w$]+\.)*PrintWriter\(\s*response")   # a variable holding the response writer
+SESSION = re.compile(r"\.getSession\(")   # a variable holding the session
 ASSIGN_SINKS = []
-ASSIGN = re.compile(r"^\s*(?:final\s+)?(?:[\w.$]+(?:<[^=]*?>)?(?:\[\])*\s+)?([\w$]+)\s*(\+?=)(?!=)\s*(.+?);?\s*$", re.S)   # `String q = ...;`, `q = ...;`, `q += ...;`
+ASSIGN = re.compile(r"^\s*(?:final\s+)?((?:[\w.$]+(?:<[^=]*?>)?(?:\[\])*\s+))?([\w$]+)\s*(\+?=)(?!=)\s*(.+?);?\s*$", re.S)   # `String q = ...;`, `q = ...;`, `q += ...;`
+
+
+def parse_assign(m) -> tuple:
+    """(declared, names, expr): `String q = x` declares; `q += x` is `q + (x)`, assembled and never a declaration."""
+    name, op, expr = m.group(2), m.group(3), m.group(4)
+    return bool(m.group(1)), [name], (f"{name} + ({expr})" if op == "+=" else expr)
 LOOP = re.compile(r"\bfor\s*\(\s*(?:final\s+)?[\w.<>\[\]$]+\s+([\w$]+)\s*:\s*(.+?)\)")
 SANITISED = re.compile(r"\b(?:Integer|Long|Short|Byte|Double|Float)\.(?:parseInt|parseLong|parseShort|parseByte|parseDouble|parseFloat|valueOf)\((?:[^()]|\([^()]*\))*\)"
                        r"|\bBoolean\.parseBoolean\((?:[^()]|\([^()]*\))*\)|\bUUID\.fromString\((?:[^()]|\([^()]*\))*\)"
@@ -81,7 +93,10 @@ def head_sources(text: str) -> dict:
     return out
 
 
-JAVA_RULES = Rules(dict(sources=SOURCES, sinks=SINKS, assign_sinks=ASSIGN_SINKS, assign=ASSIGN, loop=LOOP, sanitised=SANITISED, head_sources=head_sources, assembled=_assembled))
+JAVA_RULES = Rules(dict(sources=SOURCES, sinks=SINKS, assign_sinks=ASSIGN_SINKS, assign=ASSIGN, loop=LOOP, sanitised=SANITISED, head_sources=head_sources,
+                        assembled=_assembled, parse_assign=parse_assign,
+                        aliases=[(WRITER, ("VUL-WEB-001", "CWE-79", "HTML response", "any"), "print|println|printf|format|write|append"),
+                                 (SESSION, ("VUL-INPUT-001", "CWE-501", "session attribute", "any"), "setAttribute|putValue")]))
 
 
 def _methods(text: str, lines: list) -> dict:
