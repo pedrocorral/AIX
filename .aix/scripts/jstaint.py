@@ -111,6 +111,7 @@ class _Walk:
     def __init__(self, file: Path, lines: list, funcs: dict, findings: list, rules=None):
         self.file, self.lines, self.funcs, self.findings = file, lines, funcs, findings
         self.rules, self.follow = rules or JS_RULES, True   # follow: walk a local function called with tainted arguments (once)
+        self.index = {}   # (name, arity) -> [(file, lines, params, statements)] in other files: the cross-file step (javataint)
         self.tainted, self.depth = {}, 0
 
     def run(self, statements: list, initial: dict = None):
@@ -184,15 +185,29 @@ class _Walk:
         if source:
             self.findings.append((vul, cwe, f"input reaches {kind}", rel(self.file), lineno, f"{what} <- {source}", ADVICE[cwe], _accepted(raw)))
 
+    def _passed(self, name: str, params: list, text: str, end: int) -> dict:
+        """The callee's parameters that receive a tainted argument, with where the taint came from."""
+        return {p: f"argument of {name}: {self.taint_of(a)[0]}" for p, a in zip(params, _args_of(text, end)) if self.taint_of(a)[0]}
+
+    def _walk_callee(self, file: Path, lines: list, statements: list, passed: dict):
+        inner = _Walk(file, lines, self.funcs if file == self.file else {}, self.findings, rules=self.rules)
+        inner.follow = False
+        inner.run(statements, passed)
+
     def _calls(self, text: str):
-        """A local function called with a tainted argument is walked once with that parameter tainted."""
+        """A function called with a tainted argument is walked once with that parameter tainted: one of this file
+        (self.funcs), or one of another file by name and arity (self.index, Java), one level deep."""
         for name, (params, statements) in self.funcs.items():
             for m in re.finditer(rf"(?<![\w$.]){re.escape(name)}\(", text):
-                passed = {p: f"argument of {name}: {self.taint_of(a)[0]}" for p, a in zip(params, _args_of(text, m.end())) if self.taint_of(a)[0]}
+                passed = self._passed(name, params, text, m.end())
                 if passed:
-                    inner = _Walk(self.file, self.lines, self.funcs, self.findings, rules=self.rules)
-                    inner.follow = False
-                    inner.run(statements, passed)
+                    self._walk_callee(self.file, self.lines, statements, passed)
+        for m in re.finditer(r"(?<![\w$])([\w$]+)\(", text):
+            args = _args_of(text, m.end())
+            for file, lines, params, statements in self.index.get((m.group(1), len(args)), [])[:3]:
+                passed = self._passed(f"{m.group(1)} in {rel(file)}", params, text, m.end())
+                if passed and file != self.file:
+                    self._walk_callee(file, lines, statements, passed)
 
     def _leave_scope(self, text: str):
         stripped = re.sub(r"`[^`]*`|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", "", text)

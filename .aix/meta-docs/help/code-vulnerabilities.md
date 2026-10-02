@@ -61,8 +61,10 @@ assembled string, `createQuery`, `createNativeQuery`, JdbcTemplate `query*`/`upd
 `ObjectInputStream`/`XMLDecoder`/`readObject`, `Class.forName`, `new URL`/`openConnection`/RestTemplate/HttpClient,
 `getWriter().print*`, `ScriptEngine.eval`/SpEL. Sanitisers clear it: `Integer.parseInt` and the other parsers,
 `UUID.fromString`, `URLEncoder.encode`, `HtmlUtils`, `StringEscapeUtils`, OWASP `Encode`, `ESAPI.encoder()`, Jsoup,
-`FilenameUtils`, `.matches(...)`, `.normalize()`. Not seen: a value reaching a method in another file (a servlet base
-class), filters and validators, the type system.
+`FilenameUtils`, `.matches(...)`, `.normalize()`. A call into a method of another file under the same paths is
+followed one level too, the callee found by name and arity (a controller's parameter into a service's SQL; no types,
+so a method of the same name and arity elsewhere is walked as well, and only shows when it holds a sink). Not seen:
+two levels of calls, filters and validators, the type system.
 
 Every finding names the VUL row and the CWE. Test code is listed, not gated (--strict gates it). A taint sink reviewed
 and accepted carries `# aix: accepted VUL-… <why>` on its line, as for aix code security: listed with the reason, never gated.

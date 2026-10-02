@@ -51,6 +51,30 @@ public class Servlet extends HttpServlet {
   public static void main(String[] args) { }
 }
 """,
+    "src/main/java/com/a/OrderController.java": """package com.a;
+@RestController
+public class OrderController {
+  private final OrderService service = null;
+  @GetMapping("/orders")
+  public String find(@RequestParam("q") String q, @RequestParam int page) {
+    String safe = Integer.toString(page);
+    service.search(q, page);
+    service.search(safe, page);
+    service.count(q);
+    return "";
+  }
+}
+""",
+    "src/main/java/com/a/OrderService.java": """package com.a;
+public class OrderService {
+  public List<Order> search(String term, int page) {
+    return jdbc.queryForList("SELECT * FROM orders WHERE name = '" + term + "' LIMIT " + page);
+  }
+  public int count(String term, int extra) {
+    return jdbc.queryForObject("SELECT count(*) FROM orders WHERE name = '" + term + "'", Integer.class);
+  }
+}
+""",
     "src/test/java/com/a/SqlLessonTest.java": """package com.a;
 public class SqlLessonTest {
   void t(@RequestParam String x) { statement.executeQuery("SELECT " + x); }
@@ -78,6 +102,12 @@ class JavaTaint(unittest.TestCase):
     def test_servlet_sinks(self):
         self.assertEqual(self.hits("Servlet.java"), [(5, "shell command"), (7, "file path"), (8, "redirect target"), (11, "HTML response"), (13, "outbound request URL"), (14, "deserialisation")], self.out)
         self.assertRegex(self.out, r"Servlet\.java:14 .*\[accepted: demo of the lesson\]")
+
+    def test_across_files_by_name_and_arity(self):
+        """A controller's parameter reaches a service's SQL in another file: the callee is found by name and arity and
+        walked once; `count(q)` has one argument and `count(String, int)` two, so it is not followed."""
+        self.assertEqual(self.hits("OrderService.java"), [(4, "SQL statement")], self.out)
+        self.assertRegex(self.out, r"OrderService\.java:4 .*\n.*argument of search in src/main/java/com/a/OrderService\.java: q: @RequestParam")
 
     def test_tests_listed_not_gated_and_gate(self):
         self.assertRegex(self.out, r"SqlLessonTest\.java:3 .*\[test\]")

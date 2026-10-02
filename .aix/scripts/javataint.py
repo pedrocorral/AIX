@@ -32,7 +32,7 @@ SANITISED = re.compile(r"\b(?:Integer|Long|Short|Byte|Double|Float)\.(?:parseInt
                        r"|\bBoolean\.parseBoolean\((?:[^()]|\([^()]*\))*\)|\bUUID\.fromString\((?:[^()]|\([^()]*\))*\)"
                        r"|\b(?:URLEncoder|HtmlUtils|StringEscapeUtils|Encode|ESAPI\.encoder\(\)|Jsoup|FilenameUtils)\.\w+\((?:[^()]|\([^()]*\))*\)"
                        r"|\.(?:matches|normalize|getFileName)\((?:[^()]|\([^()]*\))*\)")
-METHOD = re.compile(r"(?:^|\n)[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w.$<>\[\], ?]+?\s+([\w$]+)\s*\(([^)]*)\)\s*(?:throws\s+[\w.,\s]+)?\s*\{")
+METHOD = re.compile(r"(?:^|\n)[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w.$<>\[\], ?]+?\s+([\w$]+)\s*\(((?:[^()]|\([^()]*\))*)\)\s*(?:throws\s+[\w.,\s]+)?\s*\{")   # a parameter may carry `@RequestParam("x")`
 JAVA_EXT = (".java",)
 
 
@@ -91,22 +91,47 @@ def _methods(text: str, lines: list) -> dict:
             if m.group(1) not in ("if", "for", "while", "switch", "catch", "synchronized", "return", "new")}
 
 
-def taint_file(file: Path, findings: list):
+def _load(file: Path):
+    """(text, lines) of a Java file, or None when a marker skips it."""
     text = file.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
-    if any(SKIP_FILE.search(l) for l in lines[:MARKER_LINES]):
+    return None if any(SKIP_FILE.search(l) for l in lines[:MARKER_LINES]) else (text, lines)
+
+
+def method_index(files: dict) -> dict:
+    """(name, arity) -> [(file, lines, params, statements)] over every file: how a call reaches a method of another
+    file (a controller's parameter into a service's SQL). By name and arity, no types: a false join still needs a
+    sink in the callee to show."""
+    index = {}
+    for file, (text, lines) in files.items():
+        for name, (params, statements) in _methods(text, lines).items():
+            index.setdefault((name, len(params)), []).append((file, lines, params, statements))
+    return index
+
+
+def taint_file(file: Path, findings: list, index: dict = None):
+    loaded = _load(file)
+    if loaded is None:
         return
-    _Walk(file, lines, _methods(text, lines), findings, rules=JAVA_RULES).run(java_statements(lines))
+    text, lines = loaded
+    walk = _Walk(file, lines, _methods(text, lines), findings, rules=JAVA_RULES)
+    walk.index = index or {}
+    walk.run(java_statements(lines))
 
 
 def taint(paths) -> list:
-    """Findings for every Java file under `paths`, deduplicated by (row, file, line)."""
-    findings = []
+    """Findings for every Java file under `paths`, deduplicated by (row, file, line); calls into other files of the
+    same paths are followed one level deep."""
+    files = {}
     for p in paths:
         base = (ROOT / p) if not Path(p).is_absolute() else Path(p)
         for f in ([base] if base.is_file() else source_files([str(base)])):
-            if f.suffix in JAVA_EXT:
-                taint_file(f, findings)
+            if f.suffix in JAVA_EXT and _load(f) is not None:
+                files[f] = _load(f)
+    index = method_index(files)
+    findings = []
+    for f in files:
+        taint_file(f, findings, index)
     seen, out = set(), []
     for fx in findings:
         if (fx[0], fx[3], fx[4]) not in seen:
