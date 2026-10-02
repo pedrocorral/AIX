@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.32 — 2026-10-02
+
+- Spring Security and Java platform rules in `aix code security`: CSRF disabled in its three syntaxes (CWE-352), security headers disabled (CWE-693), CORS open to every origin (CWE-942), `anyRequest().permitAll()` (CWE-285), `httpBasic(` in a filter chain whose method never calls `requiresSecure()` (CWE-319), an XML parser factory created in a method that never disables external entities (CWE-611, at the factory line), `spring.h2.console.enabled=true` and `server.error.include-stacktrace=always` (CWE-489), a literal signing key in `signWith` / `setSigningKey` / `hmacShaKeyFor` / `SecretKeySpec` (CWE-798), a trust-all manager or hostname verifier (CWE-295). No semgrep pack reports these categories on the fifteen extended projects, so section 12 of `docs/tests/benchmark-engines.md` lists every finding on WebGoat, PetClinic and the two JHipster apps read by hand; `tests/test_spring.py` plants each shape next to its correct counterpart.
+- A file under Maven's `src/it/` (integration tests) is a test file for the security report, like `src/test/`.
+
 ## 2.21.31 — 2026-10-02
 
 - Dead modules on an Angular + Spring application (JHipster sample, 117 reported, 2 now, both read): a dotted module name (`import './activate.service'`) was resolved by replacing its "extension", so it pointed at `activate.ts` and the service, model, route and constants files of the whole frontend went unreached (`depedges._resolve_js`); a side-effect import (`import './config/dayjs';`) was not an import. Live by convention since: `package-info.java`, a Spring Data `XImpl` next to its interface `X`, a `SpringBootServletInitializer` subclass, Angular `environment.*.ts`.

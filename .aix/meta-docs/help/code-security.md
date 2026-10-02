@@ -32,6 +32,16 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   without `integrity=` (CWE-353); Spring `management.endpoints.web.exposure.include=*` (CWE-16) and a method-level
   `@RequestMapping` without `method =` (CWE-352); `postMessage(x, "*")` (CWE-345).
 
+  Spring Security and the Java platform (2.21.32): `csrf().disable()` in its three syntaxes (CWE-352) and
+  `headers().disable()` (CWE-693); `@CrossOrigin` with no origin or `"*"`, `allowedOrigins("*")`, `addAllowedOrigin("*")`
+  (CWE-942); `anyRequest().permitAll()` (CWE-285); `httpBasic(` in a filter chain whose method never calls
+  `requiresSecure()` (CWE-319); a `DocumentBuilderFactory` / `SAXParserFactory` / `XMLInputFactory` / `TransformerFactory`
+  created in a method that never sets `disallow-doctype-decl`, `ACCESS_EXTERNAL_DTD` or the external-entities feature
+  (CWE-611, reported at the factory line); `spring.h2.console.enabled=true`, `server.error.include-stacktrace=always`
+  (CWE-489) in properties and YAML; a string literal of 8+ characters as the key of `signWith`, `setSigningKey`,
+  `Keys.hmacShaKeyFor`, `new SecretKeySpec` (CWE-798); an empty `checkServerTrusted`, `getAcceptedIssuers` returning
+  null, a hostname verifier returning true, `NoopHostnameVerifier`, `TrustAllStrategy` (CWE-295).
+
   Assembled, then used (every language): a variable takes a string built from a literal plus a value (`+`, f-string,
   .format, template literal, String.format, format!, %) and, within the next 40 lines, is the argument of a dangerous
   call. What the literal looks like picks the sinks: an SQL keyword -> query/execute (CWE-89); a path or path.join ->

@@ -219,8 +219,60 @@ def _annotates_a_class(lines: list, i: int) -> bool:
     return False
 
 
+XML_FACTORY = re.compile(r"\b(DocumentBuilderFactory|SAXParserFactory|XMLInputFactory|TransformerFactory|SchemaFactory|XMLReaderFactory|SAXReader|SAXBuilder|XMLReader)\b[^;]*\b(?:newInstance|newDefaultInstance|createXMLReader|newFactory)\s*\(|\bnew\s+(?:SAXReader|SAXBuilder)\s*\(")
+XML_HARDENED = re.compile(r"disallow-doctype-decl|ACCESS_EXTERNAL_DTD|ACCESS_EXTERNAL_SCHEMA|FEATURE_SECURE_PROCESSING|external-general-entities|external-parameter-entities|SUPPORT_DTD|IS_SUPPORTING_EXTERNAL_ENTITIES|setExpandEntityReferences\(\s*false|setXIncludeAware\(\s*false")
+XXE_RULE = ("VUL-INPUT-001", "CWE-611", "XML parser without external entities disabled (XXE)", "set disallow-doctype-decl true (or ACCESS_EXTERNAL_DTD/SCHEMA to \"\") on the factory before parsing")
+BASIC_RULE = ("VUL-SECRET-002", "CWE-319", "HTTP Basic authentication without requiresSecure()", "requiresChannel().anyRequest().requiresSecure(), or TLS at the edge with the reason beside it")
+PERMIT_RULE = ("VUL-WEB-002", "CWE-285", "every request permitted (anyRequest().permitAll())", "authenticated() by default; permitAll() on the public paths only")
+
+
+def _line_of(text: str, pos: int) -> int:
+    return text.count("\n", 0, pos) + 1
+
+
+def _method_bodies(lines: list) -> list:
+    """(start index, end index) of each brace block that opens on a Java method head, for checks scoped to a method."""
+    out, text = [], "\n".join(lines)
+    for m in re.finditer(r"\)\s*(?:throws\s+[\w.,\s]+?)?\s*\{", text):
+        start = text.count("\n", 0, m.end())
+        out.append((start, _block_end(lines, start)))
+    return out
+
+
+def _method_scope(lines: list, i: int) -> tuple:
+    """The method body (start, end) around line index i, or a 30-line window when no method head encloses it."""
+    return next(((a, b) for a, b in _method_bodies(lines) if a <= i <= b), (max(0, i - 30), min(len(lines) - 1, i + 30)))
+
+
+def _unless_in_scope(rule: tuple, trigger, guard, f: Path, lines: list) -> list:
+    """A line matching `trigger` whose enclosing method never matches `guard`: the trigger's line is the finding."""
+    out = []
+    for i, raw in enumerate(lines):
+        if trigger.search(raw):
+            a, b = _method_scope(lines, i)
+            if not guard.search("\n".join(lines[a:b + 1])):
+                out.append(_finding(rule, f, i + 1, raw))
+    return out
+
+
+def _xxe(f: Path, lines: list) -> list:
+    """An XML parser factory created in a method that never hardens one."""
+    return _unless_in_scope(XXE_RULE, XML_FACTORY, XML_HARDENED, f, lines)
+
+
+def _security_config(f: Path, lines: list) -> list:
+    """Spring Security configuration: Basic auth in a filter chain that never enforces TLS, everything permitted."""
+    out = _unless_in_scope(BASIC_RULE, re.compile(r"\.httpBasic\("), re.compile(r"requiresSecure\(\)"), f, lines)
+    text = "\n".join(lines)
+    for m in re.finditer(r"\.anyRequest\(\)\s*\.permitAll\(\)", text):
+        out.append(_finding(PERMIT_RULE, f, _line_of(text, m.start()), m.group(0)))
+    return out
+
+
 def spring(f: Path) -> list:
     out, lines = [], _lines(f)
+    if f.suffix == ".java":
+        out += _xxe(f, lines) + _security_config(f, lines)
     for i, raw in enumerate(lines, 1):
         if f.suffix == ".java" and REQUEST_MAPPING.search(raw) and not re.search(r"\bmethod\s*=", _call_text(lines, i - 1)) and not _annotates_a_class(lines, i - 1):
             out.append(_finding(("VUL-WEB-002", "CWE-352", "@RequestMapping without a method: every verb, CSRF-exposed", "@GetMapping / @PostMapping, or method = RequestMethod.GET"), f, i, raw))

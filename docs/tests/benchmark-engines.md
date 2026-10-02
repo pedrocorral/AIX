@@ -432,6 +432,31 @@ is `p/default` with its CWE metadata. Produced by `tests/benchmark/owasp.py --se
 | crypto | 246 | 130 | 0 | 0 | 116 | 100% | 0% | 100 |
 | weakrand | 493 | 218 | 0 | 0 | 275 | 100% | 0% | 100 |
 
+### 12. Spring Security misconfiguration (2.21.32): ours only, by design
+
+Eight rule rows added for Java web applications: CSRF disabled (CWE-352), security headers disabled (CWE-693), CORS open
+to every origin (CWE-942), everything permitted (CWE-285), Basic authentication without `requiresSecure()` (CWE-319), an
+XML parser factory without external entities disabled in its method (CWE-611), H2 console or stack traces exposed
+(CWE-489), a signing key in the code (CWE-798), a trust-all TLS manager or verifier (CWE-295).
+
+None of semgrep's packs tried in this benchmark (p/default, p/java, p/spring, p/security-audit, p/owasp-top-ten) reports
+a finding of these categories on the fifteen projects, so the reproduction criterion of table 10 has nothing to
+reproduce; the check is reading every finding by hand instead. Non-test findings on the four Spring projects:
+
+| project | findings | read |
+|---|---|---|
+| WebGoat | 5 | `container/WebSecurityConfig.java:86` csrf disabled, `:87` headers disabled, `webwolf/WebSecurityConfig.java:64` csrf disabled, `application-webgoat.properties:1` and `application-webwolf.properties:1` stack traces always: all five are what the line says |
+| jhipster-sample-app | 1 | `config/SecurityConfiguration.java:47` csrf disabled: a stateless JWT API, the case the advice names as the one to document beside the line |
+| jhipster-sample-app-gradle | 0 | session-based, CSRF token repository configured |
+| spring-petclinic | 0 | — |
+| BenchmarkJava (its helpers, not the test cases) | 3 | `helpers/Utils.java:421` `TrustSelfSignedStrategy`, `:425` `NoopHostnameVerifier` on the Benchmark's own HTTP client, `report/sonarqube/SonarReport.java:63` a `DocumentBuilderFactory` parsing `pom.xml` without hardening: all three are what the line says |
+
+Test-file findings (tagged `[test]`): WebGoat's JWT lesson tests sign with literal keys (4 lines, `src/test` and
+`src/it`), both JHipster `WebConfigurerTest.java:76` set `allowedOrigins("*")` in a test. WebGoat's XXE lesson
+(`lessons/xxe/CommentsCache.java:98`) creates an `XMLInputFactory` and sets `ACCESS_EXTERNAL_DTD` in the same
+method under a condition: not reported, as the rule is scoped to the method, and the lesson's vulnerability is the
+branch, which a line rule cannot see.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

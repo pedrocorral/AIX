@@ -28,8 +28,9 @@ from depscan import scan_dependencies, scan_dockerfile
 # ---- scanning -----------------------------------------------------------------------------------------------------
 
 def is_test(p: Path) -> bool:
-    return any(part in ("tests", "test", "__tests__", "fixtures") for part in p.parts) or p.name.startswith("test_") \
-        or ".test." in p.name or ".spec." in p.name
+    parts = p.parts
+    return any(part in ("tests", "test", "__tests__", "fixtures") for part in parts) or ("src", "it") in zip(parts, parts[1:]) \
+        or p.name.startswith("test_") or ".test." in p.name or ".spec." in p.name
 
 
 def is_docs(p: Path) -> bool:
