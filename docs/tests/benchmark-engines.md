@@ -457,6 +457,94 @@ Test-file findings (tagged `[test]`): WebGoat's JWT lesson tests sign with liter
 method under a condition: not reported, as the rule is scoped to the method, and the lesson's vulnerability is the
 branch, which a line rule cannot see.
 
+### 13. Java style: ours vs Checkstyle 14.3.0 and PMD 7.7.0 (same rows, same limits)
+
+`tests/benchmark/javastyle.py` on `src/main/java` of the four Spring projects. Only the rules that measure what
+`aix code style` measures, at the kit's limits (`tests/benchmark/style/checkstyle.xml`, `pmd.xml`); the rest of the two
+catalogues (formatting, naming, Javadoc, braces, import order) is out of scope. A function row matches when both sides
+name the same function; a line row when both name the same line. Ours is the raw metric here, before the gate's
+exemptions. PetClinic is zero on every row for all three tools.
+
+Before the fixes of 2.21.33 (the run that found the three bugs below):
+
+| row | project | ours | Checkstyle | both | PMD | both |
+|---|---|---|---|---|---|---|
+| cognitive > 15 | jhipster-sample-app | 1 | — | — | 0 | 0 |
+| cognitive > 15 | WebGoat | 6 | — | — | 2 | 1 |
+| parameters > 5 | jhipster-sample-app | 0 | 1 | 0 | 0 | 0 |
+| parameters > 5 | jhipster-sample-app-gradle | 0 | 1 | 0 | 0 | 0 |
+| parameters > 5 | WebGoat | 4 | 8 | 4 | 6 | 4 |
+
+After the fixes (2.21.33), every row with a finding:
+
+| row | project | ours | Checkstyle | both | PMD | both |
+|---|---|---|---|---|---|---|
+| lines > 60 | jhipster-sample-app-gradle | 1 | 1 | 1 | 0 | 0 |
+| lines > 60 | WebGoat | 2 | 2 | 2 | 1 | 1 |
+| cyclomatic > 10 | jhipster-sample-app | 1 | 1 | 1 | 1 | 1 |
+| cyclomatic > 10 | jhipster-sample-app-gradle | 1 | 1 | 1 | 1 | 1 |
+| cyclomatic > 10 | WebGoat | 3 | 3 | 3 | 2 | 2 |
+| cognitive > 15 | WebGoat | 2 | — | — | 2 | 2 |
+| nesting > 4 | WebGoat | 2 | 0 | 0 | 0 | 0 |
+| parameters > 5 | jhipster-sample-app | 1 | 1 | 1 | 0 | 0 |
+| parameters > 5 | jhipster-sample-app-gradle | 1 | 1 | 1 | 0 | 0 |
+| parameters > 5 | WebGoat | 12 | 8 | 8 | 6 | 6 |
+| file lines > 400 | WebGoat | 1 | 1 | 1 | — | — |
+| unused import | jhipster-sample-app | 0 | 0 | 0 | 29 | 0 |
+| unused import | jhipster-sample-app-gradle | 0 | 0 | 0 | 31 | 0 |
+| unused import | WebGoat | 0 | 0 | 0 | 2 | 0 |
+| unused variable / parameter / field | WebGoat | 4 | 4 | 4 | 4 | 4 |
+| swallowed exception | WebGoat | 0 | 0 | 0 | 3 | 0 |
+| == on a String | WebGoat | 1 | — | — | 1 | 1 |
+
+| project | functions (ours) | files | ours s | Checkstyle s | PMD s |
+|---|---|---|---|---|---|
+| spring-petclinic | 88 | 30 | 0.1 | 0.7 | 1.3 |
+| jhipster-sample-app | 394 | 81 | 0.2 | 1.0 | 1.7 |
+| jhipster-sample-app-gradle | 400 | 79 | 0.2 | 1.0 | 1.7 |
+| WebGoat | 718 | 257 | 0.4 | 1.4 | 2.2 |
+
+Every mismatch read by hand:
+
+**Bugs in ours, fixed in 2.21.33 (three).**
+
+1. A parameter list that continued on the next line counted 0 parameters: `_params_of` read the head's last line
+   only (`stylemetrics.py`). `BypassRestrictionsFrontendValidation.completed` has 8 parameters, `Vote.Vote`,
+   `SqlInjectionLesson10a.completed`, `CrossSiteScriptingLesson5a.completed` and JHipster's
+   `LiquibaseConfiguration.liquibase` 6, ours said 0 for all five. Heads of that shape in `src/main/java`: PetClinic 0,
+   JHipster 14 and 15, WebGoat 73. Now the head runs from the match to the brace, and generics and annotation
+   arguments are removed before counting commas.
+2. A method head with an annotation between the modifier and the return type, `public @ResponseBody AttackResult
+   resetVotes(`, was not a function for `FUNC_HEAD["java"]` (`clones.py`): absent from style, clones, the call graph
+   and hygiene. `JWTHeaderKIDEndpoint.java` has four methods; ours found the constructor and the anonymous class's
+   `resolveSigningKeyBytes` and missed `follow` and `resetVotes`. Heads of that shape: 1, 1, 1, 12; functions found
+   went from 87/394/400/710 to 88/394/400/718.
+3. Cognitive complexity was above Campbell's definition on three points: `try` added a nesting level (the definition
+   lists `catch`, not `try`); every `&&`/`||` added 1 (the definition adds 1 per sequence of like operators); `else if`
+   added 2 (the definition adds 1). `SqlInjectionLesson10b.completed`: ours 18, PMD 10, hand count by the definition
+   10; now 10. The other four ours-only functions and JHipster's `jwtDecoder` were the same three points; after the
+   fix ours and PMD name the same two functions over 15.
+
+**Definition or convention differences, no change (six).**
+
+4. PMD `UnnecessaryImport`: 62 of 62 PMD-only lines are wildcard imports (`import jakarta.persistence.*;`) whose types
+   the file uses; PMD cannot resolve them without a classpath and reports them as unused.
+5. PMD `EmptyCatchBlock`: 3 of 3 blocks hold a comment (`// don't care`, `// user already exists continue`, `// Do
+   nothing`); ours takes a statement or a comment as intent, by design (help page), and Checkstyle agrees with ours.
+6. PMD `NcssCount` counts statements, not lines: `SecurityConfiguration.filterChain` and
+   `SqlInjectionLesson5b.injectableQuery` are over 60 lines as one or two chained statements. Checkstyle's
+   `MethodLength` agrees with ours on all three.
+7. PMD's cyclomatic counts `&&`/`||` only inside a condition, Checkstyle and ours count each operator:
+   `SqlInjectionLesson10b.completed` 12 on ours and Checkstyle, 7 on PMD. Checkstyle agrees with ours on all five.
+8. Nesting: ours counts every block kind, Checkstyle same-kind nesting only (`NestedIfDepth`), PMD `if` only.
+   `SqlInjectionLesson8.java:85` is an `if` in an `if` in an `if` in a `try` in a try-with-resources: five block
+   levels, three `if`s; `JWTHeaderKIDEndpoint.resetVotes` (found since 2.21.33) is the same shape.
+9. Parameters on WebGoat, 12 on ours against 8 and 6: the four extra are `@Override` methods
+   (`computeTemplateResource` three times, `beforeBodyWrite`), which Checkstyle skips by configuration
+   (`ignoreOverriddenMethods`) and the kit's gate skips as decorated (framework-mapped, no limit); the raw metric
+   counts them. PMD's `ExcessiveParameterList` also leaves out the two `completed` methods with 6 parameters that
+   Checkstyle and ours report; its count is by its own rule, not read further.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
@@ -471,4 +559,8 @@ branch, which a line rule cannot see.
   (cookie-session secrets, which semgrep's express rule does not read).
 - The PMD Java rules were run by hand with `pmd check -R category/java/...` on the three Java projects and read
   against `aix code style --all`; their numbers are in the prose, not in the tables.
+- `tests/benchmark/javastyle.py` prints table 13: ours straight from `stylemetrics` on `src/main/java`, Checkstyle
+  from `BENCH_DIR/checkstyle-all.jar` (the all-in-one jar of a GitHub release) with `tests/benchmark/style/checkstyle.xml`,
+  PMD from `pmd-bin-<version>/` with `tests/benchmark/style/pmd.xml`; both configurations select the rows above at the kit's
+  limits. It writes `~/.cache/aix/benchmark/style-<project>.json` and lists every mismatch for reading by hand.
 - Nothing in `tests/benchmark/` runs in `aix self-test` or the suite; it needs the engines and the network.

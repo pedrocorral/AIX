@@ -34,7 +34,10 @@ line 12 (loop, nesting +2) ...", "nesting 5 at lines 44-52: invert the condition
 "6 parameters: group them into one object".
 
 Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust and Java are measured from
-tokens and braces: close for lines, parameters and nesting, approximate for complexity.
+tokens and braces: lines, parameters (a list over several lines included) and nesting exact; cyclomatic as Checkstyle
+counts it (each branch and each boolean operator); cognitive by Campbell's rules (a branch plus its nesting level,
+`try` is not a level, one per run of like boolean operators, `else if` is one branch), checked against Checkstyle and
+PMD on four Spring projects (docs/tests/benchmark-engines.md, section 13).
 
 Modernise (advice tier, never gated): the report detects the runtime the project targets (pyproject
 requires-python, .python-version, the venv, tsconfig target, engines.node, Cargo.toml, pom/Gradle; the header

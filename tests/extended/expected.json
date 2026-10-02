@@ -16,11 +16,11 @@
   "vulnerabilities": 5
  },
  "WebGoat": {
-  "clones": 44,
+  "clones": 45,
   "dead": 30,
   "graph": 820,
   "security": 108,
-  "style": 1318,
+  "style": 1326,
   "vulnerabilities": 20
  },
  "bat": {
@@ -116,7 +116,7 @@
   "dead": 0,
   "graph": 91,
   "security": 19,
-  "style": 183,
+  "style": 184,
   "vulnerabilities": 0
  }
 }

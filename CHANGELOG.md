@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.33 — 2026-10-02
+
+- Java style measured against Checkstyle 14.3.0 and PMD 7.7.0 on the same rows at the same limits (section 13 of `docs/tests/benchmark-engines.md`, runner `tests/benchmark/javastyle.py`): three bugs in ours, fixed. A parameter list that continued on the next line counted 0 parameters (102 such heads in the four Spring projects); a method head with an annotation before the return type (`public @ResponseBody AttackResult x(`) was not a function for style, clones or the call graph; cognitive complexity was above Campbell's definition: `try` added a nesting level, every `&&`/`||` added 1 instead of one per run of like operators, `else if` added 2 (a WebGoat method: 18 before, 10 now, 10 by hand and by PMD). After the fixes ours agrees with Checkstyle on every function of every row except definition differences read by hand in the document; JS/TS and Rust share the walker. `tests/test_javastyle.py` plants each shape.
+
 ## 2.21.32 — 2026-10-02
 
 - Spring Security and Java platform rules in `aix code security`: CSRF disabled in its three syntaxes (CWE-352), security headers disabled (CWE-693), CORS open to every origin (CWE-942), `anyRequest().permitAll()` (CWE-285), `httpBasic(` in a filter chain whose method never calls `requiresSecure()` (CWE-319), an XML parser factory created in a method that never disables external entities (CWE-611, at the factory line), `spring.h2.console.enabled=true` and `server.error.include-stacktrace=always` (CWE-489), a literal signing key in `signWith` / `setSigningKey` / `hmacShaKeyFor` / `SecretKeySpec` (CWE-798), a trust-all manager or hostname verifier (CWE-295). No semgrep pack reports these categories on the fifteen extended projects, so section 12 of `docs/tests/benchmark-engines.md` lists every finding on WebGoat, PetClinic and the two JHipster apps read by hand; `tests/test_spring.py` plants each shape next to its correct counterpart.

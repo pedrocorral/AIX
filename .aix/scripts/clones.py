@@ -20,7 +20,7 @@ FUNC_HEAD = {
     # function f( | const f[: Type] = [async] (params[: Ret]) => { | method(params)[: Ret] {   (params may nest one level of parens)
     "js": re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*(?::\s*[^=]+?)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\((?:[^()]|\([^()]*\))*\)|\w+)\s*(?::\s*[^=]+?)?=>\s*\{|(?:public|private|protected|static|async|\s)*(\w+)\s*\((?:[^()]|\([^()]*\))*\)\s*(?::\s*[^{]+)?\{)", re.M | re.S),
     "rust": re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+(\w+)", re.M),
-    "java": re.compile(r"^[ \t]*(?:(?:public|private|protected|static|final|abstract|synchronized|default|native)[ \t]+)*(?:<[^>\n]*>[ \t]+)?(?:[\w$.]+(?:<[^>\n]*>)?(?:\[\])*[ \t]+)?(\w+)[ \t]*\((?:[^()]|\([^()]*\))*\)\s*(?:throws\s+[\w.,\s]+?)?\s*\{", re.M)   # no ambiguous `\s` overlaps: linear on an 8 KB file,
+    "java": re.compile(r"^[ \t]*(?:(?:public|private|protected|static|final|abstract|synchronized|default|native|@[\w.]+(?:\([^()\n]*\))?)[ \t]+)*(?:<[^>\n]*>[ \t]+)?(?:[\w$.]+(?:<[^>\n]*>)?(?:\[\])*[ \t]+)?(\w+)[ \t]*\((?:[^()]|\([^()]*\))*\)\s*(?:throws\s+[\w.,\s]+?)?\s*\{", re.M)   # no ambiguous `\s` overlaps: linear on an 8 KB file,
 }
 
 
