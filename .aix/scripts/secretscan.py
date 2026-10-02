@@ -2,7 +2,7 @@
 a Shannon-entropy floor on the captured secret, then the allowlists (placeholders, stopwords, example values, paths).
 `find(path, line)` is what the tree scan and the history walk call; `path_secret(path)` names files that are secrets
 by name (a .p12 keystore)."""
-import math, re, warnings
+import hashlib, math, re, warnings
 from functools import lru_cache
 
 from secretrules import GLOBAL_ALLOW, PATH_RULES, RULES
@@ -53,8 +53,12 @@ def path_allowed(path: str) -> bool:
 
 
 def _allowed(allow: dict, path: str, line: str, match: str, secret: str) -> bool:
-    """One allowlist: any of its kinds matching allows (all of them under condition AND)."""
+    """One allowlist: any of its kinds matching allows (all of them under condition AND). `hashes` are the SHA-256 of
+    whole values to ignore (documentation example keys), compared without the value ever being in the rules file."""
     checks = []
+    if allow.get("hashes"):
+        digests = {hashlib.sha256(secret.encode()).hexdigest(), hashlib.sha256(secret.lower().encode()).hexdigest()}
+        checks.append(bool(digests & set(allow["hashes"])))
     if allow.get("regexes"):
         target = {"line": line, "match": match}.get(allow.get("target"), secret)
         checks.append(any(rx.search(target) for rx in allow["regexes"]))

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.21.25 — 2026-10-02
+
+- `aix code security --push [--gate]`: what a push-protection scanner (GitHub, Azure DevOps) would refuse, found before the push: every tracked file read with the provider rules of the gitleaks set, no marker, test folder or comment spared, generic password rules left out. Step `push`, required by the release policy, advised by the standard one; the kit's own suite runs it on the kit.
+- The generated `.aix/scripts/secretrules.py` holds nothing shaped like a credential. The eighteen documentation example values gitleaks allowlists in clear (sixteen Google API keys, an md5, a UUID) are stored as SHA-256 hashes and matched by hashing what the scanner finds, so nothing is recoverable from the file; a pattern whose own source text matched itself (Amazon Bedrock) carries an empty group that changes nothing in what it matches. Azure DevOps had refused a repository carrying the kit (`VS403654: GoogleApiKey`) on those values; GitHub had let them through. Rule semantics unchanged.
+
 ## 2.21.24 — 2026-09-30
 
 - `.aix/meta-docs/conventions/org-layer.md` (`aix help org`): the organisation layer as a contract for an internal AIX repository, written for the agent that works there. What the repository is (kit-owned `.aix/` plus `.aix/org/`), the one rule (same path replaces, new path adds, `DISABLED` removes, names match character by character), a table of where every kind of organisation content goes with its file shape (skills with class and id, AGENTS.md blocks and scoped standards, the AGENTS.md fragment, profiles, policies and `defaults.yaml`, help pages and meta-docs, seeded documents and pointer texts), what is never edited and why, how to fork the kit or merge it into a company repository that already exists, what the layer must not carry, and the three checks before a commit. Linked from AGENTS.md's navigation table, the conventions index and the guide's organisation chapter.

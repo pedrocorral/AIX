@@ -21,6 +21,7 @@ from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_
 from secretscan import SECRET_ADVICE, secret_findings
 import secretscan
 import infrarules
+import pushscan
 from depscan import scan_dependencies, scan_dockerfile
 
 
@@ -372,6 +373,8 @@ def _write_report(text: str):
 
 
 def main(args):
+    if "--push" in args:
+        return pushscan.main(gate="--gate" in args)
     if "--selftest" in args:
         return selftest()
     paths = [a for a in args if not a.startswith("--")] or default_roots()

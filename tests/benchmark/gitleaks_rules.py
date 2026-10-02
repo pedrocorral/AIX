@@ -4,8 +4,11 @@ Maintainer tool, Python 3.11+ (tomllib); the generated module is stdlib-only and
 compiled with Python's `re` after two mechanical fixes (a `(?i)` in the middle of a pattern moves to its start,
 `\\z` becomes `\\Z`); a pattern that still fails is dropped and named on stderr.
 Usage: python3 tests/benchmark/gitleaks_rules.py path/to/gitleaks.toml [version]"""
-import re, sys, tomllib, warnings
+import hashlib, re, sys, tomllib, warnings
 from pathlib import Path
+
+KEYISH = re.compile(r"(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{20,}")   # what a push scanner takes for a credential
+META = re.compile(r"[\\^$.|?*+()\[\]{}]")                                                 # a regex, not a literal value
 
 OUT = Path(__file__).resolve().parents[2] / ".aix" / "scripts" / "secretrules.py"
 HEAD = '''"""Leaf: secret patterns, generated from gitleaks {version} config/gitleaks.toml (MIT, github.com/gitleaks/gitleaks)
@@ -17,8 +20,10 @@ RULES: (id, description, regex, keywords, entropy, secret_group, allow, path). `
 any of them, case-insensitively, is never matched); `entropy` is the Shannon threshold the secret must reach (None =
 no threshold); `secret_group` is the capture group holding the secret (0 = the whole match); `allow` is a list of
 allowlists, each a dict with optional `regexes` (on the secret, or on `target` = "line" / "match"), `stopwords`
-(lowercase substrings of the secret), `paths`, and `condition` ("AND": every listed kind must match); `path` restricts
-the rule to files whose path matches (None = every file). Regexes follow RE2: compile them with re.ASCII.
+(lowercase substrings of the secret), `hashes` (SHA-256 of a whole value the rule must ignore: the documentation
+example keys gitleaks lists in clear are stored as hashes here, so this file holds nothing shaped like a credential),
+`paths`, and `condition` ("AND": every listed kind must match); `path` restricts the rule to files whose path matches
+(None = every file). Regexes follow RE2: compile them with re.ASCII.
 PATH_RULES: (id, description, path_regex) for files that are secrets by name. GLOBAL_ALLOW: paths, regexes,
 stopwords applied to every rule."""
 
@@ -32,6 +37,22 @@ def fix_regex(rx: str) -> str:
     return rx
 
 
+def neutralise(rx: str) -> str:
+    """A pattern whose own source text matches it (a literal prefix followed by a character class that the class's
+    own letters satisfy) is what a push scanner reads as a credential: an empty group `(?:)` inside the longest
+    literal run leaves the pattern's meaning untouched and its text unmatchable."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        compiled = re.compile(rx, re.ASCII)
+    if not compiled.search(rx):
+        return rx
+    runs = sorted(re.finditer(r"[A-Za-z0-9_-]{8,}", rx), key=lambda m: -len(m.group(0)))
+    if not runs:
+        return rx
+    mid = (runs[0].start() + runs[0].end()) // 2
+    return rx[:mid] + "(?:)" + rx[mid:]
+
+
 def compiles(rx: str) -> bool:
     try:
         with warnings.catch_warnings():
@@ -42,10 +63,30 @@ def compiles(rx: str) -> bool:
         return False
 
 
+def credential_like(value: str) -> bool:
+    """A literal (no regex metacharacter) that a push scanner would refuse: hashed, never written in clear."""
+    return not META.search(value) and bool(KEYISH.search(value))
+
+
+def sha(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _hashed(a: dict) -> list:
+    """SHA-256 of every credential-like value in the allowlist, exact for regexes, lowercased for stopwords."""
+    return [sha(x) for x in a.get("regexes", []) if credential_like(x)] + [sha(s.lower()) for s in a.get("stopwords", []) if credential_like(s)]
+
+
+def _patterns(a: dict, key: str) -> list:
+    """The regexes of one allowlist key that compile and are patterns, not values."""
+    return [x for x in map(fix_regex, a.get(key, [])) if compiles(x) and not credential_like(x)]
+
+
 def allowlist(a: dict) -> dict:
-    out = {k: [x for x in map(fix_regex, a[k]) if compiles(x)] for k in ("regexes", "paths") if k in a}
+    out = {k: _patterns(a, k) for k in ("regexes", "paths") if k in a}
     if "stopwords" in a:
-        out["stopwords"] = [s.lower() for s in a["stopwords"]]
+        out["stopwords"] = [s.lower() for s in a["stopwords"] if not credential_like(s)]
+    out.update({k: v for k, v in (("hashes", _hashed(a)),) if v})
     out.update({new: a[old] for old, new in (("regexTarget", "target"), ("condition", "condition")) if a.get(old)})
     return out
 
@@ -61,6 +102,7 @@ def convert(cfg: dict) -> tuple:
         if not compiles(rx):
             dropped.append(r["id"])
             continue
+        rx = neutralise(rx)
         rules.append((r["id"], r["description"], rx, [k.lower() for k in r.get("keywords", [])], r.get("entropy"), r.get("secretGroup", 1), allow,
                       fix_regex(r["path"]) if "path" in r else None))
     return rules, path_rules, dropped
@@ -76,7 +118,8 @@ def main(argv: list):
     body += "PATH_RULES = [\n" + "".join(f"    {r!r},\n" for r in path_rules) + "]\n\n"
     body += f"GLOBAL_ALLOW = {glob!r}\n"
     OUT.write_text(body, encoding="utf-8")
-    print(f"wrote {OUT}: {len(rules)} rules, {len(path_rules)} path rules; dropped {dropped or 'none'}", file=sys.stderr)
+    left = [m.group(0) for m in KEYISH.finditer(body) if len(m.group(0)) >= 28 and not re.fullmatch(r"[0-9a-f]{64}", m.group(0))]   # the hashes themselves are not credentials
+    print(f"wrote {OUT}: {len(rules)} rules, {len(path_rules)} path rules; dropped {dropped or 'none'}; credential-like literals left: {len(left)}", file=sys.stderr)
 
 
 if __name__ == "__main__":

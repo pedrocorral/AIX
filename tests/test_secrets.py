@@ -1,14 +1,16 @@
 """Secrets the gitleaks way (secretscan.py, secretrules.py): every rule compiles, the keyword gate, entropy, the
 allowlists, files that are secrets by name, the tree scan reporting a line once, the history walk over every commit
 with --commits as a bound, and the [docs] tag."""
-import re, subprocess, sys, unittest
+import hashlib, re, subprocess, sys, unittest
 from pathlib import Path
 
 from helpers import KIT, install, project_cmd, temp_home
 
 sys.path.insert(0, str(KIT / ".aix" / "scripts"))
-import secretscan  # noqa: E402
+import pushscan, secretscan  # noqa: E402
 from secretrules import GLOBAL_ALLOW, RULES  # noqa: E402
+
+KEYISH = re.compile(r"(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{28,}")
 
 def key(*parts: str) -> str:
     """The samples are assembled at run time from short fragments: a literal that looks like a live key stops a
@@ -38,6 +40,26 @@ class Rules(unittest.TestCase):
                 re.compile(path, re.ASCII)
         self.assertGreater(len(RULES), 200)
         self.assertIn("regexes", GLOBAL_ALLOW)
+
+    def test_generated_module_holds_no_credential_shaped_value(self):
+        """The documentation example keys gitleaks allowlists in clear are hashes here; a push scanner reads nothing."""
+        text = (KIT / ".aix" / "scripts" / "secretrules.py").read_text(encoding="utf-8")
+        runs = [m.group(0) for m in KEYISH.finditer(text) if not re.fullmatch(r"[0-9a-f]{64}", m.group(0))]
+        self.assertEqual([r for r in runs if r.startswith(("AIza", "AKIA", "ghp_", "xox", "sk_live", "eyJ"))], [])
+        gcp = next(r for r in RULES if r[0] == "gcp-api-key")
+        self.assertEqual(len(gcp[6][0]["hashes"]), 16, "the sixteen documentation keys, as SHA-256")
+        self.assertEqual(gcp[6][0].get("regexes", []), [])
+
+    def test_allowlist_by_hash(self):
+        """A value whose hash is in a rule's allowlist is ignored; the value itself never sits in the rules file."""
+        rule = next(r for r in secretscan._RULES if r.id == "gcp-api-key")
+        sample = "AIza" + "Sy" + "Qm4xZ7vK2pL9sT3nR8wY5cJ1hF6dG0bN4"   # built here, in the kit's own detector test
+        self.assertEqual(ids("k.py", f'key = "{sample}"'), ["gcp-api-key"])
+        rule.allow[0]["hashes"].append(hashlib.sha256(sample.encode()).hexdigest())
+        try:
+            self.assertNotIn("gcp-api-key", ids("k.py", f'key = "{sample}"'), "ignored by the Google rule (the generic one still sees a key= line)")
+        finally:
+            rule.allow[0]["hashes"].pop()
 
     def test_generated_module_carries_the_skip_marker(self):
         head = (KIT / ".aix" / "scripts" / "secretrules.py").read_text(encoding="utf-8").splitlines()[:30]
@@ -129,3 +151,19 @@ class TreeAndHistory(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PushProtection(unittest.TestCase):
+    def test_the_kit_itself_passes(self):
+        """What GitHub or Azure DevOps would refuse in a push of this repository: nothing."""
+        findings = pushscan.scan(KIT)
+        self.assertEqual([(f[3], f[4], f[2]) for f in findings], [])
+
+    def test_a_planted_provider_key_fails_whatever_the_folder_or_marker(self):
+        home = temp_home(self); p = home / "proj"; (p / "tests").mkdir(parents=True)
+        subprocess.run(["git", "-c", "safe.directory=*", "init", "-q"], cwd=p, check=True)
+        (p / "tests" / "fixtures.py").write_text(f"# aix: skip-security-scan samples\nSTRIPE = \"{STRIPE}\"\n", encoding="utf-8")
+        (p / "clean.py").write_text("x = 1\n", encoding="utf-8")
+        findings = pushscan.scan(p)
+        self.assertEqual([(Path(f[3]).name, f[4]) for f in findings], [("fixtures.py", 2)], "marker and test folder spare nothing")
+        self.assertIn("stripe-access-token", findings[0][2])

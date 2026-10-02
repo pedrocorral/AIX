@@ -41,6 +41,7 @@ STEPS = {  # id -> (kind, what, label)
     "dead":            ("check", "aix code dead --gate",     "no dead module"),
     "clones":          ("check", "aix code clones --gate",   "no duplicated function"),
     "security":        ("check", "aix code security --gate", "no unreviewed security finding"),
+    "push":            ("check", "aix code security --push --gate", "no string a push-protection scanner would refuse, in any tracked file"),
     "vulnerabilities": ("check", "aix code vulnerabilities --gate", "no taint path, known CVE or secret in history"),
     "licenses":        ("check", "aix code licenses --gate",   "no dependency with a copyleft, proprietary or unknown licence undecided"),
     "sbom":            ("check", "aix code sbom --gate",       "the bill of materials is written; no advisory at or above sbom_max_severity, no licence undecided"),

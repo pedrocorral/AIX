@@ -1,4 +1,4 @@
-aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]
+aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]      aix code security --push [--gate]
 
 DETERMINISTIC SECURITY SCAN, mapped to the vulnerability register. Every rule names the VUL row it feeds and the
 CWE it detects, so a finding is evidence the register can act on. Rules follow bandit, semgrep, gitleaks and
@@ -57,6 +57,13 @@ The important part: --audit
   (asset, control, evidence file:line, status before -> "confirmed? review"), and rows for every rule that matched
   nothing ("unverified by scan alone"). That file is the evidence `aix docs validate` and `aix docs security`
   require before a VUL status may change; a human (or the security-audit-* skills) completes the Status column.
+
+Push protection, before the push: --push
+  GitHub and Azure DevOps read every file of a push with provider patterns (Google, AWS, GitHub, Slack, Stripe,
+  private keys, JWTs, ...) and refuse the push on a match, whatever the string opens and wherever it sits: no
+  marker, test folder or comment is spared. `--push` reads every tracked file the same way (the provider rules of
+  the gitleaks set, the generic password rules left out) and lists what such a scanner would refuse; `--gate`
+  fails on any. The step `push` is required by the release policy and advised by the standard one.
 
 Options
   --strict    gate on test-code findings as well      --gate    exit 1 if any finding to review remains
