@@ -11,7 +11,7 @@ COMMENTS = r"//[^\n]*|/\*.*?\*/"
 STRINGS = r"\br#*\"[^\"]*\"#*|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])'|`(?:[^`\\]|\\.)*`"   # Rust raw strings first: a backslash is literal there;
 # a single quote holds one character (a Rust or Java char literal), never a string: `'de` and `'a` are lifetimes
 STRINGS_COMMENTS = re.compile(COMMENTS + "|" + STRINGS, re.S)
-STRINGS_JS = r"\"(?:\\.|[^\"\\\n])*\"|`(?:[^`\\]|\\.)*`"   # no single quotes: an apostrophe in JSX text or a regex literal is not a string start (a \" inside a '…' string is the known cost, benchmark section 14)
+STRINGS_JS = r"'(?:\\.|[^'\\\n])*\"(?:\\.|[^'\\\n])*'|\"(?:\\.|[^\"\\\n])*\"|`(?:[^`\\]|\\.)*`"   # a '…' string only when it holds a \" (which would otherwise open a string); other apostrophes stay: JSX text, regex literals
 STRINGS_COMMENTS_JS = re.compile(COMMENTS + "|" + STRINGS_JS, re.S)
 INTERPOLATED = re.compile(r"\$\{([^}]*)\}|\{([A-Za-z_]\w*)(?::[^}]*)?\}")   # `${expr}` (JS), `{name}` (Rust format!, Python f-strings)
 JSX_TAG = re.compile(r"(?<![\w>])<[a-zA-Z][\w.]*(?:\s[^<>]*)?/?>|</")   # a tag, not a generic (`Array<string>` follows a word)
@@ -266,19 +266,21 @@ def unused_in_function_tokens(fx: dict, params: list) -> list:
     clean = _body_tokens(fx["src"], fx["lang"])
     inner = clean.strip()[1:-1] if clean.strip().startswith("{") else clean
     out = _unused_params_tokens(fx, params, inner)
-    for m in DECLARE[fx["lang"]].finditer(inner):
+    own = _body_tokens(fx["own"], fx["lang"]) if fx.get("own") else clean   # declared here, not in a nested function (its own unit)
+    own = own.strip()[1:-1] if own.strip().startswith("{") else own
+    for m in DECLARE[fx["lang"]].finditer(own):
         name = m.group(1)
         if "SuppressWarnings" in inner[max(0, m.start() - 80):m.start()]:
             continue   # `@SuppressWarnings("unused")`: the author said so
-        elsewhere = inner[:m.start()] + inner[m.end():]   # a closure above may read a `const` declared below
+        elsewhere = inner.replace(m.group(0), " ", 1)   # the declaration is not a read; a closure above or a nested function may read it
         if not name.startswith("_") and not _read_in(name, elsewhere):
-            out.append((fx["line"] + inner.count("\n", 0, m.start(1)), f"leftover: variable `{name}` in `{fx['fname']}` is assigned and never read"))
+            out.append((fx["line"] + own.count("\n", 0, m.start(1)), f"leftover: variable `{name}` in `{fx['fname']}` is assigned and never read"))
     return out
 
 
 def swallowed_tokens(fx: dict) -> list:
     """A catch with nothing but whitespace inside (a comment inside is intent and survives the raw text check)."""
-    raw = fx["src"]
+    raw = fx.get("own") or fx["src"]
     out = []
     for m in SWALLOWED.get(fx["lang"], SWALLOWED["rust"]).finditer(raw):
         out.append((fx["line"] + raw.count("\n", 0, m.start()), "swallowed: this catch does nothing and says nothing"))
@@ -301,7 +303,8 @@ def bugs_tokens(fx: dict) -> list:
     if fx["lang"] not in BUGS:
         return []
     rx, message = BUGS[fx["lang"]]
-    clean = _body_tokens(fx["src"], "js") if fx["lang"] == "js" else STRINGS_COMMENTS.sub(_placeholder, fx["src"])
+    src = fx.get("own") or fx["src"]
+    clean = _body_tokens(src, "js") if fx["lang"] == "js" else STRINGS_COMMENTS.sub(_placeholder, src)
     out = []
     for m in rx.finditer(clean):
         if fx["lang"] == "java" or _assignment_in_condition(m.group(1)):

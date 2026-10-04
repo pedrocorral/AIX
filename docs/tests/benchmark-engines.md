@@ -638,6 +638,35 @@ findings in functions ours cannot see went from 3 of 4 to 1 of 4 (express), 10 o
 112 to 21 of 112 and 23 of 77 to 12 of 77 (excalidraw); all of those are now anonymous callbacks, the subject of the
 next criterion.
 
+**The gap closed (2.21.35).** Every JS/TS function with a block body is a unit, callbacks included, each measured on
+its own code (decision 1: a nested function's branches, nesting and lines are its own, ESLint's convention;
+decision 2: a function's length is the lines it owns, where ESLint counts nested bodies too). The same run:
+
+| project | functions ours | functions ESLint | paired | unpaired ESLint functions |
+|---|---|---|---|---|
+| express | 3249 | 3262 | 3223 (99 %) | 25 anonymous, 14 named |
+| NodeGoat | 265 | 268 | 258 (96 %) | 10 anonymous |
+| juice-shop | 4451 | 5015 | 4302 (86 %) | 658 anonymous, 55 named |
+| excalidraw | 3383 | 4723 | 3374 (71 %) | 1216 anonymous, 133 named |
+| jhipster-sample-app | 1587 | 2205 | 1587 (72 %) | 534 anonymous, 84 named |
+
+The unpaired functions, read from the longest down: arrows without a block (`orders.map(({ orderId }) =>`,
+`beforeEach(() =>`, `PanelComponent: ({ elements }) => (`: one expression, not a unit by the kit's definition;
+ESLint's over-limit findings on them are zero on every project), the `delete`/`default` methods and nested
+generics fixed on the way (`addUserToCollectionIfMissing<Type extends Pick<IUser, 'id'>>(`), and one excalidraw
+class field with a two-line generic default still unread. ESLint's over-limit findings in functions ours cannot
+see: 0 for cyclomatic, cognitive and parameters on all six projects; 2 for lines on excalidraw. Agreement on the
+paired functions, equal or within one: cyclomatic 99 % (express), 98 % (juice-shop), 91 % (excalidraw);
+cognitive 99 %, 98 %, 95 %; parameters 100 %, 99 %, 95 %. Over the kit's limits, ours / ESLint / both:
+cyclomatic express 5 / 4 / 4, juice-shop 14 / 17 / 11, excalidraw 109 / 112 / 89; cognitive express 3 / 3 / 3,
+juice-shop 10 / 9 / 9, excalidraw 81 / 77 / 71; parameters juice-shop 20 / 17 / 17, excalidraw 97 / 27 / 27
+(destructured props, decision pending). Lines is the row where decision 2 shows: ESLint puts 161 express
+functions over 60 lines, ours 4, the difference being `describe` blocks that own a few lines each;
+excalidraw 330 against 167. Found on the way and fixed: a `'…'` string or a regex literal holding a bracket
+unbalanced the body scan (every `describe` block of the Angular spec files was lost to a `'{{ name }}'` template
+string), generics after a function name were not read. Clone detection gains units too: exact groups among test
+callbacks (express 9 to 214 groups, JHipster 44 to 159) are listed and, being all tests, not gated, as before.
+
 **Bugs in ours (five), fixed in 2.21.34 except the last, which is ESLint's.**
 
 1. Named functions ours does not see. A named function expression assigned to a property, returned or passed

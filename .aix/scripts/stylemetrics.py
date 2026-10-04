@@ -5,7 +5,8 @@ import ast, re
 from pathlib import Path
 
 from codefiles import CODE_ROOTS, ROOT, EXT, rel, source_files
-from clones import FUNC_HEAD, brace_block, head_body
+from tokenwalk import TOKEN_RX, _TokenWalk
+from heads import FUNC_HEAD, blank_children, brace_block, children_of, context_label, head_body, js_units
 from depedges import iter_functions
 import hygiene
 from passthrough import _param_names, _trait_impl, passthrough_py, passthrough_tokens
@@ -194,56 +195,6 @@ def analyse_py(file: Path, cls, fn, lang="python", lines: list = None):
 
 # ---- other languages: tokens and braces --------------------------------------------------------------------------
 
-TOKEN_RX = re.compile(r"\{|\}|;|\b(if|for|while|switch|catch|match|loop|else|try|finally|synchronized)\b|&&|\|\||\?\?|\?(?![.?:])")   # `?.` and `x?: T` are not branches
-BRANCH_WORDS = ("if", "for", "while", "switch", "catch", "match", "loop")
-FLAT_BLOCKS = ("try", "finally", "synchronized")   # their brace is not a nesting level (Campbell 2017: catch is, try is not)
-OPERATORS = ("&&", "||", "??")
-
-
-class _TokenWalk:
-    """Brace-language metrics from a cleaned body: nesting depth (every block), cyclomatic (McCabe: each branch and
-    boolean operator) and cognitive complexity (Campbell 2017: +1 per branch plus the nesting level of if/else/loop/
-    catch/lambda blocks, +1 per sequence of like boolean operators, `else if` is one branch)."""
-    def __init__(self, start_line: int):
-        self.start_line, self.depth, self.cur = start_line, 0, 0
-        self.cog, self.cyc, self.items, self.deepest_line = 0, 1, [], start_line
-        self.nest, self.stack, self.flat, self.run, self.after_else = 0, [], True, None, False   # the body's own brace is not a level
-
-    def feed(self, tok: str, line: int):
-        after_else, self.after_else = self.after_else, False
-        if tok == "{":
-            self._open(line)
-        elif tok == "}":
-            self.cur -= 1; self.nest -= self.stack.pop() if self.stack else 0
-        elif tok in FLAT_BLOCKS or tok == ";":
-            self.flat, self.run = tok != ";", None
-        elif tok in BRANCH_WORDS:
-            self._branch(tok, line, after_else)
-        else:
-            self._operator(tok, line)
-
-    def _operator(self, tok: str, line: int):
-        """`&&`, `||`, `??`, `?` and `else`: cyclomatic counts each operator, cognitive one per run of like operators."""
-        self.cyc += tok != "else"; self.after_else = tok == "else"
-        if tok in OPERATORS and tok == self.run:
-            return
-        self.run = tok if tok in OPERATORS else None
-        self.cog += 1
-        self.items.append((line, 1, {"else": "else (+1)", "?": "ternary (+1)"}.get(tok, "boolean operator (+1)")))
-
-    def _open(self, line: int):
-        self.cur += 1; self.stack.append(not self.flat); self.nest += not self.flat; self.flat = False
-        if self.cur > self.depth:
-            self.depth, self.deepest_line = self.cur, line
-
-    def _branch(self, tok: str, line: int, after_else: bool):
-        self.cyc += 1; self.run = None
-        if tok == "if" and after_else:
-            self.items.append((line, 0, "else if (counted with else)")); return
-        inc = 1 + self.nest; self.cog += inc
-        self.items.append((line, inc, f"{tok} (+1, nesting +{self.nest})" if self.nest else f"{tok} (+1)"))
-
-
 def _params_of(head: str, name: str = "") -> int:
     """Parameters of the head, however many lines it spans: the list after the name, generics and annotation
     arguments removed so that their commas do not count."""
@@ -263,12 +214,15 @@ def _advice_tokens(cleaned: str, start_line: int):
 
 
 def analyse_tokens(file: Path, name: str, span: tuple, text: str, lang: str):
-    """One brace-language function: `span` is (start of the head, position of the body's brace)."""
-    head_start, header_end = span
+    """One brace-language function: `span` is (start of the head, position of the body's brace, children), the
+    children being the (brace, end) spans of the functions inside it, measured on their own and blanked out of
+    this one's code."""
+    head_start, header_end, children = span
     start_line = text.count("\n", 0, header_end) + 1
-    body = brace_block(text, header_end)
+    body = brace_block(text, header_end, lang)
+    own = blank_children(body, header_end, children)
     head = text[head_start:text.find("{", header_end)]   # the whole head: a parameter list may span lines
-    cleaned = re.sub(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`", " ", body, flags=re.S)
+    cleaned = re.sub(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`", " ", own, flags=re.S)
     walk = _TokenWalk(start_line)
     for m in TOKEN_RX.finditer(cleaned):
         walk.feed(m.group(0), start_line + cleaned.count("\n", 0, m.start()))
@@ -276,9 +230,10 @@ def analyse_tokens(file: Path, name: str, span: tuple, text: str, lang: str):
     magic, short = _advice_tokens(cleaned, start_line)
     decorated = bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*|^\s*#\[", before, re.M)) or (lang == "rust" and _trait_impl(text, header_end))
     forwards = passthrough_tokens(re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S), head, name, lang, decorated)
-    fx = dict(name=name, file=rel(file), line=start_line, lang=lang, lines=body.count("\n") + 1, params=_params_of(head, name), cyclomatic=walk.cyc,
+    lines = body.count("\n") + 1 - sum(text.count("\n", cb, ce) for cb, ce in children)
+    fx = dict(name=name, file=rel(file), line=start_line, lang=lang, lines=lines, params=_params_of(head, name), cyclomatic=walk.cyc,
               cognitive=walk.cog, cognitive_items=walk.items, nesting=max(walk.depth - 1, 0), deepest=(walk.deepest_line, walk.deepest_line),
-              docstring=any(x in before for x in ("///", "/**", "*/", "//")), public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body,
+              docstring=any(x in before for x in ("///", "/**", "*/", "//")), public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body, own=own,
               test=is_test(file, name), decorated=decorated, passthrough=forwards, jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))
     fx["src_head"] = head
     fx["hygiene"] = hygiene.function_tokens(fx, _param_names(head, name, lang))
@@ -329,11 +284,27 @@ def _python_functions(file: Path, text: str) -> list:
 
 
 def _token_functions(file: Path, text: str, lang: str) -> list:
+    if lang == "js":
+        return _js_functions(file, text)
     out = []
     for m in FUNC_HEAD[lang].finditer(text):
         hb = head_body(text, m, lang)   # None: a keyword, a signature, a call, a declaration
         if hb:
-            out.append(analyse_tokens(file, hb[0], (m.start(), hb[1]), text, lang))
+            out.append(analyse_tokens(file, hb[0], (m.start(), hb[1], ()), text, lang))
+    return out
+
+
+def _js_functions(file: Path, text: str) -> list:
+    """Every JS/TS function with a block body is a unit, a callback included, each measured on its own code; an
+    anonymous one is named by what it is passed to (`app.get('/users') callback`) and its line."""
+    units = js_units(text)
+    children = children_of(units)
+    out = []
+    for name, start, brace, end in units:
+        label = name or f"{context_label(text, start)} (l.{text.count(chr(10), 0, brace) + 1})"
+        fx = analyse_tokens(file, label, (start, brace, children[brace]), text, "js")
+        fx["anonymous"] = name is None
+        out.append(fx)
     return out
 
 

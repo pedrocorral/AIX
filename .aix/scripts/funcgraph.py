@@ -6,7 +6,7 @@ tool does not know is not an arc and not counted: the report says how many calls
 import re
 from pathlib import Path
 
-from clones import FUNC_HEAD, KEYWORDS, brace_block, head_body
+from heads import FUNC_HEAD, KEYWORDS, brace_block, head_body
 from codefiles import EXT, rel
 from pyfuncgraph import RESOLUTION
 from depedges import RS_USE, _alias_bases, _java_imports, _java_index, _java_visible, _resolve_js, _rust_base, _rust_resolve
@@ -97,7 +97,7 @@ class _File:
             if not hb:
                 continue
             name, brace = hb
-            body = brace_block(self.clean, brace)
+            body = brace_block(self.clean, brace, self.lang)
             cls = _enclosing_class(brace, self.classes)
             head = self.clean[self.clean.rfind("\n", 0, m.end() - 1) + 1:brace]
             out.append((f"{self.rel}:{cls + '.' if cls else ''}{name}", name, cls, brace, brace + len(body), _values(head, name, body, self.lang)))

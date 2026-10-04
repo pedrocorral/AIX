@@ -2,7 +2,7 @@ aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]
 
 READABILITY, per function, with specific feedback. TARGET is a folder, a file (extension optional), or one
 function: path:func, path/func, path::Class.method. A folder or file gives a table ranked worst first; a single
-function gives a card: each metric against its limit, then every finding with its line and what to do.
+function (or `path:LINE` for a callback) gives a card: each metric against its limit, then every finding with its line and what to do.
 
 Metrics and limits (.aix/config.yaml `style:` block; sources in .aix/meta-docs/conventions/readability.md)
   lines                  60   NASA/JPL one page; McConnell: a ceiling, not a target
@@ -37,11 +37,15 @@ Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust
 tokens and braces: lines, parameters (a list over several lines included) and nesting exact; cyclomatic as Checkstyle
 counts it (each branch and each boolean operator); cognitive by Campbell's rules (a branch plus its nesting level,
 `try` is not a level, one per run of like boolean operators, `else if` is one branch), checked against Checkstyle and
-PMD on four Spring projects (docs/tests/benchmark-engines.md, section 13). A JS/TS unit is a named function in any
-of its shapes: a declaration, a function or arrow assigned to a const, a property or `module.exports`, a named callback,
-an object-literal member, a class method, a class field holding an arrow, a getter or setter; an anonymous callback
-is measured inside the function that holds it, not on its own (ESLint measures each: section 14). A TypeScript
-signature without a body is not a unit.
+PMD on four Spring projects (docs/tests/benchmark-engines.md, section 13). A JS/TS unit is every function with a
+block body: a declaration, a function or arrow assigned to a const, a property or `module.exports`, an object-literal
+member, a class method, a class field holding an arrow, a getter or setter, and every callback (`app.get('/users')
+callback (l.12)`, `describe('login') callback (l.9)`, `onClick prop (l.88)`: named by what it is passed to and its
+line; `aix code style FILE:LINE` shows its card). Each is measured on its own code: a nested function's branches,
+nesting and lines belong to the nested function, and a function's length is the lines it owns (section 14 of
+docs/tests/benchmark-engines.md records both decisions against ESLint). An arrow without a block and an empty body
+stay inside their parent. A TypeScript signature without a body is not a unit. Java and Rust: a lambda or closure
+counts inside its method, as Checkstyle and PMD count it.
 
 Modernise (advice tier, never gated): the report detects the runtime the project targets (pyproject
 requires-python, .python-version, the venv, tsconfig target, engines.node, Cargo.toml, pom/Gradle; the header

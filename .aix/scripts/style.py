@@ -76,9 +76,9 @@ def _magic_findings(fx) -> list:
 
 
 def _advice_findings(fx) -> list:
-    out = [f for f in [_name_finding(fx)] if f]
+    out = [f for f in [_name_finding(fx)] if f and not fx.get("anonymous")]   # a callback has no name to judge, no doc comment to ask for
     out += [("name", line, f"single-letter name `{name}`", "say what it holds: `count`, `path`, `user`; one-letter names are for loop counters and maths") for line, name in fx["short_names"]]
-    if fx["public"] and not fx["docstring"] and fx["lines"] >= 6 and not fx["test"]:
+    if fx["public"] and not fx["docstring"] and fx["lines"] >= 6 and not fx["test"] and not fx.get("anonymous"):
         out.append(("doc", fx["line"], "public function without a docstring / doc comment", "one line: what it does and when to call it"))
     return out + _magic_findings(fx)
 
@@ -262,7 +262,7 @@ def selftest():
 
 # ---- main -------------------------------------------------------------------------------------------------------
 
-USAGE = "usage: aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]   TARGET = dir | file[.ext] | file:func | file::Class.method"
+USAGE = "usage: aix code style [TARGET...] [--all] [--gate] [--report] [--selftest]   TARGET = dir | file[.ext] | file:func | file::Class.method | file:LINE (a callback)"
 
 
 def _target_or_exit(spec: str):
@@ -274,7 +274,7 @@ def _target_or_exit(spec: str):
 
 
 def _function_hits(file: Path, name: str) -> list:
-    hits = [fx for fx in functions_in(file) if fx["name"] == name or fx["name"].endswith("." + name) or fx["fname"] == name]
+    hits = [fx for fx in functions_in(file) if fx["name"] == name or fx["name"].endswith("." + name) or fx["fname"] == name or (name.isdigit() and fx["line"] == int(name))]
     if not hits:
         sys.exit(f"aix code style: no function '{name}' in {rel(file)}")
     return hits
