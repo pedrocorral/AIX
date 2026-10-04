@@ -12,12 +12,12 @@ from javataint import METHOD, _load
 
 ROW = "VUL-AUTHZ-001"
 SNIPPET = 110
-RULE = (ROW, "CWE-639", "{id} handler reaches a user-owned {entity} with no ownership check",
+RULE = (ROW, "CWE-639", "{id} handler reaches a user-owned {entity}{via} with no ownership check",
         "load it through the caller (findByIdAndUser(id, currentUser)) or compare its owner with the principal before returning or changing it")
 SECURITY_DEP = re.compile(r"spring-security|spring-boot-starter-security|spring-boot-starter-oauth2|keycloak|shiro-|jakarta\.security|pac4j")
 SECURITY_CODE = re.compile(r"@EnableWebSecurity|SecurityFilterChain|WebSecurityConfigurerAdapter|@EnableMethodSecurity|@EnableGlobalMethodSecurity|HttpSecurity\b")
 ENTITY = re.compile(r"\bclass\s+(\w+)")   # any class: an owned thing may be an @Entity or a plain object built from the id
-FIELD = re.compile(r"^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*(?:private|protected|public)?[ \t]*(?:final[ \t]+)?(?P<type>[\w.]+)(?:<[^>]*>)?[ \t]+(?P<name>\w+)[ \t]*[;=]", re.M)
+FIELD = re.compile(r"^[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*(?:private|protected|public)?[ \t]*(?:final[ \t]+)?(?P<type>[\w.]+)(?P<generic><[^>]*>)?[ \t]+(?P<name>\w+)[ \t]*[;=]", re.M)
 OWNER_TYPES = {"User", "Users", "AppUser", "UserEntity", "UserAccount", "Owner", "Principal", "Tenant", "Member", "Customer"}
 OWNER_NAMES = re.compile(r"^(?:user|owner|tenant|userId|ownerId|tenantId|userLogin|customer|member)$")   # not createdBy/login: audit and identity fields, not ownership
 MAPPING = re.compile(r"@(?:Get|Post|Put|Delete|Patch|Request)Mapping\b|@(?:GET|POST|PUT|DELETE|PATCH)\b")
@@ -25,7 +25,7 @@ PATH_PARAM = re.compile(r"@(?:PathVariable|PathParam)\b")
 ANNOTATED = re.compile(r"@(?:PreAuthorize|PostAuthorize|Secured|RolesAllowed|PermitAll|DenyAll|PreFilter|PostFilter)\b")
 CHECK = re.compile(r"getCurrentUser\w*|getAuthentication\(|getPrincipal\(|getUserPrincipal|SecurityContextHolder|@AuthenticationPrincipal|\bPrincipal\s+\w+|\bAuthentication\s+\w+"
                    r"|isCurrentUser|hasRole|hasAuthority|hasPermission|checkAccess|assertOwner|verifyOwner|canAccess|isOwner|ownedBy"
-                   r"|And(?:User|Owner|Login|CreatedBy|Tenant|Customer|Member)\w*\(|IsCurrentUser|By(?:User|Owner|Tenant|Customer|Member)\w*\(|ForCurrentUser"
+                   r"|And\w*(?:User|Owner|Login|CreatedBy|Tenant|Customer|Member)\w*\(|IsCurrentUser|By\w*(?:User|Owner|Tenant|Customer|Member)\w*\(|ForCurrentUser"
                    r"|\.get(?:User|Owner|CreatedBy|Login|Tenant|Customer|Member)\(\)")
 REPO_CALL = re.compile(r"\b(\w+?)(?:Repository|Repo|Dao|DAO|Mapper)\s*\.\s*\w+\s*\(")
 SERVICE_CALL = re.compile(r"\b\w+(?:Service|Manager|Facade)\s*\.\s*(\w+)\s*\(((?:[^()]|\([^()]*\))*)\)")
@@ -52,15 +52,26 @@ def authenticated(paths, files: dict) -> bool:
     return any(SECURITY_CODE.search(text) for text in files.values())
 
 
-def owned_entities(files: dict) -> dict:
-    """class name -> True when a field names or types its owner (`private User user`, `private String userId`)."""
+def _class_fields(files: dict) -> dict:
+    """class name -> [(field type, field name, is a collection)] for every class."""
     out = {}
     for text in files.values():
         m = ENTITY.search(text)
-        if not m:
-            continue
-        owned = any(f.group("type").split(".")[-1] in OWNER_TYPES or OWNER_NAMES.match(f.group("name")) for f in FIELD.finditer(text))
-        out[m.group(1)] = owned
+        if m:
+            out[m.group(1)] = [(f.group("type").split(".")[-1], f.group("name"), bool(f.group("generic"))) for f in FIELD.finditer(text)]
+    return out
+
+
+def owned_entities(files: dict) -> dict:
+    """class name -> None when nothing owns it, "" when a field names or types its owner (`private User user`,
+    `private String userId`), or the name of the single-valued field through which it is owned one hop away
+    (an `Operation` with `private BankAccount bankAccount`). Collections never carry ownership."""
+    fields = _class_fields(files)
+    direct = {name: any(t in OWNER_TYPES or OWNER_NAMES.match(n) for t, n, _ in fs) for name, fs in fields.items()}
+    out = {}
+    for name, fs in fields.items():
+        via = next((n for t, n, collection in fs if not collection and direct.get(t) and t != name), None)
+        out[name] = "" if direct[name] else via
     return out
 
 
@@ -131,18 +142,19 @@ def _file_findings(f: Path, text: str, index: dict, owned: dict) -> list:
         if ANNOTATED.search(head) or ANNOTATED.search(class_annotations):
             continue
         reached = _reached(body, index)
-        entities = [e for e in _entities_reached(head, reached) if owned.get(e)]
+        entities = [e for e in _entities_reached(head, reached) if owned.get(e) is not None]
         if entities and not CHECK.search(head + reached):
-            out.append(_finding(f, line, head, entities[0]))
+            out.append(_finding(f, line, head, entities[0], owned[entities[0]]))
     return out
 
 
-def _finding(f: Path, line: int, head: str, entity: str) -> tuple:
+def _finding(f: Path, line: int, head: str, entity: str, via: str) -> tuple:
     """The register-shaped finding: the mapping line and the method's name line as the snippet."""
     name_line = next((l.strip() for l in head.splitlines() if re.search(r"\b\w+\s*\(", l) and not l.lstrip().startswith(("@", "*", "/"))), "")
     mapping = next((l.strip() for l in head.splitlines() if MAPPING.search(l)), "")
     vul, cwe, title, advice = RULE
-    return (vul, cwe, title.format(id="{id}", entity=entity), rel(f), line, (mapping + "  " + name_line)[:SNIPPET], advice, None)
+    title = title.format(id="{id}", entity=entity, via=f" (owned through its {via})" if via else "")
+    return (vul, cwe, title, rel(f), line, (mapping + "  " + name_line)[:SNIPPET], advice, None)
 
 
 def findings(paths) -> list:
@@ -151,7 +163,7 @@ def findings(paths) -> list:
     if not files or not authenticated(paths, files):
         return []
     owned = owned_entities(files)
-    if not any(owned.values()):
+    if all(v is None for v in owned.values()):
         return []
     index = _method_bodies(files)
     return [fx for f, text in files.items() if MAPPING.search(text) for fx in _file_findings(f, text, index, owned)]

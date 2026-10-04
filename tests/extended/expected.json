@@ -67,7 +67,7 @@
   "clones": 159,
   "dead": 2,
   "graph": 1412,
-  "security": 18,
+  "security": 22,
   "style": 2378,
   "vulnerabilities": 0
  },
@@ -75,7 +75,7 @@
   "clones": 157,
   "dead": 2,
   "graph": 1427,
-  "security": 19,
+  "security": 23,
   "style": 2355,
   "vulnerabilities": 0
  },

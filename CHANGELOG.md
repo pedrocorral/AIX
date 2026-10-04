@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.37 — 2026-10-04
+
+- VUL-AUTHZ-001 follows ownership one hop: a thing whose single-valued field is itself a user-owned thing is owned through it (JHipster's `Operation` through its `BankAccount`), the finding says so ("owned through its bankAccount"), and an owner comparison or repository method naming the hop (`findByIdAndBankAccountUserLogin`) counts as the check. Collections never carry ownership (a `Label` with a set of operations) and two hops are not followed. JHipster's four `Operation` handlers by id join the four `BankAccount` ones (section 15); WebGoat and PetClinic unchanged. `tests/test_authz.py` plants the hop and the collection.
+
 ## 2.21.36 — 2026-10-04
 
 - `aix code security` reports VUL-AUTHZ-001 (CWE-639) on Java: a web handler that takes an id from the URL and loads, builds or changes a user-owned thing (a class with a user-typed field or an owner id) with nothing tying it to the caller, in the handler or in the service it calls one level down: no `@PreAuthorize`/`@Secured`/`@RolesAllowed`, no principal read, no owner-aware repository method, no owner comparison (`authz.py`). Not a finding: a project without authentication, a thing without an owner, an annotated handler; ownership through another thing is not followed. Read by hand on the Java projects (section 15 of `docs/tests/benchmark-engines.md`): JHipster's four `BankAccount` handlers by id and WebGoat's two IDOR lesson handlers reported, nothing else, PetClinic zero. `tests/test_authz.py` plants one handler per situation.

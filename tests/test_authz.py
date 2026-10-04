@@ -1,7 +1,8 @@
 """VUL-AUTHZ-001: a handler that takes an id from the URL and reaches a user-owned thing without tying it to the
 caller (authz.py). One controller per situation: the bare handler is the finding; a security annotation, a principal
 parameter, a current-user read in the service it calls, an owner-aware repository method, a thing without an owner,
-and a project without authentication are not."""
+and a project without authentication are not. Ownership is followed one hop through a single-valued field (an
+operation of an account of a user), never through a collection (a label with a set of operations)."""
 import unittest
 
 from helpers import install, project_cmd, temp_home
@@ -19,6 +20,16 @@ LABEL = """package app;
 public class Label {
   private Long id;
   private String name;
+  private Set<Operation> operations = new HashSet<>();
+}
+"""
+OPERATION = """package app;
+@Entity
+public class Operation {
+  private Long id;
+  private BigDecimal amount;
+  @ManyToOne
+  private Account account;
 }
 """
 SERVICE = """package app;
@@ -66,13 +77,21 @@ public class AccountResource {
   public ResponseEntity<Label> label(@PathVariable("id") Long id) {
     return ResponseEntity.of(labelRepository.findById(id));
   }
+  @GetMapping("/operations/{id}")
+  public ResponseEntity<Operation> operation(@PathVariable("id") Long id) {
+    return ResponseEntity.of(operationRepository.findById(id));
+  }
+  @GetMapping("/operations/{id}/mine")
+  public ResponseEntity<Operation> myOperation(@PathVariable("id") Long id) {
+    return ResponseEntity.of(operationRepository.findByIdAndAccountUserLogin(id, SecurityUtils.getCurrentUserLogin()));
+  }
 }
 """
 
 
 def write(project, with_security: bool):
     src = project / "src/main/java/app"; src.mkdir(parents=True)
-    (src / "Account.java").write_text(ACCOUNT); (src / "Label.java").write_text(LABEL)
+    (src / "Account.java").write_text(ACCOUNT); (src / "Label.java").write_text(LABEL); (src / "Operation.java").write_text(OPERATION)
     (src / "AccountService.java").write_text(SERVICE); (src / "AccountResource.java").write_text(CONTROLLER)
     if with_security:
         (project / "pom.xml").write_text(POM)
@@ -89,8 +108,9 @@ class OwnershipChecks(unittest.TestCase):
         return sorted(int(l.split("AccountResource.java:")[1].split()[0]) for l in self.out.splitlines() if "CWE-639" in l)
 
     def test_only_the_handlers_without_a_check_are_reported(self):
-        self.assertEqual(self.findings(), [5, 24], self.out)   # bare, and the service that loads by id alone
+        self.assertEqual(self.findings(), [5, 24, 36], self.out)   # bare, the service that loads by id alone, the operation owned through its account
         self.assertIn("reaches a user-owned Account", self.out)
+        self.assertIn("reaches a user-owned Operation (owned through its account)", self.out, self.out)
 
     def test_the_row_is_listed_as_ruled(self):
         self.assertIn("VUL-AUTHZ-001", self.out)

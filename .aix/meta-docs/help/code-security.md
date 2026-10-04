@@ -50,7 +50,8 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   owner-aware repository method (`findByIdAndUser…`, `…IsCurrentUser`), no owner comparison (`.getUser()`,
   `.getOwner()`), in the handler or in the service method it calls one level down. Not a finding: a project with no
   authentication (no security dependency in the build, no security configuration), a thing without an owner, an
-  annotated handler. Ownership through another thing (an operation of a bank account of a user) is not followed.
+  annotated handler. Ownership is followed one hop through a single-valued field (an operation of a bank account of
+  a user: "owned through its bankAccount"), never through a collection and never two hops away.
 
   Assembled, then used (every language): a variable takes a string built from a literal plus a value (`+`, f-string,
   .format, template literal, String.format, format!, %) and, within the next 40 lines, is the argument of a dangerous
