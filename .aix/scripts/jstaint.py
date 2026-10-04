@@ -67,9 +67,13 @@ def _code_only(expr: str) -> str:
 
 
 def _args_of(text: str, start: int) -> list:
-    """The top-level arguments of the call whose `(` is at text[start - 1]."""
-    depth, args, cur = 0, [], ""
-    for ch in text[start:]:
+    """The top-level arguments of the call whose `(` is at text[start - 1]; brackets and commas inside a string
+    literal do not count (`"select id, name from t where x = " + x` is one argument)."""
+    depth, args, cur, i = 0, [], "", start
+    while i < len(text):
+        ch = text[i]
+        if ch in "\"'`":
+            end = _string_end(text, i); cur += text[i:end]; i = end; continue
         if ch in "([{":
             depth += 1
         elif ch in ")]}":
@@ -77,9 +81,19 @@ def _args_of(text: str, start: int) -> list:
                 break
             depth -= 1
         if ch == "," and depth == 0:
-            args.append(cur); cur = ""; continue
-        cur += ch
+            args.append(cur); cur = ""
+        else:
+            cur += ch
+        i += 1
     return [a.strip() for a in args + [cur] if a.strip()]
+
+
+def _string_end(text: str, i: int) -> int:
+    """The index just past the string literal opening at text[i]; an escaped quote stays inside."""
+    quote, j = text[i], i + 1
+    while j < len(text) and text[j] != quote:
+        j += 2 if text[j] == "\\" else 1
+    return min(j + 1, len(text))
 
 
 def _names_of(destructured: str) -> list:
@@ -213,9 +227,9 @@ class _Walk:
             return
         if which == "string" and re.match(r"^(?:\(|function\b|async\b|[\w$]+\s*=>)", args[0]):
             return
-        expr = " , ".join(args) if which in ("any", "shell", "assembled") else args[0]   # an assembled string may be any argument (`search(base, filter)`)
+        expr = " , ".join(args) if which in ("any", "shell", "assembled") else args[0]   # an assembled string may be any argument (`search(base, filter)`); "first"/"first-assembled": the first only
         source, assembled = self.taint_of(expr)
-        if source and (which != "assembled" or assembled):
+        if source and (which not in ("assembled", "first-assembled") or assembled):
             at = lineno + text.count("\n", 0, m.start())
             self.findings.append((vul, cwe, f"input reaches {kind}", rel(self.file), at, f"{text[m.start():m.end()]}...) <- {source}", ADVICE[cwe], _accepted(raw)))
 

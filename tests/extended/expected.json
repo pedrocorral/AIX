@@ -5,7 +5,7 @@
   "graph": 23,
   "security": 940,
   "style": 7555,
-  "vulnerabilities": 1644
+  "vulnerabilities": 1657
  },
  "NodeGoat": {
   "clones": 10,
@@ -21,7 +21,7 @@
   "graph": 820,
   "security": 110,
   "style": 2429,
-  "vulnerabilities": 22
+  "vulnerabilities": 27
  },
  "bat": {
   "clones": 43,

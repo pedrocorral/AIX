@@ -821,6 +821,86 @@ not `LabelService.find`; a field typed `ThingInterface` reaches `Thing1` and `Th
 repository; a receiver of unknown type (`mystery.find(q)`) falls back to the name rule and reaches `LabelService`
 once.
 
+### 18. CodeQL as the taint reference (run on 2026-10-05, nothing changed in the gate yet)
+
+CodeQL CLI 2.27.1 with `codeql/java-queries` 1.11.11, suite `java-security-extended`, on databases built from source
+(`tests/benchmark/codeql.py`; the CLI, a Maven 3.9.9, a JDK 21 for WebGoat, whose Lombok does not run on this
+machine's Java 25, and the databases live in the benchmark folder outside the repository). Paired with
+`aix code vulnerabilities --taint` by file, CWE family and sink line within three; only the families ours has rows for
+(SQL, command, path, XSS, LDAP, XPath, redirect, XXE, deserialisation, trust boundary, SSRF, code).
+
+| project | ours | CodeQL | both | CodeQL analyze s | every CodeQL rule that fired |
+|---|---|---|---|---|---|
+| WebGoat | 22 | 27 | 15 | 11.7 | sql-injection 16, path-injection 7, polynomial-redos 5, missing-jwt-signature-check 5, log-injection 4, insecure-cookie 3, sensitive-cookie-not-httponly 3, spring-disabled-csrf-protection 2, unsafe-deserialization 2, insecure-randomness 2, sensitive-log 2, xxe 1, zipslip 1, potentially-weak-cryptographic-algorithm 1 |
+| jhipster-sample-app | 0 | 0 | 0 | 15.1 | log-injection 21, spring-disabled-csrf-protection 1, sensitive-log 1 |
+| spring-petclinic | 0 | 0 | 0 | 14.6 | tainted-arithmetic 2 |
+| BenchmarkJava | 1644 | 2762 | 1000 | 18.5 | xss 1724, stack-trace-exposure 780, sql-injection 359, weak-cryptographic-algorithm 287, … |
+
+**OWASP Benchmark, CodeQL against the ground truth** (ours in table 11; both tools without the rules rows):
+
+| category | CodeQL TPR | CodeQL FPR | CodeQL score | ours score |
+|---|---|---|---|---|
+| sqli | 100 % | 89 % | 11 | 18 |
+| cmdi | 100 % | 51 % | 49 | 21 |
+| pathtraver | 100 % | 49 % | 51 | 21 |
+| xss | 100 % | 43 % | 57 | 28 |
+| ldapi | 100 % | 41 % | 59 | 36 |
+| xpathi | 100 % | 35 % | 65 | 18 |
+| trustbound | 100 % | 56 % | 44 | 10 |
+
+CodeQL misses no true case and tells apart far more of the Benchmark's false ones (its 89 % on SQL is the one place
+ours scores higher); ours misses 47 / 16 / 19 / 35 / 3 / 1 / 50 true cases by category, the constant-folding traps
+of table 11.
+
+**WebGoat, every mismatch read by hand.**
+
+CodeQL only, 12:
+
+| what | read |
+|---|---|
+| `SqlInjectionLesson2.java:65`, `3:63`, `4:62`, `5:80`, SQL | `completed(@RequestParam String query)` hands the whole statement to `executeQuery(query)`. Ours requires an assembled string at an SQL sink, so a raw tainted statement, the worst case, is silent. A gap in ours |
+| `JWTHeaderKIDEndpoint.java:92`, SQL | the `kid` header of a JWT taken from the request into a query; ours has no JWT-header source. A gap in ours, small |
+| `CommentsCache.java:105`, XXE, from `BlindSendFileAssignment.java:87` | the request body parsed as XML two calls away; ours has the factory rule (section 12) but no XML-parsing sink for a tainted document. A gap in ours |
+| `ProfileZipSlip.java:67`, path | an uploaded zip's entry names into `new File`; ours has no zip-entry source. A gap in ours, small |
+| `VulnerableComponentsLesson.java:57`, deserialisation | `xstream.fromXML(payload)` on a variable; ours' sink wants `new XStream().fromXML(`. A gap in ours |
+| `ProfileUploadBase.java:44`, path, from `ProfileUpload.java:38` | `fullName.replace("../", "")` on the way; ours reads `.replace(` as a sanitiser, CodeQL does not (the lesson shows the bypass). A definition difference |
+| `ProfileUploadRetrieval.java:97, 99, 103`, path | the same flow ours reports at line 92, where the `File` is built; CodeQL reports where it is read, outside the three-line window. Matched by flow |
+
+Ours only, 7:
+
+| what | read |
+|---|---|
+| `FileServer.java:89, 90`, path | `new File(dir, myFile.getOriginalFilename())` from an upload; CodeQL's path rule does not take the original file name as a source. Ours right |
+| `ProfileUploadRetrieval.java:92`, path | the flow above, matched |
+| `SSRFTask2.java:51`, SSRF | `new URL(…)` from a parameter; the suite has no SSRF rule. Ours right |
+| `MissingAccessControlUserRepository.java:40`, SQL | `jdbcTemplate.update("INSERT … VALUES(:username, …)", new MapSqlParameterSource().addValue("username", user.getUsername()))`: named parameters, the tainted value never touches the statement. Ours wrong: the assembled check looks at every argument, the statement is the first one only |
+| `ProfileUploadFix.java:39`, SQL | `super.execute(file, fullName…)`: `.execute(` matched the JDBC sink on any receiver. Ours wrong |
+| `EncodingAssignment.java:54`, trust boundary | a session attribute built from the request's username and a random secret; CodeQL's rule wants raw servlet input. A definition difference, ours keeps the Benchmark's reading |
+
+**What this says.** Two false positives and three real gaps in ours on one project, all in how the SQL and
+deserialisation sinks are read, plus two sources ours does not know (JWT header, zip entry). The cross-file walk of
+2.21.39 holds: every CodeQL cross-file flow in these families that ours misses is missed for a sink or source reason,
+not for the hop.
+
+**After 2.21.40.** SQL sinks judged on the statement argument (raw or assembled for statement-only methods, assembled
+for the parameterisable ones), `.execute(` only on a statement-like receiver, `.fromXML(` on any receiver, an XML parser
+fed a tainted document as an XXE sink; and two more defects found on the way: the Java method reader did not accept an
+annotation before the return type (`public @ResponseBody AttackResult completed(`), so those handlers' parameters were
+never sources, and the argument splitter cut a first argument at a comma inside a string literal. The same run:
+
+| project | ours | CodeQL | both |
+|---|---|---|---|
+| WebGoat | 27 (was 22) | 27 | 20 (was 15) |
+| BenchmarkJava | 1657 | 2762 | 1013 |
+
+Benchmark, ours: sqli 235 true / 152 false (was 225 / 149), score 21 (was 18); every other category unchanged. WebGoat:
+the four `executeQuery(query)` lessons, `Servers.java:73` and the XXE flow are matched now; the two false positives are
+gone; ours gains `JWTHeaderJKUEndpoint.java:51`, an SSRF through the JWT's `jku` header that CodeQL's suite has no rule
+for. Still CodeQL only: the `kid` header into SQL (the JWT's parsed header is not a source ours follows), the zip
+entry's name, and `VulnerableComponentsLesson.java:57` and `ProfileUploadBase.java:44`, where a `.replace(…)` on the
+way is a sanitiser for ours and not for CodeQL. Still ours only: the upload's original file name as a path, the
+session attribute, and the two SSRF flows.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
@@ -844,4 +924,7 @@ once.
   from `BENCH_DIR/checkstyle-all.jar` (the all-in-one jar of a GitHub release) with `tests/benchmark/style/checkstyle.xml`,
   PMD from `pmd-bin-<version>/` with `tests/benchmark/style/pmd.xml`; both configurations select the rows above at the kit's
   limits. It writes `~/.cache/aix/benchmark/style-<project>.json` and lists every mismatch for reading by hand.
+- `tests/benchmark/codeql.py` prints section 18 from CodeQL databases built beforehand (`codeql database create
+  --language=java --command="./mvnw -DskipTests compile"` into `BENCH_DIR/codeql/db-<project dir>`), analysed with the
+  `java-security-extended` suite into SARIF, paired with `javataint.taint` and scored on the Benchmark's CSV.
 - Nothing in `tests/benchmark/` runs in `aix self-test` or the suite; it needs the engines and the network.

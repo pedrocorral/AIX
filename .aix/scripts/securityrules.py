@@ -153,4 +153,5 @@ ADVICE = {"CWE-470": "never load a class named by input; an allowlist of class n
           "CWE-89": "parameterised query: execute(sql, params)", "CWE-22": "resolve against a base directory and reject anything outside it",
           "CWE-601": "allow-list targets or relative paths only", "CWE-1336": "render a file template with a context",
           "CWE-502": "json / yaml.safe_load; never deserialise input", "CWE-918": "allow-list hosts; block private ranges and redirects",
+          "CWE-611": "parse with external entities and the doctype disabled (disallow-doctype-decl, ACCESS_EXTERNAL_DTD/SCHEMA to \"\"); never a document from the request on a default factory",
           "CWE-79": "escape on output (textContent, the template engine's auto-escape); never build HTML from input"}

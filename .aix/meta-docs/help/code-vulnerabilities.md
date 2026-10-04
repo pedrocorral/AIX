@@ -55,10 +55,12 @@ head binds from the request (`@RequestParam`, `@PathVariable`, `@RequestBody`, `
 `@ModelAttribute`, JAX-RS `@QueryParam` and friends) and servlet getters (`request.getParameter`, `getHeader`,
 `getQueryString`, `getCookies`, `getInputStream`, `getReader`, `getRequestURI`). Taint follows `=`, `+=`, `+`
 concatenation, `String.format` and `StringBuilder`, `for (T x : ...)`, and a method of the same file called with a
-tainted argument (one level). Sinks: JDBC and JPA execution (`executeQuery`, `execute`, `prepareStatement` on an
-assembled string, `createQuery`, `createNativeQuery`, JdbcTemplate `query*`/`update`), `Runtime.exec` and
+tainted argument. Sinks: JDBC and JPA execution judged on the statement, the first argument (`executeQuery`,
+`prepareStatement`, `createQuery`, `createNativeQuery`: raw or assembled; JdbcTemplate `query*`/`update`, which also
+take bound parameters: assembled only; `execute` on a statement-like receiver), `Runtime.exec` and
 `ProcessBuilder`, `new File`/`Paths.get`/`Files.*` (any argument), `sendRedirect`/`RedirectView`,
-`ObjectInputStream`/`XMLDecoder`/`readObject`, `Class.forName`, `new URL`/`openConnection`/RestTemplate/HttpClient,
+`ObjectInputStream`/`XMLDecoder`/`readObject`/`fromXML`, an XML parser fed a tainted document (`parse`,
+`createXMLStreamReader`, `unmarshal` on a builder, parser, factory or reader; CWE-611), `Class.forName`, `new URL`/`openConnection`/RestTemplate/HttpClient,
 `getWriter().print*` (a writer kept in a variable too), `session.setAttribute` (trust boundary), LDAP `search` and
 XPath `evaluate`/`compile` on an assembled filter, `ScriptEngine.eval`/SpEL; qualified names (`new java.io.File(`)
 match. Flows the OWASP Benchmark exercises are read: a variable reassigned inside a block keeps its taint after

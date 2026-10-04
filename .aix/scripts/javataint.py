@@ -18,11 +18,17 @@ SOURCES = re.compile(r"\b(?:request|req|httpRequest|servletRequest)\.(?:getParam
 BINDING = re.compile(r"@(?:RequestParam|PathVariable|RequestBody|RequestHeader|CookieValue|ModelAttribute|MatrixVariable|RequestPart|FormParam|QueryParam|PathParam|HeaderParam)\b")
 Q = r"(?:[\w$]+\.)*"   # a fully qualified name: `new java.io.File(`, `javax.crypto.Cipher.getInstance(`
 SINKS = [  # (call head, VUL row, CWE, kind, which argument is dangerous)
-    (r"\.(?:executeQuery|executeUpdate|execute|executeLargeUpdate|prepareStatement|prepareCall|createQuery|createNativeQuery|createSQLQuery|queryForList|queryForObject|queryForMap|update|batchUpdate|addBatch|nativeQuery)\(", "VUL-INJ-001", "CWE-89", "SQL statement", "assembled"),
+    # SQL: the statement is the first argument. A method that takes only a statement is a sink for a tainted first argument, raw or
+    # assembled; a method that also takes bound parameters (`update(sql, params)`) only for an assembled one: a tainted value among the
+    # parameters never touches the statement (CodeQL benchmark, section 18). `.execute(` is JDBC only on a statement-like receiver.
+    (r"\.(?:executeQuery|executeUpdate|executeLargeUpdate|prepareStatement|prepareCall|createQuery|createNativeQuery|createSQLQuery|nativeQuery|addBatch)\(", "VUL-INJ-001", "CWE-89", "SQL statement", "first"),
+    (r"\b(?:[\w$]*(?:[sS]tatement|[sS]tmt|[jJ]dbc|[tT]emplate|[sS]ession|[qQ]uery|[sS]ql)[\w$]*|ps|st|cs|em)\.execute\(", "VUL-INJ-001", "CWE-89", "SQL statement", "first"),
+    (r"\.(?:queryForList|queryForObject|queryForMap|update|batchUpdate|query)\(", "VUL-INJ-001", "CWE-89", "SQL statement", "first-assembled"),
     (rf"\b{Q}Runtime\.getRuntime\(\)\.exec\(|\b[\w$]+\.exec\(|\bnew\s+{Q}ProcessBuilder\(|\.command\(", "VUL-INJ-002", "CWE-78", "shell command", "any"),
     (rf"\bnew\s+{Q}(?:File|FileInputStream|FileOutputStream|FileReader|FileWriter|RandomAccessFile|PrintWriter|FileSystemResource)\(|\b{Q}Paths\.get\(|\b{Q}Path\.of\(|\b{Q}Files\.(?:read\w*|write\w*|newInputStream|newOutputStream|newBufferedReader|newBufferedWriter|delete\w*|copy|move|lines|exists|createFile|createDirectory)\(", "VUL-INJ-002", "CWE-22", "file path", "any"),   # `new File(dir, name)`: the name is the second argument
     (r"\.sendRedirect\(|\bnew\s+(?:[\w$]+\.)*RedirectView\(", "VUL-WEB-003", "CWE-601", "redirect target", "first"),
-    (rf"\bnew\s+{Q}ObjectInputStream\(|\bnew\s+{Q}XMLDecoder\(|\.readObject\(|\bXStream\(\)\.fromXML\(", "VUL-INPUT-002", "CWE-502", "deserialisation", "any"),
+    (rf"\bnew\s+{Q}ObjectInputStream\(|\bnew\s+{Q}XMLDecoder\(|\.readObject\(|\.fromXML\(", "VUL-INPUT-002", "CWE-502", "deserialisation", "any"),
+    (r"\b(?![\w$]*[jJ][sS][oO][nN])(?:[\w$]*(?:[bB]uilder|[pP]arser|[fF]actory|[uU]nmarshaller|[dD]om|[xX]ml|[sS]ax|[sS]tax|[rR]eader)[\w$]*|db|dbf|xif|xef)\.(?:parse|createXMLStreamReader|createXMLEventReader|unmarshal)\(", "VUL-INPUT-001", "CWE-611", "XML document parsed", "any"),   # XXE: a tainted document into a parser
     (rf"\b{Q}Class\.forName\(|\.loadClass\(", "VUL-INJ-002", "CWE-470", "class loading", "first"),
     (rf"\bnew\s+{Q}URL\(|\.openConnection\(|\b{Q}HttpRequest\.newBuilder\(|\bRestTemplate\(\)\.\w+\(|\brestTemplate\.(?:getForObject|getForEntity|exchange|postForObject)\(", "VUL-INPUT-001", "CWE-918", "outbound request URL", "first"),   # a URI object alone requests nothing
     (r"\.getWriter\(\)\.(?:print|println|printf|format|write|append)\(|\.getOutputStream\(\)\.(?:print|println|write)\(", "VUL-WEB-001", "CWE-79", "HTML response", "any"),
@@ -46,7 +52,7 @@ SANITISED = re.compile(r"\b(?:Integer|Long|Short|Byte|Double|Float)\.(?:parseInt
                        r"|\bBoolean\.parseBoolean\((?:[^()]|\([^()]*\))*\)|\bUUID\.fromString\((?:[^()]|\([^()]*\))*\)"
                        r"|\b(?:URLEncoder|HtmlUtils|StringEscapeUtils|Encode|ESAPI\.encoder\(\)|Jsoup|FilenameUtils)\.\w+\((?:[^()]|\([^()]*\))*\)"
                        r"|\.(?:matches|normalize|getFileName)\((?:[^()]|\([^()]*\))*\)")
-METHOD = re.compile(r"(?:^|\n)[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*[\w.$<>\[\], ?]+?\s+([\w$]+)\s*\(((?:[^()]|\([^()]*\))*)\)\s*(?:throws\s+[\w.,\s]+)?\s*\{")   # a parameter may carry `@RequestParam("x")`
+METHOD = re.compile(r"(?:^|\n)[ \t]*(?:@\w+(?:\([^)]*\))?[ \t]*)*(?:(?:public|private|protected|static|final|synchronized|abstract|default)\s+)*(?:@[\w.$]+(?:\([^)]*\))?\s+)*[\w.$<>\[\], ?]+?\s+([\w$]+)\s*\(((?:[^()]|\([^()]*\))*)\)\s*(?:throws\s+[\w.,\s]+)?\s*\{")   # a parameter may carry `@RequestParam("x")`; `public @ResponseBody T m(` is a method
 JAVA_EXT = (".java",)
 
 
