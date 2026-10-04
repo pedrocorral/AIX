@@ -171,7 +171,12 @@ def _rust_imports(file: _File, files: dict):
         if target:
             _bind_named(file, target, path[-1] if braces is None else braces)
         elif path[0] not in ("crate", "super", "self"):
-            file.externals |= {n.strip().split(" as ")[-1].strip() for n in ([path[-1]] if braces is None else braces.split(","))}
+            file.externals |= _use_names(path, braces)
+
+
+def _use_names(path: list, braces) -> set:
+    """The local names a `use` of an external crate binds: the last segment, or each name in the braces."""
+    return {n.strip().split(" as ")[-1].strip() for n in ([path[-1]] if braces is None else braces.split(","))}
 
 
 def _java_visible_classes(file: _File, files: dict, java_idx: dict):

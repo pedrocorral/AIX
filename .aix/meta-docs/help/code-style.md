@@ -7,6 +7,8 @@ function (or `path:LINE` for a callback) gives a card: each metric against its l
 Metrics and limits (.aix/config.yaml `style:` block; sources in .aix/meta-docs/conventions/readability.md)
   lines                  60   NASA/JPL one page; McConnell: a ceiling, not a target
   cognitive complexity   15   Campbell / SonarSource 2017: nesting and breaks in linear flow; built for readability
+                              (a Python comprehension is a loop; Rust's `?`, match arms and guards are not branches:
+                              checked against complexipy and rust-code-analysis, benchmark section 16)
   cyclomatic complexity  10   McCabe 1976: independent paths = tests needed
   nesting depth           4   Kernighan & Plauger, McConnell
   parameters              5   pylint default; McConnell's hard limit 7; a destructured object counts as its keys

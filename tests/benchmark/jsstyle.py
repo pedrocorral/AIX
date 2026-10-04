@@ -79,12 +79,16 @@ def eslint_functions(items: list) -> dict:
             _core_value(fns, t, value)
         elif t["rule"] in ("sonarjs/cognitive-complexity", "max-depth"):
             later.append((t, value))
+    _fold_later(fns, later)
+    return fns
+
+
+def _fold_later(fns: dict, later: list):
     for t, value in later:
         fn = _innermost(fns, t["file"], t["line"])
         if fn is not None:
             key = "nesting" if t["rule"] == "max-depth" else "cognitive"
             fn[key] = max(fn[key], value)
-    return fns
 
 
 CORE = {"max-lines-per-function": "lines", "complexity": "cyclomatic", "max-params": "params"}

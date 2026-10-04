@@ -88,7 +88,18 @@ class _Cognitive:
             return self._if
         if isinstance(node, (ast.For, ast.While, ast.AsyncFor)):
             return self._loop
-        return {ast.Try: self._try, ast.IfExp: self._ternary, ast.BoolOp: self._bool}.get(type(node))
+        return {ast.Try: self._try, ast.IfExp: self._ternary, ast.BoolOp: self._bool, ast.ListComp: self._comprehension, ast.SetComp: self._comprehension,
+                ast.DictComp: self._comprehension, ast.GeneratorExp: self._comprehension}.get(type(node))
+
+    def _comprehension(self, node, depth) -> list:
+        """A comprehension is a loop: +1 and the nesting level, +1 per further `for`, +1 per `if` clause; what it
+        holds is one level deeper (sonar-python; complexipy agrees, benchmark section 16)."""
+        self.add(node, 1 + depth, f"comprehension (+1, nesting +{depth})" if depth else "comprehension (+1)")
+        for extra in node.generators[1:]:
+            self.add(extra.iter, 1, "comprehension for (+1)")
+        for cond in [c for g in node.generators for c in g.ifs]:
+            self.add(cond, 1, "comprehension if (+1)")
+        return _at(ast.iter_child_nodes(node), depth + 1)
 
     def _ternary(self, node, depth) -> list:
         self.add(node, 1 + depth, "ternary (+1)")
@@ -104,7 +115,7 @@ class _Cognitive:
         out = _at(node.body, depth + 1) + [(node.test, depth)]
         if not node.orelse:
             return out
-        if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
+        if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If) and node.orelse[0].col_offset == node.col_offset:   # `elif`, not `else: if` (indented deeper)
             self.add(node.orelse[0], 1, "elif (+1)")
             return out + self._if(node.orelse[0], depth, is_elif=True)
         self.add(node.orelse[0], 1, "else (+1)")
@@ -127,8 +138,8 @@ def _at(nodes, depth) -> list:
 
 
 def cognitive_py(fn):
-    """SonarSource cognitive complexity: +1 per break in linear flow (if/elif/else, loops, except, ternary,
-    boolean-operator sequences, recursion), +nesting level for the nested ones, elif/else without nesting penalty.
+    """SonarSource cognitive complexity: +1 per break in linear flow (if/elif/else, loops, comprehensions, except,
+    ternary, boolean-operator sequences, recursion), +nesting level for the nested ones, elif/else without nesting penalty.
     Returns (total, [(line, increment, reason)])."""
     c = _Cognitive(fn)
     for stmt in fn.body:
@@ -218,12 +229,16 @@ def analyse_tokens(file: Path, name: str, span: tuple, text: str, lang: str):
     children being the (brace, end) spans of the functions inside it, measured on their own and blanked out of
     this one's code."""
     head_start, header_end, children = span
+    while head_start < header_end and text[head_start] in " \t\r\n":
+        head_start += 1   # a Rust head match may begin on the blank line above the `fn`
     start_line = text.count("\n", 0, header_end) + 1
     body = brace_block(text, header_end, lang)
     own = blank_children(body, header_end, children)
     head = text[head_start:text.find("{", header_end)]   # the whole head: a parameter list may span lines
     cleaned = re.sub(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`", " ", own, flags=re.S)
-    walk = _TokenWalk(start_line)
+    if lang == "rust":
+        cleaned = re.sub(r"\bif\b(?=[^{};\n]*=>)", "  ", cleaned)   # a match arm's guard (`Short(ch) if ch == 'h' =>`) is part of the arm, not a branch
+    walk = _TokenWalk(start_line, lang)
     for m in TOKEN_RX.finditer(cleaned):
         walk.feed(m.group(0), start_line + cleaned.count("\n", 0, m.start()))
     before = text[max(0, text.rfind("\n", 0, text.rfind("\n", 0, header_end))):header_end]
@@ -231,7 +246,7 @@ def analyse_tokens(file: Path, name: str, span: tuple, text: str, lang: str):
     decorated = bool(re.search(r"@\w+\s*(?:\([^)]*\))?\s*|^\s*#\[", before, re.M)) or (lang == "rust" and _trait_impl(text, header_end))
     forwards = passthrough_tokens(re.sub(r"//[^\n]*|/\*.*?\*/", " ", body, flags=re.S), head, name, lang, decorated)
     lines = body.count("\n") + 1 - sum(text.count("\n", cb, ce) for cb, ce in children)
-    fx = dict(name=name, file=rel(file), line=start_line, lang=lang, lines=lines, params=_params_of(head, name), cyclomatic=walk.cyc,
+    fx = dict(name=name, file=rel(file), line=start_line, head_line=text.count("\n", 0, head_start) + 1, lang=lang, lines=lines, params=_params_of(head, name), cyclomatic=walk.cyc,
               cognitive=walk.cog, cognitive_items=walk.items, nesting=max(walk.depth - 1, 0), deepest=(walk.deepest_line, walk.deepest_line),
               docstring=any(x in before for x in ("///", "/**", "*/", "//")), public=not name.startswith("_"), short_names=short, magic=magic, fname=name, src=body, own=own,
               test=is_test(file, name), decorated=decorated, passthrough=forwards, jsx=bool(JSX.search(body)) or file.suffix in (".jsx", ".tsx"))

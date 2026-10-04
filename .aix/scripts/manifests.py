@@ -239,9 +239,17 @@ def read_gradle(root: Path) -> list:
         base = build.parent
         catalog = base / "gradle" / "libs.versions.toml"
         libraries, plugins = version_catalog(catalog) if catalog.exists() else ([], {})
-        scripts = "\n".join(_text(g) for g in list(base.glob("*.gradle")) + list(base.glob("gradle/*.gradle")) + list(base.glob("*.gradle.kts")))
+        scripts = _gradle_scripts(base)
         boot = plugins.get("org.springframework.boot") or next(iter(re.findall(r"id\s*\(?['\"]org\.springframework\.boot['\"]\)?\s*version\s*['\"]([\w.-]+)['\"]", scripts)), "")
-        deps = [(name, version, "", []) for name, version in libraries] + [(f"{g}:{a}", v or "", "", []) for g, a, v in GRADLE_DEP.findall(scripts)]
+        deps = _gradle_deps(libraries, scripts)
         if deps:
             out.append((rel(build), deps, {}, ("org.springframework.boot:spring-boot-dependencies", boot) if boot else None))
     return out
+
+
+def _gradle_scripts(base: Path) -> str:
+    return "\n".join(_text(g) for g in list(base.glob("*.gradle")) + list(base.glob("gradle/*.gradle")) + list(base.glob("*.gradle.kts")))
+
+
+def _gradle_deps(libraries: list, scripts: str) -> list:
+    return [(name, version, "", []) for name, version in libraries] + [(f"{g}:{a}", v or "", "", []) for g, a, v in GRADLE_DEP.findall(scripts)]

@@ -1,7 +1,7 @@
 """The token walker of the brace languages: nesting depth, cyclomatic and cognitive complexity from a cleaned body."""
 import re
 
-TOKEN_RX = re.compile(r"\{|\}|;|\b(if|for|while|switch|catch|match|loop|else|try|finally|synchronized)\b|&&|\|\||\?\?|\?(?![.?:])")   # `?.` and `x?: T` are not branches
+TOKEN_RX = re.compile(r"\{|\}|;|=>|\b(if|for|while|switch|catch|match|loop|else|try|finally|synchronized)\b|&&|\|\||\?\?|\?(?![.?:])")   # `?.` and `x?: T` are not branches
 BRANCH_WORDS = ("if", "for", "while", "switch", "catch", "match", "loop")
 FLAT_BLOCKS = ("try", "finally", "synchronized")   # their brace is not a nesting level (Campbell 2017: catch is, try is not)
 OPERATORS = ("&&", "||", "??")
@@ -11,13 +11,18 @@ class _TokenWalk:
     """Brace-language metrics from a cleaned body: nesting depth (every block), cyclomatic (McCabe: each branch and
     boolean operator) and cognitive complexity (Campbell 2017: +1 per branch plus the nesting level of if/else/loop/
     catch/lambda blocks, +1 per sequence of like boolean operators, `else if` is one branch)."""
-    def __init__(self, start_line: int):
-        self.start_line, self.depth, self.cur = start_line, 0, 0
+    def __init__(self, start_line: int, lang: str = "js"):
+        self.lang, self.start_line, self.depth, self.cur = lang, start_line, 0, 0
         self.cog, self.cyc, self.items, self.deepest_line = 0, 1, [], start_line
         self.nest, self.stack, self.flat, self.run, self.after_else = 0, [], True, None, False   # the body's own brace is not a level
 
     def feed(self, tok: str, line: int):
         after_else, self.after_else = self.after_else, False
+        if tok == "?" and self.lang == "rust":
+            return   # Rust's `?` propagates an error, it is not a ternary (benchmark section 16)
+        if tok == "=>":
+            self.flat = self.lang == "rust"   # a `match` arm's block is not a level of its own: the `match` is the level
+            return
         if tok == "{":
             self._open(line)
         elif tok == "}":

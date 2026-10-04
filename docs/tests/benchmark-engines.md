@@ -734,6 +734,65 @@ every handler the rule skipped. `authz.py` on the Java projects of the cache, no
 reported; a security annotation, a `Principal` parameter with an owner comparison, a service reading the current
 user, an owner-aware repository call, an entity without an owner and a project without authentication are not.
 
+### 16. Python and Rust cognitive complexity: ours vs complexipy and rust-code-analysis (2.21.38)
+
+Both references implement SonarSource's definition and print a value per function. Python: complexipy 8.0.1 on
+flask, requests, pygoat and the kit's own scripts and tests (`tests/benchmark/pystyle.py`, paired by file and
+qualified name; of several definitions with one name, typing overloads and property setters, the last one). Rust:
+rust-code-analysis 0.0.25 (Mozilla) on ripgrep and bat (`tests/benchmark/ruststyle.py`, paired by file and the
+line of the `fn`), with clippy's `cognitive_complexity`, `too_many_arguments` and `too_many_lines` lints as a
+second column. Both toolchains live in the benchmark folder outside the repository (a rustup toolchain with clippy,
+630 MB; rust-code-analysis built with `cargo install --locked`).
+
+Before the fixes, Python: flask 784 equal / 29 within one / 23 apart of 836, requests 564 / 15 / 17, pygoat 177 /
+1 / 1, the kit 1008 / 191 / 372 of 1571, ours below complexipy in 335 of the kit's 372. Rust against
+rust-code-analysis: bat 406 equal / 61 / 54 of 521, ripgrep 2405 / 159 / 144 of 2708, ours above in every large
+function.
+
+After the fixes:
+
+| project | functions | paired | equal | within 1 | further apart | ours > 15 | reference > 15 | both |
+|---|---|---|---|---|---|---|---|---|
+| flask | 836 | 823 | 796 | 19 | 8 | 11 | 11 | 11 |
+| requests | 596 | 596 | 588 | 3 | 5 | 13 | 13 | 13 |
+| pygoat | 179 | 179 | 178 | 1 | 0 | 4 | 4 | 4 |
+| aix (the kit) | 1573 | 1573 | 1242 | 140 | 191 | 4 | 2 | 1 |
+| bat | 521 | 521 | 473 | 37 | 11 | 10 | 9 | 9 |
+| ripgrep | 2709 | 2708 | 2627 | 56 | 25 | 29 | 28 | 28 |
+
+Every difference read by hand, with planted probes through both references where the reading needed one:
+
+**Bugs in ours, fixed (five).**
+
+1. Python comprehensions were not counted. A list, set, dict comprehension or generator expression is a loop: +1 and
+   its nesting level, +1 per further `for`, +1 per `if` clause, and what it holds is one level deeper. The kit's own
+   code is written in comprehensions, which is why 335 of its functions read lower than complexipy.
+2. Python `else:` holding a single `if` was read as `elif`: the AST is the same shape, the column tells them apart.
+   `Server.__exit__` in requests' test server: ours 2, by the definition 4.
+3. Rust `?` was counted as a ternary (the walker's `?` is the JS/Java one): `read(p)?` on every line of a function
+   added 1 each. Rust has no ternary.
+4. A Rust `match` arm's block was a nesting level of its own, so an `if` inside an arm cost one more than the
+   definition says (the `match` is the level).
+5. A Rust match guard (`Arg::Short(ch) if ch == 'h' =>`) was a branch; it is part of the arm.
+
+**Where the reference is short, no change (Python).** The kit's remaining 191 differences, all read by construct:
+complexipy does not look into generator expressions that are arguments of a call with keyword arguments
+(`dict(a=sum(x for x in xs))` is 0 for complexipy, 1 by the definition; the plain `sum(x for x in xs if x)` is 2 for
+both), into f-strings (`f"{'x' if a else 'y'}"` is 0 for complexipy) or into lambdas (`lambda x: 1 if x else 0`
+is 0), and it does not add a nesting level for a nested function (`def inner` holding an `if`: 1 for complexipy, 2
+by the definition). Ours follows the definition on all four, so the kit, which is full of generator expressions in
+`dict(...)` calls, reads higher. The eight flask and five requests differences are the same constructs plus
+functions where ours is above by 2 to 4 for the same reasons (`routes_command` 23 against 19).
+
+**Where the definitions differ, no change (Rust).** Parameters: rust-code-analysis and clippy count `self`, ours
+does not (150 of bat's 521 differ by exactly one, every one a method). Lines: ours counts the body from its brace,
+rust-code-analysis the span from the `fn` line, so a multi-line head or a doc comment above makes the difference
+(46 on bat); over 60 lines both sides name the same 17 on bat and 38 of 39 and 42 on ripgrep. Clippy's
+`too_many_lines` leaves out blank and comment lines (187 differ on bat) and its `cognitive_complexity` lint is its
+own algorithm, in the nursery group: 46 of bat's functions differ from both ours and rust-code-analysis. The 25
+ripgrep and 11 bat functions still apart from rust-code-analysis are large `match`/`loop` bodies with closures
+(`walk.rs:next` ours 30, reference 20); every one is over 15 on both sides.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
