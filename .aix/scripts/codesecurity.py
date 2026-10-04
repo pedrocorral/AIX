@@ -20,7 +20,7 @@ import assembled
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from secretscan import SECRET_ADVICE, secret_findings
 import secretscan
-import infrarules
+import authz, infrarules
 import pushscan
 from depscan import scan_dependencies, scan_dockerfile
 
@@ -163,7 +163,7 @@ def _dedupe(findings):
 
 
 def scan(paths):
-    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)] + infrarules.root_findings(paths)
+    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)] + infrarules.root_findings(paths) + authz.findings(paths)
     for root in {ROOT} | {(ROOT / r) for r in paths if (ROOT / r).is_dir()}:
         findings += scan_dependencies(root)
     return _dedupe(findings)
@@ -235,7 +235,7 @@ def _by_open_count(by_vul) -> list:
 def render(findings, paths, strict):
     """(report text, number of findings to review) for the scan of `paths`."""
     rows = register_rows()
-    covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES})
+    covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES} | {authz.ROW})
     skipped = [fx for fx in findings if fx[0] == "SKIPPED"]
     findings = [fx for fx in findings if fx[0] != "SKIPPED"]
     by_vul = _group(findings)
@@ -277,7 +277,7 @@ def write_audit(findings, paths):
     today = date.today().isoformat()
     out = ROOT / "docs" / "security" / "audits" / f"AUDIT-{today}-code.md"
     by_vul = _group(findings)
-    covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES})
+    covered = sorted({r[0] for r in RULES} | {r[0] for r in DOCKER_RULES} | {authz.ROW})
     result = "findings" if any(not f[7] for f in findings) else "pass"
     body = [f"---\nid: AUDIT-{today}-code\nskill: aix code security (deterministic scan)\ndate: {today}\nscope: [{', '.join(paths)}]\nresult: {result}\n---",
             f"# Audit — code scan — {today}", "", "## Method (what was checked, tools run)",

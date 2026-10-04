@@ -42,6 +42,16 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   `Keys.hmacShaKeyFor`, `new SecretKeySpec` (CWE-798); an empty `checkServerTrusted`, `getAcceptedIssuers` returning
   null, a hostname verifier returning true, `NoopHostnameVerifier`, `TrustAllStrategy` (CWE-295).
 
+  Ownership on `{id}` handlers, Java (2.21.36, VUL-AUTHZ-001, CWE-639): a web handler that takes an id from the URL
+  (`@PathVariable`, `@PathParam`) and loads, builds or changes a thing that belongs to a user (a class with a
+  user-typed field or an owner id: `private User user`, `userId`, `ownerId`, `tenantId`), with nothing on the way
+  tying it to the caller: no `@PreAuthorize`/`@Secured`/`@RolesAllowed` on the method or its class, no principal
+  read (`getCurrentUserLogin`, `getAuthentication`, a `Principal` parameter, `@AuthenticationPrincipal`), no
+  owner-aware repository method (`findByIdAndUser…`, `…IsCurrentUser`), no owner comparison (`.getUser()`,
+  `.getOwner()`), in the handler or in the service method it calls one level down. Not a finding: a project with no
+  authentication (no security dependency in the build, no security configuration), a thing without an owner, an
+  annotated handler. Ownership through another thing (an operation of a bank account of a user) is not followed.
+
   Assembled, then used (every language): a variable takes a string built from a literal plus a value (`+`, f-string,
   .format, template literal, String.format, format!, %) and, within the next 40 lines, is the argument of a dangerous
   call. What the literal looks like picks the sinks: an SQL keyword -> query/execute (CWE-89); a path or path.join ->

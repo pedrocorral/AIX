@@ -9,7 +9,8 @@ Metrics and limits (.aix/config.yaml `style:` block; sources in .aix/meta-docs/c
   cognitive complexity   15   Campbell / SonarSource 2017: nesting and breaks in linear flow; built for readability
   cyclomatic complexity  10   McCabe 1976: independent paths = tests needed
   nesting depth           4   Kernighan & Plauger, McConnell
-  parameters              5   pylint default; McConnell's hard limit 7
+  parameters              5   pylint default; McConnell's hard limit 7; a destructured object counts as its keys
+                              (`({ a, b, c })` is three: what the function depends on, decided 2026-10-04 against ESLint's one)
   file lines            400
   leftovers             none  an import nothing in the file uses (JS/TS, Java, Python; a Rust `use` may carry a trait, the
                               compiler warns), a variable assigned and never read, a trailing parameter never read (one

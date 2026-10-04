@@ -660,7 +660,7 @@ paired functions, equal or within one: cyclomatic 99 % (express), 98 % (juice-sh
 cognitive 99 %, 98 %, 95 %; parameters 100 %, 99 %, 95 %. Over the kit's limits, ours / ESLint / both:
 cyclomatic express 5 / 4 / 4, juice-shop 14 / 17 / 11, excalidraw 109 / 112 / 89; cognitive express 3 / 3 / 3,
 juice-shop 10 / 9 / 9, excalidraw 81 / 77 / 71; parameters juice-shop 20 / 17 / 17, excalidraw 97 / 27 / 27
-(destructured props, decision pending). Lines is the row where decision 2 shows: ESLint puts 161 express
+(destructured props: decided 2026-10-04, ours counts the keys, ESLint counts one; no change). Lines is the row where decision 2 shows: ESLint puts 161 express
 functions over 60 lines, ours 4, the difference being `describe` blocks that own a few lines each;
 excalidraw 330 against 167. Found on the way and fixed: a `'…'` string or a regex literal holding a bracket
 unbalanced the body scan (every `describe` block of the Angular spec files was lost to a `'{{ name }}'` template
@@ -717,6 +717,22 @@ callbacks (express 9 to 214 groups, JHipster 44 to 159) are listed and, being al
    properties (`private readonly http: HttpClient`), excalidraw 88 are interface or type members, 9 / 12 / 12 are
    enum members, the rest function-type parameter names (`(sizes: StorageSizes) => void`) and overload signatures.
    ESLint's `no-empty` and `no-cond-assign` agree with ours on every line ours reads.
+
+### 15. Ownership on `{id}` handlers (2.21.36, VUL-AUTHZ-001): ours only, read by hand
+
+No engine in this benchmark has a rule for object-level authorisation, so the measure is reading every finding and
+every handler the rule skipped. `authz.py` on the Java projects of the cache, non-test code:
+
+| project | handlers with a path parameter | reported | read |
+|---|---|---|---|
+| jhipster-sample-app (and the Gradle twin) | 17 | 4 | `BankAccountResource.java:77, 111, 165, 178`: update, patch, get and delete a `BankAccount` (`private User user`) by id, loaded with `findById`/`findOneWithEagerRelationships`, no principal read, no annotation; the repository has `findByUserIsCurrentUser` but the id handlers do not use it. Skipped: `Label` and `Authority` (no owner field), `User` (the `UserResource` handlers carry `@PreAuthorize("hasRole('ADMIN')")`), `Operation` (owned through its bank account: one hop, out of scope by the criterion) |
+| WebGoat | 9 | 2 | `lessons/idor/IDORViewOtherProfile.java:57` and `IDOREditOtherProfile.java:56`: the IDOR lesson, `new UserProfile(userId)` from the path (`private String userId`), the only check a comparison against a session value the rule does not know (`userSessionData.getValue("idor-authenticated-user-id")`), and the lesson's point is that it is wrong. The other seven path-parameter handlers build nothing owned |
+| spring-petclinic | 4 | 0 | no Spring Security in the build and no security configuration: nothing to own |
+| BenchmarkJava, commons-lang | 0 | 0 | — |
+
+`tests/test_authz.py` plants one handler per situation: the bare one and a service that loads by id alone are
+reported; a security annotation, a `Principal` parameter with an owner comparison, a service reading the current
+user, an owner-aware repository call, an entity without an owner and a project without authentication are not.
 
 ## Where the numbers come from
 
