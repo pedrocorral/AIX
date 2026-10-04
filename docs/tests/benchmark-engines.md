@@ -545,6 +545,150 @@ Every mismatch read by hand:
    counts them. PMD's `ExcessiveParameterList` also leaves out the two `completed` methods with 6 parameters that
    Checkstyle and ours report; its count is by its own rule, not read further.
 
+### 14. JS/TS style: ours vs ESLint 10.12.0 (typescript-eslint parser 8.71, SonarJS plugin 4.2) on the same functions
+
+`tests/benchmark/jsstyle.py` on the six JS/TS projects of the cache, both sides reading the same file list (the kit's
+code roots, vendored files and `node_modules` left out). ESLint runs with every threshold at 0 so it reports each
+function with its value (`tests/benchmark/style/eslint.config.mjs`); the runner pairs its functions with ours by file,
+line and name, then applies the kit's limits to both sides. Ours is the raw metric, before the gate's exemptions.
+Node and ESLint live in the benchmark folder, outside the repository.
+
+**Which functions each side sees.** ESLint measures every function including anonymous ones; ours measures the named
+units its head patterns know. The unpaired ESLint functions, by kind:
+
+| project | files | functions ours | functions ESLint | paired | ESLint-only, by kind | ours s | ESLint s |
+|---|---|---|---|---|---|---|---|
+| express | 152 | 144 | 3262 | 144 | anonymous function 2977, named function 77, named method 64 | 0.2 | 1.0 |
+| NodeGoat | 44 | 38 | 268 | 35 | anonymous arrow 203, anonymous function 29, named method 1 | 0.1 | 0.6 |
+| juice-shop | 585 | 869 | 5015 | 829 | anonymous arrow 3619, anonymous function 399, named function 92, named method 73 | 0.9 | 2.1 |
+| excalidraw | 379 | 1261 | 4723 | 1257 | anonymous arrow 2734, anonymous function 275, named method 265, named function 191 | 2.4 | 2.9 |
+| jhipster-sample-app | 286 | 384 | 2205 | 378 | anonymous arrow 1400, anonymous function 316, named method 78, named arrow 24, named function 9 | 0.4 | 1.2 |
+| jhipster-sample-app-gradle | 289 | 385 | 2217 | 379 | anonymous arrow 1402, anonymous function 322, named method 81, named arrow 24, named function 9 | 0.4 | 1.2 |
+
+**The metrics on the paired functions**, and how many each side puts over the kit's limit:
+
+| metric | project | equal | within 1 | further apart | ours over | ESLint over | both |
+|---|---|---|---|---|---|---|---|
+| lines > 60 | express | 144 | 0 | 0 | 3 | 3 | 3 |
+| lines > 60 | NodeGoat | 35 | 0 | 0 | 8 | 8 | 8 |
+| lines > 60 | juice-shop | 778 | 8 | 43 | 14 | 14 | 14 |
+| lines > 60 | excalidraw | 579 | 0 | 678 | 118 | 135 | 118 |
+| lines > 60 | jhipster-sample-app | 358 | 0 | 20 | 0 | 0 | 0 |
+| lines > 60 | jhipster-sample-app-gradle | 357 | 0 | 22 | 0 | 0 | 0 |
+| cyclomatic > 10 | express | 118 | 16 | 10 | 3 | 1 | 1 |
+| cyclomatic > 10 | NodeGoat | 18 | 5 | 12 | 2 | 0 | 0 |
+| cyclomatic > 10 | juice-shop | 629 | 88 | 112 | 12 | 7 | 4 |
+| cyclomatic > 10 | excalidraw | 811 | 203 | 243 | 97 | 87 | 68 |
+| cyclomatic > 10 | jhipster-sample-app | 316 | 40 | 22 | 2 | 1 | 1 |
+| cyclomatic > 10 | jhipster-sample-app-gradle | 316 | 41 | 22 | 2 | 1 | 1 |
+| cognitive > 15 | express | 110 | 10 | 24 | 2 | 1 | 1 |
+| cognitive > 15 | NodeGoat | 18 | 0 | 17 | 5 | 0 | 0 |
+| cognitive > 15 | juice-shop | 635 | 53 | 141 | 15 | 4 | 3 |
+| cognitive > 15 | excalidraw | 775 | 211 | 271 | 84 | 54 | 50 |
+| cognitive > 15 | jhipster-sample-app | 308 | 24 | 46 | 0 | 0 | 0 |
+| cognitive > 15 | jhipster-sample-app-gradle | 310 | 23 | 46 | 0 | 0 | 0 |
+| nesting > 4 | express | 94 | 39 | 11 | 0 | 0 | 0 |
+| nesting > 4 | NodeGoat | 4 | 16 | 15 | 4 | 0 | 0 |
+| nesting > 4 | juice-shop | 420 | 217 | 192 | 12 | 1 | 0 |
+| nesting > 4 | excalidraw | 694 | 291 | 272 | 46 | 4 | 4 |
+| nesting > 4 | jhipster-sample-app | 242 | 83 | 53 | 2 | 0 | 0 |
+| nesting > 4 | jhipster-sample-app-gradle | 243 | 82 | 54 | 2 | 0 | 0 |
+| parameters > 5 | express | 144 | 0 | 0 | 0 | 0 | 0 |
+| parameters > 5 | NodeGoat | 35 | 0 | 0 | 1 | 1 | 1 |
+| parameters > 5 | juice-shop | 797 | 19 | 13 | 17 | 17 | 17 |
+| parameters > 5 | excalidraw | 1091 | 46 | 120 | 77 | 27 | 27 |
+| parameters > 5 | jhipster-sample-app | 375 | 3 | 0 | 1 | 1 | 1 |
+| parameters > 5 | jhipster-sample-app-gradle | 376 | 3 | 0 | 1 | 1 | 1 |
+
+**The line rows** (file lines matched by file, the rest by line):
+
+| row | project | ours | ESLint | both |
+|---|---|---|---|---|
+| file lines > 400 | express / NodeGoat / juice-shop / excalidraw / JHipster ×2 | 15 / 0 / 8 / 56 / 0 / 0 | 15 / 0 / 8 / 56 / 0 / 0 | all |
+| swallowed exception | express / NodeGoat / juice-shop / excalidraw / JHipster ×2 | 0 / 0 / 1 / 3 / 0 / 0 | 0 / 0 / 1 / 3 / 0 / 0 | all |
+| assignment inside a condition | express | 0 | 3 | 0 |
+| unused import / variable / parameter | express | 0 | 145 | 0 |
+| unused import / variable / parameter | NodeGoat | 12 | 23 | 7 |
+| unused import / variable / parameter | juice-shop | 10 | 267 | 5 |
+| unused import / variable / parameter | excalidraw | 34 | 371 | 1 |
+| unused import / variable / parameter | jhipster-sample-app | 2 | 66 | 0 |
+| unused import / variable / parameter | jhipster-sample-app-gradle | 2 | 70 | 0 |
+
+Every mismatch read by hand:
+
+**After the fixes of 2.21.34** (bugs 1 to 4 below), the same run:
+
+| project | functions ours | functions ESLint | paired | ESLint-only named | ESLint-only anonymous |
+|---|---|---|---|---|---|
+| express | 339 (was 144) | 3262 | 339 | 14 (was 141) | 2909 |
+| NodeGoat | 76 (was 38) | 268 | 73 | 0 (was 1) | 195 |
+| juice-shop | 1027 (was 869) | 5015 | 975 | 54 (was 165) | 3986 |
+| excalidraw | 1601 (was 1261) | 4723 | 1599 | 140 (was 456) | 2984 |
+| jhipster-sample-app | 390 (was 384) | 2205 | 390 | 101 (was 111) | 1714 |
+
+The named functions still unpaired are expression-bodied arrows with no block (`next: () => this.success.set(true)`,
+33 of JHipster's first 40, 37 of juice-shop's), which are not units by the kit's definition, a head continuing on the
+next line, and methods named `delete` or `default`, keywords for the head reader. Over the kit's limits on the paired
+functions, ours / ESLint / both: lines express 7 / 7 / 7, excalidraw 152 / 169 / 152; cyclomatic express 9 / 3 / 3,
+excalidraw 126 / 91 / 73; cognitive juice-shop 38 / 4 / 4, excalidraw 108 / 65 / 61; parameters juice-shop 18 / 17 /
+17, excalidraw 81 / 27 / 27. The unused-name row: NodeGoat 7 / 23 / 7, juice-shop 22 / 267 / 19, excalidraw 17 / 371
+/ 6, express and JHipster 0 on ours; the three juice-shop lines ours alone reports are two `...args` rest parameters
+the body never reads (it reads `arguments`) and the known `"` inside a `'…'` string. ESLint's over-limit complexity
+findings in functions ours cannot see went from 3 of 4 to 1 of 4 (express), 10 of 17 to 10 of 17 (juice-shop), 25 of
+112 to 21 of 112 and 23 of 77 to 12 of 77 (excalidraw); all of those are now anonymous callbacks, the subject of the
+next criterion.
+
+**Bugs in ours (five), fixed in 2.21.34 except the last, which is ESLint's.**
+
+1. Named functions ours does not see. A named function expression assigned to a property, returned or passed
+   (`app.init = function init() {`, `module.exports = function query(`, `return function expressInit(`: all 23 of
+   express's unpaired named functions in `lib/`), an object-literal method (`html: function () {`, `next: () =>
+   this.success.set(true)`: 17 of express's first 40, 28 of juice-shop's, 30 of JHipster's), a class field holding an
+   arrow (`private onUnload = () => {`: 37 of excalidraw's first 40), a getter or setter. These are absent from style,
+   clones, the call graph and hygiene, and the three express assignments inside a condition (`lib/router/index.js:116`) that ESLint
+   reports are inside such functions.
+2. A `{` inside the head cuts the body to one line: a destructured parameter (`function handleZipFileUpload ({ file }:
+   Request, …) {`, `export default function App({ appTitle, … }: AppProps) {`) or an inline object type. The function
+   then measures 1 line, complexity 1, 0 parameters: 15 on juice-shop, 4 on excalidraw, 2 and 3 on JHipster, among them
+   an 819-line React component. A return type with braces (`delete(series: string): Observable<{}> {`) is the same
+   shape.
+3. A TypeScript declaration without a body is read as a function whose body is the next block: interface and overload
+   signatures (`hasAnyFilterSet(): boolean;` in `filter.model.ts`, reported with the interface's brace as its body),
+   `declare global` members in the Cypress support files, `onCloseRequest: () => void` type members in excalidraw.
+   4 to 12 per TypeScript project.
+4. Unused-name false positives, all 34 ours-only lines on excalidraw and the 5 on NodeGoat read: a comment or an
+   inline type inside a multi-line parameter list becomes a parameter name (`/* event */`, `UIAppState>["setState"];
+   libraryReturnUrl`), a TypeScript parameter property (`public name: string`), a comment inside a multi-line import
+   list (`// jhipster-needle-add-icon-import`), `require` lines inside an unterminated block comment read as imports
+   (NodeGoat `profile-dao.js:18`, `server.js:21`), and a `"` inside a `'…'` string starting a string (juice-shop
+   `customizeEasterEgg.ts:26`, `overlay` is read on the next line). The last one stays: stripping `'…'` strings
+   broke on a regex literal holding an apostrophe (`/OWASP Juice Shop's/`, 23 false imports in one file), so the
+   name search keeps ignoring single quotes, as JSX text needs.
+5. ESLint cannot parse 35 juice-shop files (`data/static/codefixes/*.ts`, code snippets that are not standalone
+   modules); ours reads them. Not a bug in ours, listed so the ours-only functions there are explained.
+
+**Definition differences, a decision rather than a fix (four).**
+
+6. A nested function is counted inside the enclosing function by ours; ESLint measures each function on its own.
+   Ours alone puts over the cognitive limit 1 / 5 / 12 / 34 functions (express / NodeGoat / juice-shop / excalidraw),
+   of which 1 / 5 / 12 / 28 hold a nested function: `lib/response.js:sendfile` ours 14 and 26 (cyclomatic, cognitive)
+   against ESLint 2 and 1, NodeGoat's `SessionHandler` 23 and 55 against 1 and 0, excalidraw's `ExcalidrawWrapper`
+   66 and 161 against 11 and 2. Nesting follows: ours counts every brace (callbacks, object literals), ESLint's
+   `max-depth` counts control blocks only: ours alone 4 / 12 / 46 / 2 over 4.
+7. Lines: ours counts the body from its brace, ESLint from the head's first line. The 611 excalidraw pairs where ours
+   is shorter with the same reported line are multi-line arrow heads (`RoomModal` 150 vs 158, eight lines of
+   destructured props); the 62 "head only" differences elsewhere are the same. ESLint puts 135 excalidraw functions
+   over 60 lines, ours 118.
+8. Parameters: a destructured object is one parameter for ESLint and its keys for ours: 129 of excalidraw's 166
+   differing pairs, and 44 functions over 5 on ours alone are React components taking one props object
+   (`LayerUI` ours 19, ESLint 1). Both sides agree on every plain list (17 / 17 on juice-shop, 27 / 27 on excalidraw).
+9. Unused names on ESLint's side: `no-unused-vars` is ESLint's base rule, which does not understand TypeScript. Of the
+   ESLint-only lines, express 131 and NodeGoat 13 are callback parameters (`req`, `res`, `next`, `err`) and 14 more
+   are in test files, both exempt in ours by design; juice-shop 155 and JHipster 27 are constructor parameter
+   properties (`private readonly http: HttpClient`), excalidraw 88 are interface or type members, 9 / 12 / 12 are
+   enum members, the rest function-type parameter names (`(sizes: StorageSizes) => void`) and overload signatures.
+   ESLint's `no-empty` and `no-cond-assign` agree with ours on every line ours reads.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
@@ -559,6 +703,11 @@ Every mismatch read by hand:
   (cookie-session secrets, which semgrep's express rule does not read).
 - The PMD Java rules were run by hand with `pmd check -R category/java/...` on the three Java projects and read
   against `aix code style --all`; their numbers are in the prose, not in the tables.
+- `tests/benchmark/jsstyle.py` prints section 14: ours straight from `stylemetrics` on the kit's code roots, ESLint from
+  `BENCH_DIR/eslint/node_modules` (eslint, @typescript-eslint/parser, eslint-plugin-sonarjs, installed with the Node
+  tarball in `BENCH_DIR/node`) with `tests/benchmark/style/eslint.config.mjs` at threshold 0, so every function comes
+  back with its value and the runner applies the kit's limits to both sides. It writes
+  `~/.cache/aix/benchmark/jsstyle-<project>.json` with the paired functions and every mismatch.
 - `tests/benchmark/javastyle.py` prints table 13: ours straight from `stylemetrics` on `src/main/java`, Checkstyle
   from `BENCH_DIR/checkstyle-all.jar` (the all-in-one jar of a GitHub release) with `tests/benchmark/style/checkstyle.xml`,
   PMD from `pmd-bin-<version>/` with `tests/benchmark/style/pmd.xml`; both configurations select the rows above at the kit's

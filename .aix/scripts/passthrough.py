@@ -64,10 +64,12 @@ def passthrough_py(fn):
 def _param_names(head: str, name: str, lang: str) -> list:
     """Parameter names in order: `x: T` (TS, Rust), `T x` (Java), `x` (JS); receivers (`self`, `this`) left out.
     The parameters are the parentheses after the function's name (`pub(crate) fn f(` has other parentheses first)."""
+    head = re.sub(r"//[^\n]*|/\*.*?\*/", " ", head, flags=re.S)   # `( /* event */ )`, a commented parameter
     m = re.search(rf"\b{re.escape(name)}\b[^(]*\(((?:[^()]|\([^()]*\))*)\)", head)
     names = []
     for p in (_split_top(m.group(1)) if m else []):
-        p = re.sub(r"=.*$", "", p.strip())
+        p = re.sub(r"=.*$", "", p.strip(), flags=re.S)
+        p = re.sub(r"^(?:(?:public|private|protected|readonly|override)\s+)+", "", p)   # TS parameter properties
         if not p or p in ("self", "&self", "&mut self", "mut self", "this"):
             continue
         names.append(p.split(" ")[-1].rstrip("[]").lstrip(".") if lang == "java" else p.split(":")[0].strip().lstrip("&").replace("mut ", "").strip(".").rstrip("?"))

@@ -6,7 +6,7 @@ tool does not know is not an arc and not counted: the report says how many calls
 import re
 from pathlib import Path
 
-from clones import FUNC_HEAD, KEYWORDS, brace_block
+from clones import FUNC_HEAD, KEYWORDS, brace_block, head_body
 from codefiles import EXT, rel
 from pyfuncgraph import RESOLUTION
 from depedges import RS_USE, _alias_bases, _java_imports, _java_index, _java_visible, _resolve_js, _rust_base, _rust_resolve
@@ -66,7 +66,7 @@ def _values(head: str, name: str, body: str, lang: str) -> set:
     of the callbacks inside it; not the nested functions, which are nodes."""
     values = set(_param_names(head, name, lang)) | {d.group(1) for d in DECLARE[lang].finditer(body)} | _callback_params(body)
     values |= {n for d in DESTRUCTURED.finditer(body) for n in IDENT.findall(d.group(1))}
-    functions = {next(g for g in m.groups() if g) for m in FUNC_HEAD[lang].finditer(body)}
+    functions = {hb[0] for hb in (head_body(body, m, lang) for m in FUNC_HEAD[lang].finditer(body)) if hb}
     return {v for v in values if v} - functions
 
 
@@ -93,11 +93,11 @@ class _File:
         """(node, simple name, class, body start, body end), innermost function owning a position wins."""
         out = []
         for m in FUNC_HEAD[self.lang].finditer(self.clean):
-            name = next((g for g in m.groups() if g), None)
-            brace = self.clean.find("{", m.end() - 1)
-            if not name or (self.lang != "rust" and name in KEYWORDS) or brace < 0 or ";" in self.clean[m.end() - 1:brace]:
-                continue   # `else if (` looks like a function head in JS and Java; Rust's `fn new` is a function
-            body = brace_block(self.clean, m.end() - 1)
+            hb = head_body(self.clean, m, self.lang)   # None: `else if (`, a signature, a call, a declaration
+            if not hb:
+                continue
+            name, brace = hb
+            body = brace_block(self.clean, brace)
             cls = _enclosing_class(brace, self.classes)
             head = self.clean[self.clean.rfind("\n", 0, m.end() - 1) + 1:brace]
             out.append((f"{self.rel}:{cls + '.' if cls else ''}{name}", name, cls, brace, brace + len(body), _values(head, name, body, self.lang)))

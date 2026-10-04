@@ -37,7 +37,11 @@ Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust
 tokens and braces: lines, parameters (a list over several lines included) and nesting exact; cyclomatic as Checkstyle
 counts it (each branch and each boolean operator); cognitive by Campbell's rules (a branch plus its nesting level,
 `try` is not a level, one per run of like boolean operators, `else if` is one branch), checked against Checkstyle and
-PMD on four Spring projects (docs/tests/benchmark-engines.md, section 13).
+PMD on four Spring projects (docs/tests/benchmark-engines.md, section 13). A JS/TS unit is a named function in any
+of its shapes: a declaration, a function or arrow assigned to a const, a property or `module.exports`, a named callback,
+an object-literal member, a class method, a class field holding an arrow, a getter or setter; an anonymous callback
+is measured inside the function that holds it, not on its own (ESLint measures each: section 14). A TypeScript
+signature without a body is not a unit.
 
 Modernise (advice tier, never gated): the report detects the runtime the project targets (pyproject
 requires-python, .python-version, the venv, tsconfig target, engines.node, Cargo.toml, pom/Gradle; the header

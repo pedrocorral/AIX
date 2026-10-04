@@ -16,12 +16,129 @@ true false undefined void fn let mut pub struct enum impl trait match loop use m
 public private protected static final abstract interface package void int long double float boolean char byte short
 """.split())
 TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`[^`]*`|\d+(?:\.\d+)?|[A-Za-z_]\w*|[^\sA-Za-z_0-9]')
+JS_MODS = r"(?:(?:export|default|public|private|protected|static|readonly|override|abstract|async|declare)\s+)*"
 FUNC_HEAD = {
     # function f( | const f[: Type] = [async] (params[: Ret]) => { | method(params)[: Ret] {   (params may nest one level of parens)
-    "js": re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?\s*(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*(?::\s*[^=]+?)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\((?:[^()]|\([^()]*\))*\)|\w+)\s*(?::\s*[^=]+?)?=>\s*\{|(?:public|private|protected|static|async|\s)*(\w+)\s*\((?:[^()]|\([^()]*\))*\)\s*(?::\s*[^{]+)?\{)", re.M | re.S),
+    "js": re.compile(
+        # an assignment: `const f = (`, `app.init = function init(`, `module.exports = function (`, `private onUnload = async (`, `x => {`
+        r"^[ \t]*" + JS_MODS + r"(?:(?:const|let|var)\s+)?(?:module\.exports|(?:[\w$]+\.)*(?P<target>[\w$]+))\s*(?::\s*[^=\n]*?)?\s*=\s*(?:async\s+)?"
+        r"(?:function\s*\*?\s*(?P<own>\w+)?\s*\(|(?:<[^>\n]*>\s*)?\(|(?P<single>\w+)\s*=>)"
+        # an object-literal member: `html: function () {`, `next: () => {`, `'key': async (`
+        r"|^[ \t]*(?P<key>[\w$]+|'[^'\n]*'|\"[^\"\n]*\")\s*:\s*(?:async\s+)?(?:function\s*\*?\s*(?P<own2>\w+)?\s*\(|(?:<[^>\n]*>\s*)?\(|(?P<single2>\w+)\s*=>)"
+        # a declaration or a named function expression anywhere: `function f(`, `return function expressInit(`
+        r"|\bfunction\s*\*?\s*(?P<decl>\w+)\s*\("
+        # an accessor, then a method (or a call at line start: js_body tells them apart)
+        r"|^[ \t]*(?:static\s+)?(?:get|set)\s+(?P<accessor>\w+)\s*\("
+        r"|^[ \t]*" + JS_MODS + r"(?:\*\s*)?(?P<method>[\w$]+)\s*(?:<[^>\n]*>)?\s*\(", re.M),
     "rust": re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+(\w+)", re.M),
     "java": re.compile(r"^[ \t]*(?:(?:public|private|protected|static|final|abstract|synchronized|default|native|@[\w.]+(?:\([^()\n]*\))?)[ \t]+)*(?:<[^>\n]*>[ \t]+)?(?:[\w$.]+(?:<[^>\n]*>)?(?:\[\])*[ \t]+)?(\w+)[ \t]*\((?:[^()]|\([^()]*\))*\)\s*(?:throws\s+[\w.,\s]+?)?\s*\{", re.M)   # no ambiguous `\s` overlaps: linear on an 8 KB file,
 }
+
+
+def _close_group(text: str, i: int) -> int:
+    """Index of the bracket closing the one at `i` (`(`, `[`, `{` or `<`), strings and comments skipped; -1 if none."""
+    opener, closer = text[i], {"(": ")", "[": "]", "{": "}", "<": ">"}[text[i]]
+    depth, j = 0, i
+    while j < len(text):
+        m = SKIP_TOKEN.match(text, j)
+        if m:
+            j = m.end(); continue
+        depth += (text[j] == opener) - (text[j] == closer)
+        if depth == 0:
+            return j
+        j += 1
+    return -1
+
+
+def _skip_blank(text: str, j: int, newlines: bool) -> int:
+    while j < len(text) and text[j] in (" \t\r\n" if newlines else " \t"):
+        j += 1
+    return j
+
+
+def _skip_type(text: str, j: int) -> int:
+    """Past a TypeScript type annotation starting at `j`: words, unions, balanced groups; a `{` after the first token
+    is the body, a line end after a complete type ends it (an interface member), `=>` ends it (an arrow follows)."""
+    first, after_op = True, False
+    while j < len(text):
+        j = _skip_blank(text, j, False)
+        if text[j:j + 1] == "\n":
+            k = _skip_blank(text, j, True)
+            if not (text[k:k + 1] in "|&{" or text.startswith("=>", k)):
+                return j
+            j = k; continue
+        if _type_ends(text, j, first, after_op):
+            return j
+        j, first, after_op = _type_token(text, j, first)
+    return j
+
+
+def _type_ends(text: str, j: int, first: bool, after_op: bool) -> bool:
+    c = text[j:j + 1]
+    body = c == "{" and not first and not after_op
+    return text.startswith("=>", j) or body or not (c in "<([{|&?" or c.isalnum() or c in "_$.'\"")
+
+
+def _type_token(text: str, j: int, first: bool) -> tuple:
+    """One token of a type at `j`, a balanced group, an operator or a word: (index after it, first, after_op)."""
+    c = text[j]
+    if c in "<([{":
+        end = _close_group(text, j)
+        return (end + 1 if end >= 0 else len(text)), False, False
+    if c in "|&?":
+        return j + 1, first, True
+    k = j + 1
+    while k < len(text) and (text[k].isalnum() or text[k] in "_$."):
+        k += 1
+    return k, False, False
+
+
+def js_body(text: str, end: int) -> int:
+    """Index of the body's `{` for a JS/TS head whose match ends at its `(` or `=>`: the parameters are skipped
+    balanced (a destructured pattern or an inline type may hold braces), then a return type, then an arrow. A `;`,
+    a line end or anything else first means no body: a signature, a call, a plain assignment."""
+    j = end
+    if text[end - 1] == "(":
+        j = _close_group(text, end - 1)
+        if j < 0:
+            return -1
+        j += 1
+    j = _skip_blank(text, j, True)
+    if text.startswith(":", j):
+        j = _skip_blank(text, _skip_type(text, j + 1), True)
+    if text.startswith("=>", j):
+        j = _skip_blank(text, j + 2, True)
+    return j if text.startswith("{", j) else -1
+
+
+def _js_name(m) -> str:
+    g = m.groupdict()
+    return g["own"] or g["own2"] or g["decl"] or g["accessor"] or g["target"] or g["method"] or (g["key"] or "").strip("'\"") or None
+
+
+def _in_comment(text: str, pos: int) -> bool:
+    line = text[text.rfind("\n", 0, pos) + 1:pos]
+    return "//" in line or line.lstrip().startswith(("*", "/*"))
+
+
+def _js_head_body(text: str, m):
+    name = _js_name(m)
+    if not name or name in KEYWORDS or (m.group("decl") and _in_comment(text, m.start())):
+        return None
+    brace = js_body(text, m.end())
+    return (name, brace) if brace >= 0 else None
+
+
+def head_body(text: str, m, lang: str):
+    """(name, index of the body's `{`) for a FUNC_HEAD match, or None when it is not a function: a keyword
+    (`if (`), a JS signature or call, a Java or Rust declaration (`;` before the brace)."""
+    if lang == "js":
+        return _js_head_body(text, m)
+    name = next((g for g in m.groups() if g), None)
+    brace = text.find("{", m.end() - 1)
+    if not name or (lang != "rust" and name in KEYWORDS) or brace < 0 or ";" in text[m.end() - 1:brace]:
+        return None   # `;` first: a declaration (a Java interface method, a Rust trait method)
+    return name, brace
 
 
 def _docless_body(fn) -> list:
@@ -112,10 +229,11 @@ def _python_units(f: Path, text: str) -> list:
 def _token_units(f: Path, text: str, lang: str) -> list:
     out = []
     for m in FUNC_HEAD[lang].finditer(text):
-        name = next((g for g in m.groups() if g), "anon")
-        if name in KEYWORDS:
+        hb = head_body(text, m, lang)
+        if not hb:
             continue
-        block = brace_block(text, m.end() - 1)
+        name, brace = hb
+        block = brace_block(text, brace)
         n_lines = block.count("\n") + 1
         if n_lines >= MIN_LINES:
             out.append((f"{rel(f)}:{name}", rel(f), text.count("\n", 0, m.start()) + 1, n_lines, normalise_tokens(block)))

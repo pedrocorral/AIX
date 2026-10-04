@@ -11,7 +11,7 @@ COMMENTS = r"//[^\n]*|/\*.*?\*/"
 STRINGS = r"\br#*\"[^\"]*\"#*|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])'|`(?:[^`\\]|\\.)*`"   # Rust raw strings first: a backslash is literal there;
 # a single quote holds one character (a Rust or Java char literal), never a string: `'de` and `'a` are lifetimes
 STRINGS_COMMENTS = re.compile(COMMENTS + "|" + STRINGS, re.S)
-STRINGS_JS = r"\"(?:\\.|[^\"\\\n])*\"|`(?:[^`\\]|\\.)*`"   # no single quotes: an apostrophe in JSX text is not a string start
+STRINGS_JS = r"\"(?:\\.|[^\"\\\n])*\"|`(?:[^`\\]|\\.)*`"   # no single quotes: an apostrophe in JSX text or a regex literal is not a string start (a \" inside a '…' string is the known cost, benchmark section 14)
 STRINGS_COMMENTS_JS = re.compile(COMMENTS + "|" + STRINGS_JS, re.S)
 INTERPOLATED = re.compile(r"\$\{([^}]*)\}|\{([A-Za-z_]\w*)(?::[^}]*)?\}")   # `${expr}` (JS), `{name}` (Rust format!, Python f-strings)
 JSX_TAG = re.compile(r"(?<![\w>])<[a-zA-Z][\w.]*(?:\s[^<>]*)?/?>|</")   # a tag, not a generic (`Array<string>` follows a word)
@@ -183,9 +183,14 @@ BUGS = {"js": (re.compile(r"\b(?:if|while)\s*\(((?:[^()]|\([^()]*\))*)\)"), "bug
         "java": (re.compile(r"\"\"\s*[!=]=\s*\w|\b\w+\s*[!=]=\s*\"\""), "bug: `==` compares String references, not text: use equals()")}   # strings are `""` by then
 
 
+def _blank_comments(text: str) -> str:
+    """The text with every comment replaced by blanks of the same length: positions and line numbers unchanged."""
+    return re.sub(COMMENTS, lambda m: re.sub(r"[^\n]", " ", m.group(0)), text, flags=re.S)
+
+
 def _import_list(m, lang: str) -> list:
-    """The local names an import line binds."""
-    groups = [g for g in m.groups() if g]
+    """The local names an import line binds (a comment inside a multi-line list is not a name)."""
+    groups = [re.sub(COMMENTS, " ", g) for g in m.groups() if g]
     names = []
     for g in groups:
         for part in g.split(","):
@@ -211,7 +216,7 @@ def unused_imports_tokens(text: str, lang: str, filename: str) -> list:
     if lang not in IMPORTS or filename.endswith(RE_EXPORT_FILES):
         return []
     out = []
-    for m in IMPORTS[lang].finditer(text):
+    for m in IMPORTS[lang].finditer(_blank_comments(text)):   # a `require` inside a block comment is not an import
         rest = _code_around(text, m, lang)
         line = text.count("\n", 0, m.start()) + 1
         out += [(line, f"leftover: unused import `{name}`") for name in _import_list(m, lang) if not re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", rest)]
