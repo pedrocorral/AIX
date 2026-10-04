@@ -8,6 +8,7 @@ from pathlib import Path
 
 from codefiles import ROOT, rel, source_files
 from securityrules import ACCEPT, ADVICE, SKIP_FILE, MARKER_LINES
+from javatypes import RECEIVER_CALL, local_types
 
 JS_EXT = (".js", ".jsx", ".ts", ".tsx", ".mjs")
 SOURCES = re.compile(r"\breq(?:uest)?\.(?:query|params|body|headers|cookies|url|originalUrl|nextUrl)\b|\bctx\.(?:request\.)?(?:query|params|body|headers)\b"
@@ -123,8 +124,11 @@ class _Walk:
     """One pass over statements, with the tainted variables in scope, collecting sink hits."""
     def __init__(self, file: Path, lines: list, funcs: dict, findings: list, rules=None):
         self.file, self.lines, self.funcs, self.findings = file, lines, funcs, findings
-        self.rules, self.follow = rules or JS_RULES, True   # follow: walk a local function called with tainted arguments (once)
-        self.index = {}   # (name, arity) -> [(file, lines, params, statements)] in other files: the cross-file step (javataint)
+        self.rules, self.follow = rules or JS_RULES, True   # follow: walk a function called with tainted arguments
+        self.index = {}   # (name, arity) -> [(file, lines, params, statements)] in other files: the cross-file step by name (javataint)
+        self.types, self.hops, self.stack = None, 2, []   # the Java type index, calls left to follow, the callees on the way (no cycles)
+        self.walked = {}   # (file, first line, tainted parameters) -> hops it was walked with, shared: a callee is walked once per taint set and depth
+        self.locals = {}   # name -> declared type, from the statements walked so far
         self.tainted, self.depth = {}, 0
         self.declared, self.alias = {}, {}   # name -> depth it was declared at; name -> sink rule it stands for (a writer)
 
@@ -136,7 +140,9 @@ class _Walk:
                 self.tainted[name] = _Taint(f"{name}: {source} (line {lineno})", self.depth + 1, False)
             self._assignments(text, lineno)
             self._sinks(text, raw, lineno)
-            if self.follow:
+            if self.types is not None:
+                self.locals.update(local_types(text))
+            if self.follow and self.hops > 0:
                 self._calls(text)
             self._leave_scope(text)
 
@@ -224,24 +230,53 @@ class _Walk:
         return {p: f"argument of {name}: {self.taint_of(a)[0]}" for p, a in zip(params, _args_of(text, end)) if self.taint_of(a)[0]}
 
     def _walk_callee(self, file: Path, lines: list, statements: list, passed: dict):
-        inner = _Walk(file, lines, self.funcs if file == self.file else {}, self.findings, rules=self.rules)
-        inner.follow = False
+        key = (file, statements[0][0] if statements else 0)
+        memo = key + (tuple(sorted(passed)),)
+        if key in self.stack or self.walked.get(memo, -1) >= self.hops - 1:
+            return   # a cycle, or a callee this run has walked with the same tainted parameters as deep or deeper (the findings are already in)
+        self.walked[memo] = self.hops - 1
+        funcs = self.funcs if file == self.file else (self.types.methods.get(file, {}) if self.types else {})
+        inner = _Walk(file, lines, funcs, self.findings, rules=self.rules)
+        inner.index, inner.types, inner.hops, inner.stack, inner.walked = self.index, self.types, self.hops - 1, self.stack + [key], self.walked
+        inner.follow = inner.hops > 0
         inner.run(statements, passed)
 
     def _calls(self, text: str):
         """A function called with a tainted argument is walked once with that parameter tainted: one of this file
-        (self.funcs), or one of another file by name and arity (self.index, Java), one level deep."""
+        (self.funcs), one of another file through the receiver's declared type (self.types, Java), else by name
+        and arity (self.index, Java); `hops` calls deep."""
         for name, (params, statements) in self.funcs.items():
             for m in re.finditer(rf"(?<![\w$.]){re.escape(name)}\(", text):
                 passed = self._passed(name, params, text, m.end())
                 if passed:
                     self._walk_callee(self.file, self.lines, statements, passed)
+        self._named_calls(text, self._typed_calls(text) if self.types else set())
+
+    def _named_calls(self, text: str, typed: set):
+        """The cross-file step by name and arity, for the calls the type index did not resolve."""
         for m in re.finditer(r"(?<![\w$])([\w$]+)\(", text):
+            if m.end() in typed:
+                continue
             args = _args_of(text, m.end())
             for file, lines, params, statements in self.index.get((m.group(1), len(args)), [])[:3]:
                 passed = self._passed(f"{m.group(1)} in {rel(file)}", params, text, m.end())
                 if passed and file != self.file:
                     self._walk_callee(file, lines, statements, passed)
+
+    def _typed_calls(self, text: str) -> set:
+        """Calls followed through their receiver's type; returns the call positions resolved, which the name rule skips."""
+        resolved = set()
+        for m in RECEIVER_CALL.finditer(text):
+            type_name = self.types.receiver_type(m, self.file, self.locals)
+            if not type_name:
+                continue
+            args = _args_of(text, m.end())
+            for file, params, statements in self.types.targets(type_name, m.group("method"), len(args)):
+                resolved.add(m.end())
+                passed = self._passed(f"{type_name}.{m.group('method')} in {rel(file)}", params, text, m.end())
+                if passed:
+                    self._walk_callee(file, self.types.lines[file], statements, passed)
+        return resolved
 
     def _leave_scope(self, text: str):
         stripped = re.sub(r"`[^`]*`|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", "", text)

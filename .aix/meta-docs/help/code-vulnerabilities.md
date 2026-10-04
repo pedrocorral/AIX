@@ -66,8 +66,10 @@ it, a one-line `if`/`else` branch adds taint and never clears it, a list or map 
 tainted, `+=` assembles. Sanitisers clear it: `Integer.parseInt` and the other parsers,
 `UUID.fromString`, `URLEncoder.encode`, `HtmlUtils`, `StringEscapeUtils`, OWASP `Encode`, `ESAPI.encoder()`, Jsoup,
 `FilenameUtils`, `.matches(...)`, `.normalize()`. A call into a method of another file under the same paths is
-followed one level too, the callee found by name and arity (a controller's parameter into a service's SQL; no types,
-so a method of the same name and arity elsewhere is walked as well, and only shows when it holds a sink). Not seen:
+followed too, two calls deep (a controller's parameter into a service, then into a repository), the callee found
+through the receiver's declared type (a field, a local, a constructor, a static class name; an interface or parent
+type walks every implementation one level), or by name and arity when the type cannot be read, three candidates at
+most; a false join still only shows when the callee holds a sink (2.21.39, benchmark section 17). Not seen:
 two levels of calls, filters and validators, the type system.
 
 Every finding names the VUL row and the CWE. Test code is listed, not gated (--strict gates it). A taint sink reviewed

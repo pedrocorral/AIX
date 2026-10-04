@@ -135,10 +135,11 @@ class JavaTaint(unittest.TestCase):
         self.assertRegex(self.out, r"Servlet\.java:14 .*\[accepted: demo of the lesson\]")
 
     def test_across_files_by_name_and_arity(self):
-        """A controller's parameter reaches a service's SQL in another file: the callee is found by name and arity and
-        walked once; `count(q)` has one argument and `count(String, int)` two, so it is not followed."""
+        """A controller's parameter reaches a service's SQL in another file: the callee is found through the receiver's
+        type (or by name and arity when the type cannot be read) and walked once; `count(q)` has one argument and
+        `count(String, int)` two, so it is not followed."""
         self.assertEqual(self.hits("OrderService.java"), [(4, "SQL statement")], self.out)
-        self.assertRegex(self.out, r"OrderService\.java:4 .*\n.*argument of search in src/main/java/com/a/OrderService\.java: q: @RequestParam")
+        self.assertRegex(self.out, r"OrderService\.java:4 .*\n.*argument of (?:OrderService\.)?search in src/main/java/com/a/OrderService\.java: (?:argument of \w+: )?q: @RequestParam")
 
     def test_flows_the_benchmark_uses(self):
         """A reassignment inside a block keeps the taint after it; a one-line `if` or `else` branch adds taint and

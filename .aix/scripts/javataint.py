@@ -2,12 +2,14 @@
 statement, scoped by braces: request input (`@RequestParam`, `@PathVariable`, `@RequestBody` and the other Spring
 binding annotations on a method's parameters; `request.getParameter(...)`, headers, cookies, the body of a servlet
 request) flows through assignments, `+` concatenation and `String.format`; a sink reached without a sanitiser is a
-finding; a method of the same file called with tainted arguments is followed one call deep. Evidence to review, not
+finding; a method called with tainted arguments is followed two calls deep, in this file or in the class the receiver's
+declared type names (javatypes), else by name and arity. Evidence to review, not
 proof: no types, no filters, no cross-file."""
 import re
 from pathlib import Path
 
 from codefiles import ROOT, source_files
+from javatypes import TypeIndex
 from jstaint import Rules, _Walk, body_statements, strip_comments
 from securityrules import SKIP_FILE, MARKER_LINES
 
@@ -124,29 +126,37 @@ def method_index(files: dict) -> dict:
     return index
 
 
-def taint_file(file: Path, findings: list, index: dict = None):
+def taint_file(file: Path, findings: list, index: dict = None, types: TypeIndex = None, walked: dict = None):
     loaded = _load(file)
     if loaded is None:
         return
     text, lines = loaded
     walk = _Walk(file, lines, _methods(text, lines), findings, rules=JAVA_RULES)
-    walk.index = index or {}
+    walk.index, walk.types, walk.walked = index or {}, types, walked if walked is not None else {}
     walk.run(java_statements(lines))
+
+
+def type_index(files: dict) -> TypeIndex:
+    """The project's classes, parents, fields and methods, built once per run (javatypes)."""
+    types = TypeIndex()
+    for file, (text, lines) in files.items():
+        types.add_file(file, text, lines, _methods(text, lines))
+    return types
 
 
 def taint(paths) -> list:
     """Findings for every Java file under `paths`, deduplicated by (row, file, line); calls into other files of the
-    same paths are followed one level deep."""
+    same paths are followed two levels deep, through the receiver's declared type when it can be read."""
     files = {}
     for p in paths:
         base = (ROOT / p) if not Path(p).is_absolute() else Path(p)
         for f in ([base] if base.is_file() else source_files([str(base)])):
             if f.suffix in JAVA_EXT and _load(f) is not None:
                 files[f] = _load(f)
-    index = method_index(files)
+    index, types, walked = method_index(files), type_index(files), {}
     findings = []
     for f in files:
-        taint_file(f, findings, index)
+        taint_file(f, findings, index, types, walked)
     seen, out = set(), []
     for fx in findings:
         if (fx[0], fx[3], fx[4]) not in seen:

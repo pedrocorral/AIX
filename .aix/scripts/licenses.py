@@ -86,7 +86,7 @@ def _cargo_installed(root: Path) -> list:
     lock = root / "Cargo.lock"
     if not lock.exists():
         return []
-    registry = Path(os.environ.get("CARGO_HOME") or (Path.home() / ".cargo")) / "registry" / "src"
+    registry = Path(os.environ.get("CARGO_HOME") or (Path.home() / ".cargo")) / "registry" / "src"   # aix: accepted VUL-SECRET-001 the person's own CARGO_HOME names their registry cache; nothing crosses a trust boundary
     out = []
     for name, version in re.findall(r'\[\[package\]\]\s*\nname\s*=\s*"([^"]+)"\s*\nversion\s*=\s*"([^"]+)"', lock.read_text(encoding="utf-8", errors="replace")):
         toml = next(iter(registry.glob(f"*/{name}-{version}/Cargo.toml")), None)
@@ -102,7 +102,7 @@ def _maven_installed(root: Path) -> list:
     pom = root / "pom.xml"
     if not pom.exists():
         return []
-    repo = Path(os.environ.get("MAVEN_REPO") or (Path.home() / ".m2" / "repository"))
+    repo = Path(os.environ.get("MAVEN_REPO") or (Path.home() / ".m2" / "repository"))   # aix: accepted VUL-SECRET-001 the person's own MAVEN_REPO names their local repository; nothing crosses a trust boundary
     out = []
     for group, artifact, version in re.findall(r"<dependency>\s*<groupId>([^<]+)</groupId>\s*<artifactId>([^<]+)</artifactId>\s*<version>([^<$]+)</version>", pom.read_text(encoding="utf-8", errors="replace")):
         dep_pom = repo / group.replace(".", "/") / artifact / version / f"{artifact}-{version}.pom"

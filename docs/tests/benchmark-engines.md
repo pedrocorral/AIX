@@ -793,6 +793,34 @@ own algorithm, in the nursery group: 46 of bat's functions differ from both ours
 ripgrep and 11 bat functions still apart from rust-code-analysis are large `match`/`loop` bodies with closures
 (`walk.rs:next` ours 30, reference 20); every one is over 15 on both sides.
 
+### 17. Java taint through the receiver's type, two calls deep (2.21.39)
+
+Until 2.21.38 a tainted argument passed to `accountService.find(name)` was followed into any method called `find`
+with one parameter, anywhere in the project, three at most, one call deep. Now the receiver's declared type decides
+(`javatypes.py`: a field, a local, a constructor, a static class name; an interface or parent type walks every
+implementation one level), the name rule is the fallback when the type cannot be read, and calls are followed two
+levels deep with a stack against cycles and a memo so a callee is walked once per tainted-parameter set and depth.
+
+**OWASP Benchmark, table 11 regenerated.** Identical to before in every taint category (sqli 225 / 149, cmdi 110 /
+83, pathtraver 114 / 88, xss 211 / 121, ldapi 24 / 17, xpathi 14 / 15, trustbound 33 / 13 true / false positives):
+the Benchmark's cross-file pattern, `ThingInterface thing = ThingFactory.createThing(); thing.doSomething(param)`,
+was already reached by name, and now is reached by type. Time on its 2,740 files: 94 s before, 95 s after, the first
+run without the memo past the 120-second limit of the extended suite.
+
+**Spring projects, every finding read.** JHipster: 0 data-flow findings before and after (its services call JPA
+repositories, no string sinks). WebGoat: 20 before, 22 after, both new ones real and reachable only through the type
+and the second hop:
+
+| finding | path |
+|---|---|
+| `container/users/UserService.java:52`, `jdbcTemplate.execute("CREATE SCHEMA \"" + webGoatUser.getUsername() + …)` | the registration handler's username into `userService.addUser(…)`, then `createLessonsForUser(webGoatUser)` |
+| `lessons/sqlinjection/introduction/SqlInjectionLesson8.java:158`, `statement.executeUpdate(logQuery)` with `action` inside | the lesson's tainted `query` into `log(connection, query)`, a second injection in the access log |
+
+**Planted** (`tests/test_java_types.py`): a call on a field typed `AccountService` reaches that class's `find` and
+not `LabelService.find`; a field typed `ThingInterface` reaches `Thing1` and `Thing2`; a two-hop chain reaches the
+repository; a receiver of unknown type (`mystery.find(q)`) falls back to the name rule and reaches `LabelService`
+once.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

@@ -6,7 +6,8 @@
               the same file, to dangerous sinks (shell, eval, SQL, file paths, redirects, template strings,
               deserialisation, outbound requests). Sanitisers (int/float, shlex.quote, escape, secure_filename,
               uuid, parameterised execute, Path.resolve with is_relative_to) clear the taint.
-              Result: "input reaches sink" with the path. Static, one call deep across functions, one file at a time.
+              Result: "input reaches sink" with the path. Static; Python and JS one call deep, one file at a time; Java two calls
+              deep across files, through the receiver's declared type.
   --cve       every lockfile (uv/poetry/pdm/Cargo, package-lock, pnpm, yarn, Pipfile, Gemfile, composer, go.sum) as it is, and
               `==` pins and pom.xml dependencies resolved through deps.dev, checked in one
               batch against the OSV database (api.osv.dev). Needs the network; stops cleanly and says so otherwise.
@@ -81,7 +82,7 @@ def write_audit(all_findings, paths, unreachable):
     out = ROOT / "docs" / "security" / "audits" / f"AUDIT-{today}-vulnerabilities.md"
     body = [f"---\nid: AUDIT-{today}-vulnerabilities\nskill: aix code vulnerabilities (taint, CVE, history)\ndate: {today}\nscope: [{', '.join(paths)}]\nresult: {'findings' if all_findings else 'pass'}\n---",
             f"# Audit — deep code checks — {today}", "", "## Method (what was checked, tools run)",
-            "`aix code vulnerabilities`: Python taint analysis (input sources to dangerous sinks, one call deep, per file), pinned dependencies against the OSV database"
+            "`aix code vulnerabilities`: taint analysis (input sources to dangerous sinks; Python and JS one call deep per file, Java two calls deep across files by type), pinned dependencies against the OSV database"
             + (" (unreachable in this run)" if unreachable else "") + ", secrets in git history. Findings are evidence to review; a quiet check is not proof of absence.", "",
             "## Findings", "| VUL id | Asset / threat | Impact | Likelihood rationale | Control | Verification method | Evidence | Status before → after | Residual risk |", "|---|---|---|---|---|---|---|---|---|"]
     for vul, cwe, what, file, ln, snippet, advice, _ in sorted(all_findings, key=lambda f: (f[0], f[3], f[4])):
@@ -195,7 +196,7 @@ def _sections(modes, paths, commits):
     """The report sections for the chosen modes; unreachable = OSV could not be queried."""
     sections, unreachable = [], False
     if "--taint" in modes:
-        sections.append(("taint paths (Python, JS/TS, Java)", taint(paths) + jstaint.taint(paths) + javataint.taint(paths), "input sources followed to sinks, one call deep, per file"))
+        sections.append(("taint paths (Python, JS/TS, Java)", taint(paths) + jstaint.taint(paths) + javataint.taint(paths), "input sources followed to sinks; Python and JS one call deep per file, Java two calls across files through the receiver's type"))
     if "--cve" in modes:
         found, stats = cve()
         unreachable = found is None
