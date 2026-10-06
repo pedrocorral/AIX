@@ -6,6 +6,9 @@ tests reference existing requirements, vulnerability register statuses are valid
 import re, sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import idcheck
+
 ROOT = Path(__file__).resolve().parents[2]
 DOCS, SKILLS, META = ROOT / "docs", ROOT / ".aix" / "skills", ROOT / ".aix" / "meta-docs"
 ID_RE = re.compile(r"\b(FR|NFR|API|DM|ADR|TS|VUL|TASK|CONFLICT)-[A-Z0-9]+(?:-\d{3,4})?\b")
@@ -187,6 +190,58 @@ def check_vul_register():
                 errors.append(f"vulnerability-register: {cells[0]} has invalid status '{cells[3]}'")
 
 
+def check_ids():
+    """Every id and every reference to one is an id of the scheme: its shape, its domain code in the glossary, the file
+    named after it, defined once (idcheck); code markers too."""
+    import coverage_matrix
+    domains, seen = idcheck.domain_codes(ROOT), {}
+    for md in sorted(DOCS.rglob("*.md")):
+        fm, body = frontmatter(md)
+        _check_doc_ids(md, fm or {}, body or "", domains, seen)
+    for f in coverage_matrix._code_files():
+        if f.suffix in (".md", ".txt") or any(part.startswith(".") for part in f.relative_to(ROOT).parts):
+            continue   # markers live in code; prose and hidden folders (a copied `.claude/skills`) are not scanned here
+        for m in idcheck.MARK.finditer(f.read_text(encoding="utf-8", errors="replace")):
+            for token in idcheck.tokens_in(m.group(2)):
+                _id_error(f, token, domains, f"@{m.group(1)}")
+
+
+def _check_doc_ids(md: Path, fm: dict, body: str, domains: set, seen: dict):
+    own = str(fm.get("id", "")).strip()
+    if own and _meant_as_id(own) and _id_error(md, own, domains, "id") is None:
+        _check_own_id(md, own, seen)
+    in_fields = {own}
+    for field in ("covers", "affects", "related", "depends_on", "mitigates", "tests"):
+        for token in idcheck.tokens_in(str(fm.get(field, "")).split("#")[0]):   # a YAML comment after the value is prose
+            in_fields.add(token); _id_error(md, token, domains, f"{field}:")
+    for token in dict.fromkeys(idcheck.tokens_in(body, prose=True)):
+        if token not in in_fields:
+            _id_error(md, token, domains, "text")
+
+
+def _meant_as_id(own: str) -> bool:
+    """A scheme prefix, or a suspect one with a number: `TEST-RULES` names a guide, `TEST-AUTH-001` was meant as an id."""
+    prefix = own.replace("_", "-").split("-")[0].upper()
+    return prefix in idcheck.SHAPES or (prefix in idcheck.SUSPECT and bool(re.search(r"\d", own)))
+
+
+def _check_own_id(md: Path, own: str, seen: dict):
+    """A valid id names its file and is defined once."""
+    if not md.name.startswith(own + "-") and md.name != own + ".md":
+        errors.append(f"{md.relative_to(ROOT)}: file name does not start with its id `{own}` (`{own}-<kebab-title>.md`)")
+    if own in seen:
+        errors.append(f"{md.relative_to(ROOT)}: id `{own}` is already defined in {seen[own].relative_to(ROOT)}; ids are never reused")
+    seen.setdefault(own, md)
+
+
+def _id_error(f: Path, token: str, domains: set, where: str):
+    """Report a token that is not an id of the scheme; returns the reason (None when it is one)."""
+    why = idcheck.reason(token, domains)
+    if why:
+        errors.append(f"{f.relative_to(ROOT)}: {where} {why}")
+    return why
+
+
 def check_orphans():
     """A layer file that overrides nothing: a near-miss of a kit name is an error (a typo), a genuine addition a warning."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -203,7 +258,7 @@ if __name__ == "__main__":
     check_instructions()
     check_status_drift()
     check_vul_evidence()
-    check_skills(); check_indexes(); check_references(collect_ids()); check_field_dictionary(); check_vul_register()
+    check_skills(); check_indexes(); check_references(collect_ids()); check_field_dictionary(); check_vul_register(); check_ids()
     for w in warnings: print("WARN ", w)
     for e in errors: print("ERROR", e)
     print(f"{len(errors)} errors, {len(warnings)} warnings")

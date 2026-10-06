@@ -1,5 +1,5 @@
 ---
-id: DM-FIELD-DICTIONARY
+id: DATA-FIELD-DICTIONARY
 title: Canonical field dictionary
 status: approved
 ---

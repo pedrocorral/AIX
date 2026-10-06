@@ -12,13 +12,14 @@ title: IDs and traceability
 | API | `API-<DOMAIN>-NNN` | `API-AUTH-002` | `docs/requirements/api/<domain>/` |
 | DM | `DM-<Entity>` | `DM-User` | `docs/requirements/data-model/` |
 | ADR | `ADR-NNNN` | `ADR-0007` | `docs/requirements/decisions/` |
-| TS | `TS-<DOMAIN>-NNN` | `TS-AUTH-011` | `docs/tests/<level>/<domain>/` |
+| TS | `TS-<DOMAIN>-NNN` (a non-functional spec takes its NFR category: `TS-SEC-001`) | `TS-AUTH-011` | `docs/tests/<level>/<domain>/` |
 | VUL | `VUL-<CAT>-NNN` (INJ, AUTHN, AUTHZ, INPUT, SECRET, DEP, WEB, DATA, LOG, AI, INFRA) | `VUL-INJ-002` | `docs/security/vulnerability-register.md` |
 | TASK | `TASK-NNNN` | `TASK-0042` | `docs/road-map/**` |
 | CONFLICT | `CONFLICT-NNNN` | `CONFLICT-0003` | `docs/conflicts/{open,resolved}/` |
 
 `<DOMAIN>` = bounded context of the app (AUTH, BILLING, CATALOG…); defined in `docs/requirements/product/glossary.md`.
-File name = `<ID>-<kebab-title>.md`. The ID also appears in front-matter `id:` (validator relies on it).
+File name = `<ID>-<kebab-title>.md`. The ID also appears in front-matter `id:` (validator relies on it). `aix docs validate`
+reports every id or reference that does not follow this table, with the rule it breaks and the nearest correct form.
 
 ## Code markers (grep-able, language-agnostic comments)
 ```

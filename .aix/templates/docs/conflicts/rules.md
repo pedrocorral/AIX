@@ -1,5 +1,5 @@
 ---
-id: CONFLICT-RULES
+id: CONFLICTS-RULES
 title: Conflict record rules
 ---
 # Conflict record rules

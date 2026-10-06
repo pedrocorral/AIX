@@ -18,7 +18,7 @@ class SeedFromTemplate(unittest.TestCase):
         self.assertTrue((docs / "INDEX.md").exists() and (docs / "requirements" / "decisions" / "ADR-0001-adopt-aix-and-choose-stack.md").exists())
         self.assertTrue((docs / "requirements" / "functional" / "example").is_dir(), "the EXAMPLE domain is the seed")
         for kit_only in ("requirements/decisions/ADR-0001-one-positive-payload-list.md", "requirements/decisions/ADR-0005-kit-docs-and-seed-split.md",
-                         "tests/suite.md", "road-map/completed/2026-09/TASK-0003-aix-code-security-deterministic-code-side-security.md"):
+                         "tests/TS-KIT-001-suite.md", "road-map/completed/2026-09/TASK-0003-aix-code-security-deterministic-code-side-security.md"):
             self.assertFalse((docs / kit_only).exists(), f"{kit_only} is the kit's own, it must not travel")
         state = (docs / "road-map" / "going-on" / "STATE.md").read_text(encoding="utf-8")
         self.assertNotIn("Kit 2.", state, "no kit history in a project's STATE.md")

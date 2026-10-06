@@ -326,6 +326,19 @@ def _print_plan(project: Path, rows, edited, dry: bool):
     print("  untouched: docs/ (requirements, tests, security, conflicts, operations, road-map), .aix/skills/extern, your config values, runtime folders, your code")
 
 
+RENAMED_DOC_IDS = {"CONFLICT-RULES": "CONFLICTS-RULES", "DM-FIELD-DICTIONARY": "DATA-FIELD-DICTIONARY"}   # 2.21.41: guide docs seeded under a scheme prefix
+
+
+def migrate_doc_ids(project: Path):
+    """Two kit-seeded guide docs carried ids in the CONFLICT and DM namespaces, which `aix docs validate` now reads
+    as malformed ids (2.21.41): their `id:` is renamed in place, nothing else in the file changes."""
+    for rel, (old, new) in {"docs/conflicts/rules.md": ("CONFLICT-RULES", "CONFLICTS-RULES"), "docs/requirements/data-model/field-dictionary.md": ("DM-FIELD-DICTIONARY", "DATA-FIELD-DICTIONARY")}.items():
+        f = project / rel
+        if f.is_file() and f"id: {old}\n" in f.read_text(encoding="utf-8", errors="replace"):
+            f.write_text(f.read_text(encoding="utf-8", errors="replace").replace(f"id: {old}\n", f"id: {new}\n", 1), encoding="utf-8")
+            print(f"  docs: id {old} -> {new} in {rel} (a guide, not an id of the scheme)")
+
+
 def _apply_plan(project: Path, rows, yes: bool):
     import manifest, gitignore
     print("\n  WARNING: `aix upgrade` is an experimental feature. Kit-owned files listed above are overwritten;\n"
@@ -333,6 +346,7 @@ def _apply_plan(project: Path, rows, yes: bool):
     if not yes and not confirm("  Are you sure you want to use this? [y/N] "):
         sys.exit("aborted")
     apply(project, rows)
+    migrate_doc_ids(project)
     manifest.write_manifest(project)
     gitignore.ask_and_apply(project, yes=yes, label="aix upgrade")  # after the files, so the agents line is final
     print(f"  applied {len(rows)} changes; relinking skills in the project")
