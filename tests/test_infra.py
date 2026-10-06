@@ -49,6 +49,26 @@ spec:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
 """
+K8S_HARDENED = """apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - image: dsyer/petclinic
+          name: app
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: cache
+          securityContext: {runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}, seccompProfile: {type: RuntimeDefault}}
+          image: redis:latest
+"""
 COMPOSE = """services:
   web:
     build: .
@@ -107,7 +127,11 @@ class Rules(unittest.TestCase):
 
     def test_workflow(self):
         found = infrarules.findings(self.write(".github/workflows/ci.yml", WORKFLOW))
-        self.assertEqual([(fx[2], fx[4]) for fx in found], [("action pinned to a mutable tag", 7), ("workflow shell injection: untrusted context in run", 11), ("remote script piped to a shell", 17)])
+        self.assertEqual([(fx[2], fx[4]) for fx in found], [("workflow without a permissions block (the token keeps the repository default)", 1), ("action pinned to a mutable tag", 7), ("workflow shell injection: untrusted context in run", 11), ("remote script piped to a shell", 17)])
+        quiet = self.write(".github/workflows/ok.yml", "name: ok\non: [push]\npermissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n")
+        self.assertEqual(titles(quiet), [], "a top-level permissions block")
+        per_job = self.write(".github/workflows/jobs.yml", "name: pj\non: [push]\njobs:\n  build:\n    permissions:\n      contents: read\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n  test:\n    permissions: write-all\n    runs-on: ubuntu-latest\n    steps:\n      - run: make\n")
+        self.assertEqual([(fx[2], fx[4]) for fx in infrarules.findings(per_job)], [("workflow token permissions set to write-all", 11)])
 
     def test_dependabot_and_npmrc(self):
         self.assertEqual(titles(self.write(".github/dependabot.yml", "version: 2\nupdates:\n  - package-ecosystem: npm\n    directory: /\n  - package-ecosystem: pip\n    cooldown:\n      default-days: 7\n")), ["dependabot update without a cooldown"])
@@ -115,9 +139,12 @@ class Rules(unittest.TestCase):
         self.assertEqual(titles(self.write("sub/.npmrc", "min-release-age=7\n")), [])
 
     def test_containers(self):
-        self.assertEqual(titles(self.write("Dockerfile", "FROM x\nRUN sudo apt-get install -y curl\nUSER app\n")), ["sudo in a Dockerfile"])
+        self.assertEqual(titles(self.write("Dockerfile", "FROM x\nRUN echo 'root:pw' | chpasswd\nRUN sudo apt-get install -y curl\nUSER app\n")), ["password set in the image (chpasswd / passwd)", "sudo in a Dockerfile"])
         found = infrarules.findings(self.write("k8s/db.yml", K8S))
-        self.assertEqual([(fx[2], fx[4]) for fx in found], [("container may run as root", 7), ("container allows privilege escalation", 7)])
+        self.assertEqual([(fx[2], fx[4]) for fx in found], [("container may run as root", 7), ("container allows privilege escalation", 7), ("container with a writable root filesystem", 7), ("container keeps its Linux capabilities", 7), ("container without a seccomp profile", 7),
+                                                            ("container with a writable root filesystem", 12), ("container keeps its Linux capabilities", 12), ("container without a seccomp profile", 12)])
+        hardened = self.write("k8s/web.yml", K8S_HARDENED)
+        self.assertEqual([(fx[2], fx[4]) for fx in infrarules.findings(hardened)], [("image without a pinned tag", 7), ("image without a pinned tag", 19)], "untagged and latest images; the hardened containers are silent")
         self.assertEqual(titles(self.write("k8s/config.yml", "apiVersion: v1\nkind: ConfigMap\ndata:\n  a: b\n")), [])
         found = infrarules.findings(self.write("docker-compose.yml", COMPOSE))
         self.assertEqual([(fx[2], fx[4]) for fx in found], [("compose service without no-new-privileges", 4), ("compose service with a writable root filesystem", 4)])

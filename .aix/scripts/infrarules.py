@@ -65,8 +65,36 @@ def _call_text(lines: list, i: int) -> str:
 
 # ---- GitHub Actions, dependabot, .npmrc ----------------------------------------------------------------------------
 
+PERMISSIONS_RULE = ("VUL-INFRA-001", "CWE-250", "workflow without a permissions block (the token keeps the repository default)",
+                    "set `permissions: contents: read` at the top of the workflow and widen one job where it needs more; the default token can write to the repository")
+WRITE_ALL_RULE = ("VUL-INFRA-001", "CWE-250", "workflow token permissions set to write-all", "name the permissions each job needs; write-all is every scope")
+
+
+def _token_permissions(f: Path, lines: list) -> list:
+    """A workflow with no `permissions:` at the top or in every job runs with the repository's default token
+    (Checkov CKV2_GHA_1, benchmark section 19); `write-all` is named as such."""
+    write_all = next((i for i, raw in enumerate(lines, 1) if re.match(r"^\s*permissions:\s*write-all\s*$", raw)), None)
+    if write_all:
+        return [_finding(WRITE_ALL_RULE, f, write_all, lines[write_all - 1])]
+    if re.search(r"^permissions:", "\n".join(lines), re.M) or _every_job_scoped(lines):
+        return []
+    return [_finding(PERMISSIONS_RULE, f, 1, lines[0] if lines else "")]
+
+
+def _every_job_scoped(lines: list) -> bool:
+    jobs = [i for i, raw in enumerate(lines) if re.match(r"^  \w[\w-]*:\s*$", raw) and _in_jobs(lines, i)]
+    return bool(jobs) and all(re.search(r"^\s+permissions:", "\n".join(lines[j:_block_end(lines, j) + 1]), re.M) for j in jobs)
+
+
+def _in_jobs(lines: list, i: int) -> bool:
+    """The two-space key at index i sits under the top-level `jobs:`."""
+    above = [raw for raw in lines[:i] if re.match(r"^\w", raw)]
+    return bool(above) and above[-1].startswith("jobs:")
+
+
 def workflow(f: Path) -> list:
-    out, lines = [], _lines(f)
+    lines = _lines(f)
+    out = _token_permissions(f, lines)
     for i, raw in enumerate(lines, 1):
         m = USES.match(raw)
         if m and not SHA.search(raw) and not m.group(1).startswith("./"):
@@ -99,23 +127,40 @@ def npmrc(f: Path) -> list:
 
 # ---- containers -----------------------------------------------------------------------------------------------------
 
+SUDO_RULE = ("VUL-INFRA-001", "CWE-250", "sudo in a Dockerfile", "run the step as root at build time and switch to USER afterwards; sudo in an image is an escalation path")
+CHPASSWD_RULE = ("VUL-SECRET-001", "CWE-798", "password set in the image (chpasswd / passwd)", "an image is public once pushed: inject credentials at run time (a secret, an env file), never at build time")
+
+
 def dockerfile(f: Path) -> list:
-    return [_finding(("VUL-INFRA-001", "CWE-250", "sudo in a Dockerfile", "run the step as root at build time and switch to USER afterwards; sudo in an image is an escalation path"), f, i, raw)
-            for i, raw in enumerate(_lines(f), 1) if re.match(r"^\s*RUN\b.*\bsudo\b", raw)]
+    out = []
+    for i, raw in enumerate(_lines(f), 1):
+        if re.match(r"^\s*RUN\b.*\bsudo\b", raw):
+            out.append(_finding(SUDO_RULE, f, i, raw))
+        if re.match(r"^\s*RUN\b.*\b(?:chpasswd|passwd\s+\w|usermod\s+(?:-p|--password))\b", raw):
+            out.append(_finding(CHPASSWD_RULE, f, i, raw))
+    return out
 
 
 ROOT_RULE = ("VUL-INFRA-001", "CWE-250", "container may run as root", "securityContext: runAsNonRoot: true (and a numeric runAsUser)")
 ESCALATION_RULE = ("VUL-INFRA-001", "CWE-250", "container allows privilege escalation", "securityContext: allowPrivilegeEscalation: false")
 
 
+WRITABLE_FS_RULE = ("VUL-INFRA-001", "CWE-732", "container with a writable root filesystem", "securityContext: readOnlyRootFilesystem: true, with an emptyDir for what must be written")
+CAPABILITIES_RULE = ("VUL-INFRA-001", "CWE-250", "container keeps its Linux capabilities", "securityContext: capabilities: drop: [ALL], then add the one or two a process really needs")
+SECCOMP_RULE = ("VUL-INFRA-001", "CWE-250", "container without a seccomp profile", "securityContext: seccompProfile: type: RuntimeDefault (on the pod or the container)")
+IMAGE_TAG_RULE = ("VUL-DEP-001", "CWE-1104", "image without a pinned tag", "name a version tag or a digest (`image: name:1.2.3` or `@sha256:…`); no tag or `latest` is whatever was pushed last")
+CONTAINER_CHECKS = [(r"runAsNonRoot:\s*true", ROOT_RULE, True), (r"allowPrivilegeEscalation:\s*false", ESCALATION_RULE, False), (r"readOnlyRootFilesystem:\s*true", WRITABLE_FS_RULE, False),
+                    (r"drop:\s*(?:\[\s*[\"']?ALL[\"']?\s*\]|\n\s*-\s*[\"']?ALL[\"']?)", CAPABILITIES_RULE, False), (r"seccompProfile:\s*\{?\s*type:\s*(?:RuntimeDefault|Localhost)", SECCOMP_RULE, True)]   # (what hardens, the row when absent, the pod spec counts too)
+
+
 def _container_findings(f: Path, lines: list, j: int, pod: str) -> list:
-    """The two checks on the container item starting at index j; `pod` is the surrounding pod spec."""
+    """The checks on the container item starting at index j; `pod` is the surrounding pod spec, which may carry the
+    pod-level settings (runAsNonRoot, seccomp)."""
     item = "\n".join(lines[j:_block_end(lines, j) + 1])
-    out = []
-    if not re.search(r"runAsNonRoot:\s*true", item + pod):
-        out.append(_finding(ROOT_RULE, f, j + 1, lines[j]))
-    if not re.search(r"allowPrivilegeEscalation:\s*false", item):
-        out.append(_finding(ESCALATION_RULE, f, j + 1, lines[j]))
+    out = [_finding(rule, f, j + 1, lines[j]) for hardened, rule, pod_counts in CONTAINER_CHECKS if not re.search(hardened, item + (pod if pod_counts else ""))]
+    image = re.search(r"^\s*-?\s*image:\s*[\"']?(\S+?)[\"']?\s*$", item, re.M)
+    if image and ("@sha256:" not in image.group(1)) and (":" not in image.group(1).rsplit("/", 1)[-1] or image.group(1).endswith(":latest")):
+        out.append(_finding(IMAGE_TAG_RULE, f, j + 1 + item[:image.start()].count("\n"), image.group(0)))
     return out
 
 

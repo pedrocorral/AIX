@@ -901,6 +901,60 @@ entry's name, and `VulnerableComponentsLesson.java:57` and `ProfileUploadBase.ja
 way is a sanitiser for ours and not for CodeQL. Still ours only: the upload's original file name as a path, the
 session attribute, and the two SSRF flows.
 
+### 19. Infra rules: ours vs Checkov 3.3.25 (run on 2026-10-06, nothing changed in the gate yet)
+
+`tests/benchmark/infrastyle.py` on the fifteen projects: Checkov with its dockerfile, kubernetes, helm, github_actions
+and yaml frameworks on the same files, ours the infra rows of `aix code security` (Dockerfiles, compose, Kubernetes,
+workflows, `.npmrc`, dependabot). Paired by file and line within three; Kubernetes pairs rarely fall within three
+lines (Checkov reports at the Deployment, ours at the container), so those were read by meaning.
+
+| project | ours | Checkov | both | | project | ours | Checkov | both |
+|---|---|---|---|---|---|---|---|---|
+| flask | 2 | 3 | 0 | | NodeGoat | 9 | 3 | 1 |
+| requests | 1 | 0 | 0 | | pygoat | 9 | 9 | 4 |
+| express | 10 | 2 | 0 | | WebGoat | 29 | 6 | 0 |
+| excalidraw | 32 | 13 | 1 | | juice-shop | 21 | 14 | 3 |
+| spring-petclinic | 18 | 43 | 0 | | BenchmarkJava | 10 | 6 | 2 |
+| commons-lang | 2 | 0 | 0 | | jhipster-sample-app | 10 | 1 | 0 |
+| ripgrep | 14 | 0 | 0 | | jhipster-sample-app-gradle | 12 | 1 | 0 |
+| bat | 24 | 5 | 1 | | | | | |
+
+Checkov takes 3 to 6 s per project. Its checks that fired, with the projects they fire on:
+
+| Checkov check | projects | what it checks | read |
+|---|---|---|---|
+| CKV2_GHA_1 | 12 | top-level `permissions` not `write-all` | fires when a workflow has no `permissions:` block at all (express `ci.yml`, 190 lines, none): the token then carries the repository's default, write on older repositories. Ours has no rule. **Real risk, every project but three** |
+| CKV_DOCKER_2 | 6 | a `HEALTHCHECK` instruction | operations, not risk |
+| CKV_DOCKER_3 | 5 | a `USER` is created | ours matches 4 of 5 (`container runs as root (no USER)`); the fifth is bat's syntax-test fixture |
+| CKV_DOCKER_7 | 2 | base image not `latest` | matched by ours (`base image without a pinned tag`) |
+| CKV2_DOCKER_17 | 1 | `chpasswd` in a Dockerfile | BenchmarkJava `VMs/Dockerfile:35`, a password set at build time. Real, one project |
+| CKV_DOCKER_6 | 1 | `LABEL maintainer` instead of `MAINTAINER` | style |
+| CKV_K8S_20, 23 | 1 | privilege escalation, root | spring-petclinic's two Deployments: the same two findings ours reports per container (`may run as root`, `allows privilege escalation`), 17 lines apart |
+| CKV_K8S_22, 28, 29, 30, 31, 37 | 1 | read-only filesystem, `NET_RAW`, a security context at all, seccomp, capabilities | the same containers, which carry no `securityContext`; ours says so through the two rows above and has no row for the filesystem, the capabilities or seccomp. Real, one project in the cache |
+| CKV_K8S_14, 43, 15 | 1 | image tag not `latest`/blank, a digest, `imagePullPolicy: Always` | `image: dsyer/petclinic` with no tag: ours has this for Dockerfiles, not for manifests. Real; the digest and the pull policy are policy |
+| CKV_K8S_35, 38 | 1 | secrets as files not env, service-account token not mounted | hardening, one project |
+| CKV_K8S_10 to 13, 21, 40, CKV2_K8S_6 | 1 | CPU and memory requests and limits, the default namespace, a high UID, a NetworkPolicy | operations and policy |
+
+Ours only, 191 lines across the fifteen, by rule: action pinned to a mutable tag 128, dependabot without a cooldown
+11, a password or secret literal in an infra file 17, compose without `no-new-privileges` or with a writable root 10,
+privileged container 4, `.npmrc` without a minimum release age 4, workflow shell injection 3, Dockerfile without a
+pinned base 3. Checkov's default set has no check for a mutable action tag, a dependabot cooldown or `.npmrc`; its
+secrets framework was not run (section 8 covers secrets); its compose checks are not in a default framework.
+
+**What this says.** On what both read, the two agree. Ours has nothing on a workflow's token permissions, the one
+Checkov check that fires almost everywhere and is a real hole, and nothing on a Kubernetes container's filesystem,
+capabilities, seccomp or image tag. Checkov has nothing on supply-chain pinning, which is most of what ours reports.
+
+**After 2.21.42.** A workflow with no `permissions:` block at the top or in every job, and `write-all`; a Kubernetes
+container without a read-only root filesystem, with its capabilities kept, without a seccomp profile; an image in a
+manifest with no tag or `latest`; `chpasswd` in a Dockerfile. The same run: ours 249 infra findings (was 191), paired
+with Checkov 49 (was 12). CKV2_GHA_1 pairs on 7 of its 12 projects; of the other 5, two are files where ours reports at
+line 1 and Checkov at the one job without permissions (flask `publish.yaml`, WebGoat `release.yml`), and three are
+workflows whose every job carries a scoped block with one write permission (`security-events: write`,
+`pull-requests: write`), which Checkov still reports as `write-all`: ours stays silent there, by its own check's
+description rightly. `chpasswd` pairs 1 of 1; the Kubernetes rows pair by meaning as before. The policy checks stay
+unmatched by design.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
@@ -927,4 +981,7 @@ session attribute, and the two SSRF flows.
 - `tests/benchmark/codeql.py` prints section 18 from CodeQL databases built beforehand (`codeql database create
   --language=java --command="./mvnw -DskipTests compile"` into `BENCH_DIR/codeql/db-<project dir>`), analysed with the
   `java-security-extended` suite into SARIF, paired with `javataint.taint` and scored on the Benchmark's CSV.
+- `tests/benchmark/infrastyle.py` prints section 19: Checkov (`BENCH_DIR/venv/bin/checkov`) with its dockerfile,
+  kubernetes, helm, github_actions and yaml frameworks on each prepared copy, ours from `codesecurity.scan` on the
+  infra files, paired by file and line.
 - Nothing in `tests/benchmark/` runs in `aix self-test` or the suite; it needs the engines and the network.

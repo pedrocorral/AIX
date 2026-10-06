@@ -32,6 +32,13 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   without `integrity=` (CWE-353); Spring `management.endpoints.web.exposure.include=*` (CWE-16) and a method-level
   `@RequestMapping` without `method =` (CWE-352); `postMessage(x, "*")` (CWE-345).
 
+  From the Checkov comparison (2.21.42, benchmark section 19): a workflow with no `permissions:` block at the top or
+  in every job runs with the repository's default token (CWE-250), and `permissions: write-all` is named as such; a
+  Kubernetes container without `readOnlyRootFilesystem: true` (CWE-732), without `capabilities: drop: [ALL]`, without
+  a `seccompProfile` of `RuntimeDefault` or `Localhost` on the container or the pod (CWE-250); an `image:` in a manifest
+  with no tag, `:latest`, and no digest (CWE-1104); `chpasswd`, `passwd` or `usermod -p` in a Dockerfile `RUN`
+  (CWE-798, a password baked into the image).
+
   Spring Security and the Java platform (2.21.32): `csrf().disable()` in its three syntaxes (CWE-352) and
   `headers().disable()` (CWE-693); `@CrossOrigin` with no origin or `"*"`, `allowedOrigins("*")`, `addAllowedOrigin("*")`
   (CWE-942); `anyRequest().permitAll()` (CWE-285); `httpBasic(` in a filter chain whose method never calls
