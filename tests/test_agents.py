@@ -53,6 +53,9 @@ class AgentsSelection(unittest.TestCase):
         self.assertRegex(out, r"codex .*\[x\].*\.agents/skills \(AGENTS\.md read natively\)")
         project_cmd(self.project, self.home, "agents", "gemini", "codex")
         self.assertTrue((self.project / "GEMINI.md").exists())
+        project_cmd(self.project, self.home, "agents", "claude", "gemini")
+        doctor = project_cmd(self.project, self.home, "doctor", check=False).stdout
+        self.assertNotIn("codex is not selected but AIX files remain", doctor, "the shared .agents/skills is gemini's while gemini is selected\n" + doctor)
         project_cmd(self.project, self.home, "agents", "claude")
         self.assertFalse((self.project / ".agents").exists(), "nobody selected reads it any more")
         self.assertIn("agents: ['codex']", project_cmd(self.project, self.home, "agents", "openai").stdout, "openai is an alias of codex")

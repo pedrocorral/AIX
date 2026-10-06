@@ -28,8 +28,10 @@ def check_path():
 
 
 def _leftovers_of(agents, a: dict) -> list:
+    """Pointer files and the skills folder of an unselected agent; a skills folder another selected agent reads
+    (gemini and codex share .agents/skills) is that agent's, not a leftover."""
     left = [rel for rel in a["pointers"] if agents.is_aix_pointer(ROOT / rel)]
-    if a["skills"] and (ROOT / a["skills"]).is_dir():
+    if a["skills"] and (ROOT / a["skills"]).is_dir() and not agents.agents_of_dir(a["skills"], ROOT):
         left.append(a["skills"])
     return left
 

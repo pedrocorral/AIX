@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.44 — 2026-10-06
+
+- `aix doctor` no longer reports "codex is not selected but AIX files remain: .agents/skills" on a project where Gemini is selected: the folder is shared by the two agents and is Gemini's while Gemini is selected. A skills folder another selected agent reads is never a leftover. Seen on a real project; `tests/test_agents.py` covers it.
+
 ## 2.21.43 — 2026-10-06
 
 - Two false positives reported by an agent (Bonsai 2) on a real project, both confirmed against the code and fixed. A lockfile may sit at the workspace root: an app inside a pnpm (`pnpm-workspace.yaml`), Yarn or npm (`package.json` with `workspaces`), Lerna or uv (`[tool.uv.workspace]`) workspace is covered by the root's `pnpm-lock.yaml`/`yarn.lock`/`package-lock.json`/`uv.lock`; until now every app of a correctly configured monorepo was "without a lockfile" and the advice would have added lockfiles pnpm does not use. A finding in a file git ignores and does not track (`backend/.env` under a `.gitignore` with `.env`) is listed as `[untracked, git-ignored]` and not gated (`--strict` gates it), with the advice to keep it ignored and ship a `.env.example`; until now it carried the same wording as a committed secret. Outside a git checkout nothing changes. `tests/test_false_positives.py` plants a pnpm, a Yarn and a uv workspace next to a standalone app, and a git-ignored `.env`.
