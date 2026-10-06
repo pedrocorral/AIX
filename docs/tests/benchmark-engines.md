@@ -955,6 +955,47 @@ workflows whose every job carries a scoped block with one write permission (`sec
 description rightly. `chpasswd` pairs 1 of 1; the Kubernetes rows pair by meaning as before. The policy checks stay
 unmatched by design.
 
+### 20. Cloud configuration: Terraform, CloudFormation and a real Helm chart (run on 2026-10-06, nothing changed in the gate)
+
+Section 19 said no project in the cache carries Terraform or CloudFormation. Three were cloned for this run
+(`tests/benchmark/cloudinfra.py`; TerraGoat and CfnGoat are Bridgecrew's deliberately vulnerable configurations,
+ingress-nginx a maintained Helm chart; outside the repository, not in `projects.json`):
+
+| project | files | ours (infra findings) | what ours found | Checkov | Checkov s |
+|---|---|---|---|---|---|
+| TerraGoat | 47 `.tf` | 11 | 7 mutable action tags, 3 workflows without permissions, 1 Dockerfile without USER; nothing in a `.tf` file | 467 | 3.6 |
+| CfnGoat | 4 CloudFormation templates | 10 | 5 mutable action tags, 2 workflows without permissions, 3 secret literals; nothing in a template | 68 | 4.2 |
+| ingress-nginx | 1 chart, 232 YAML | 65 | 15 Dockerfiles without a pinned base, 9 without USER, 7 containers × the five Kubernetes rows (the templates read as YAML, unrendered) | 519 | 4.0 |
+
+**Terraform and CloudFormation: ours is blind.** Not one of its findings is in a `.tf` file or a template; the rows
+it has read other files of the same repositories. Checkov's 467 and 68, by family, every check name read:
+
+| family | TerraGoat | CfnGoat | examples |
+|---|---|---|---|
+| logging and audit off | 89 | 6 | RDS cluster log capture, S3 access logging, Azure SQL auditing, CloudTrail |
+| encryption off or without a customer key | 75 | 6 | Aurora at rest, EBS, S3 default encryption, KMS CMK |
+| backup, deletion protection, versioning | 49 | 3 | RDS deletion protection, S3 versioning, backup plans |
+| IAM and privilege | 46 | 13 | policies with `*` actions or resources, write without constraints, credentials exposure, permissions management |
+| public exposure | 44 | 27 | S3 public ACLs and policies (four checks per bucket), public RDS, public SQL server, 0.0.0.0/0 ingress |
+| network | 18 | 4 | security group rules open to the world, SSH and RDP, Lambda outside a VPC |
+| secrets | 18 | 2 | passwords and keys in variables and defaults |
+| other | 128 | 7 | tags, descriptions, MFA, instance metadata options, Azure threat detection e-mails |
+
+**Helm.** Checkov renders the chart with `helm` (40 pods) and runs its Kubernetes set: 22 writable filesystems, 13
+each of root, seccomp, capabilities and `NET_RAW`, plus 40 service-account tokens, 38 missing NetworkPolicies and the
+limits and namespace policies. Ours reads the templates as plain YAML, `{{ }}` and all, and finds 7 containers with
+the five rows of 2.21.42; the chart's values and conditionals are not rendered, so containers behind an `{{ if }}` are
+not seen. The rows agree where both see a container.
+
+**What this says.** Cloud configuration is a family ours does not read at all, and until 2.21.45 the kit said
+nothing about it, not even that it looked away. Since 2.21.45 the report counts the Terraform, CloudFormation and
+Helm files it meets and names the Checkov command that reads them (`cloudconfig.py`); the reader itself waits for
+that line to show up on a project that matters. Two ways to close it, for the person to choose: a Terraform and
+CloudFormation reader in ours for the holes rather than the policies (public exposure, IAM wildcards, encryption and
+logging off, secrets in variables: about 250 of TerraGoat's 467 and 50 of CfnGoat's 68), a new family and a version
+of its own; or a plain statement in the report and the help page that the kit does not read cloud configuration and
+that Checkov does, with the command to run it.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
@@ -984,4 +1025,7 @@ unmatched by design.
 - `tests/benchmark/infrastyle.py` prints section 19: Checkov (`BENCH_DIR/venv/bin/checkov`) with its dockerfile,
   kubernetes, helm, github_actions and yaml frameworks on each prepared copy, ours from `codesecurity.scan` on the
   infra files, paired by file and line.
+- `tests/benchmark/cloudinfra.py` prints section 20 on three projects cloned by hand into the extended cache
+  (TerraGoat, CfnGoat, ingress-nginx), Checkov's terraform, cloudformation, helm and kubernetes frameworks with
+  `helm` from `BENCH_DIR/helm-bin`.
 - Nothing in `tests/benchmark/` runs in `aix self-test` or the suite; it needs the engines and the network.

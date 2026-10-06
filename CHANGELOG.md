@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.21.45 — 2026-10-06
+
+- Cloud configuration measured against Checkov on TerraGoat, CfnGoat and a real Helm chart (section 20 of `docs/tests/benchmark-engines.md`, runner `tests/benchmark/cloudinfra.py`, the three cloned by hand into the extended cache): ours reads nothing in a Terraform or CloudFormation file (Checkov 467 and 68 findings, by family: logging off, encryption off, public exposure, IAM wildcards, secrets in variables), and reads Helm templates unrendered. `aix code security` now counts the Terraform, CloudFormation and Helm files a project carries and says "not read by this scan: N Terraform files (run `checkov -d . --framework terraform`)" (`cloudconfig.py`); nothing when there are none. A reader for those files is a family of its own, to build when that line shows up on a project that matters. `tests/test_cloudconfig.py` plants both cases.
+
 ## 2.21.44 — 2026-10-06
 
 - `aix doctor` no longer reports "codex is not selected but AIX files remain: .agents/skills" on a project where Gemini is selected: the folder is shared by the two agents and is Gemini's while Gemini is selected. A skills folder another selected agent reads is never a leftover. Seen on a real project; `tests/test_agents.py` covers it.

@@ -104,3 +104,9 @@ Git-ignored files (2.21.43): a finding in a file that git ignores and does not t
 `.gitignore` with `.env`) is listed as `[untracked, git-ignored]`, not gated (`--strict` gates it): nothing entered
 the repository; the advice is to keep it ignored and ship a `.env.example` with placeholders. Outside a git checkout
 every file counts as tracked.
+
+Cloud configuration (2.21.45): the scan does not read Terraform, CloudFormation or Helm. When a project carries them
+the report says so and names the reader: "not read by this scan: 47 Terraform files (run `checkov -d . --framework
+terraform`); 1 Helm chart (…)". Benchmark section 20 measured the gap: Checkov reports 467 findings on TerraGoat and
+68 on CfnGoat, ours none in those files. Nothing is invented and nothing is silent; a reader for those files is a
+family of its own, to build when that line shows up on a project that matters.

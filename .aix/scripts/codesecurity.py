@@ -21,7 +21,7 @@ from findingtags import _not_gated, _tag
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from secretscan import SECRET_ADVICE, secret_findings
 import secretscan
-import authz, infrarules
+import authz, cloudconfig, infrarules
 import pushscan
 from depscan import scan_dependencies, scan_dockerfile
 
@@ -206,7 +206,7 @@ def _classify(findings, strict: bool):
 
 
 def _closing_lines(covered, by_vul, skipped) -> list:
-    lines = [f"  skipped by marker: {fx[3]}  ({fx[5]})" for fx in skipped]
+    lines = [f"  skipped by marker: {fx[3]}  ({fx[5]})" for fx in skipped] + cloudconfig.unread_lines()
     lines.append("  no pattern matched for: " + ", ".join(v for v in covered if v not in by_vul) + "  (rules ran; absence of a match is not evidence of absence)")
     lines.append("  next: review each REVIEW line; fix or mark `# aix: accepted VUL-… <why>`; `aix code security --audit` writes the audit report;")
     lines.append("        then `aix docs security` / the security-audit-* skills move register rows on that evidence.")
