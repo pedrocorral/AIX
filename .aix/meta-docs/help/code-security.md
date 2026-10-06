@@ -19,7 +19,8 @@ What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests,
   VUL-LOG-001        credentials in log/print lines                                        CWE-532
   VUL-AI-001/002     prompts built by interpolation; LLM calls without an output limit      CWE-77/770
   VUL-INFRA-001      chmod 777, privileged containers, Dockerfile without USER              CWE-732/250
-  VUL-DEP-001        unpinned requirements, unbounded npm ranges, missing lockfiles, FROM without tag  CWE-1104
+  VUL-DEP-001        unpinned requirements, unbounded npm ranges, missing lockfiles (a workspace root's lockfile,
+                     pnpm/Yarn/npm/uv, covers the apps inside it), FROM without tag                 CWE-1104
 
   Infrastructure and frameworks (file-level rules, the categories a semgrep run adds; .github/ and the root's own
   files are scanned whatever the code roots): GitHub Actions `uses:` pinned to a tag instead of a commit SHA
@@ -98,3 +99,8 @@ Options
   --audit     write the audit report + INDEX row       --report  write docs/tests/code-security.md
   --selftest  known-vulnerable snippets must be found, safe variants must not
 Related: aix docs security (register state), skills security-audit-* (reasoning on the hits), security-threat-model.
+
+Git-ignored files (2.21.43): a finding in a file that git ignores and does not track (`backend/.env` under a
+`.gitignore` with `.env`) is listed as `[untracked, git-ignored]`, not gated (`--strict` gates it): nothing entered
+the repository; the advice is to keep it ignored and ship a `.env.example` with placeholders. Outside a git checkout
+every file counts as tracked.

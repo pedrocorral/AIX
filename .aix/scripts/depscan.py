@@ -17,7 +17,27 @@ def _manifests(root: Path, pattern: str):
 
 
 def _has_lock(f: Path, locks) -> bool:
-    return any((f.parent / l).exists() for l in locks)
+    """A lockfile next to the manifest, or at the workspace root that owns it (a pnpm, Yarn, npm or uv workspace keeps
+    one lockfile at its root by design: an app inside it never carries its own)."""
+    if any((f.parent / l).exists() for l in locks):
+        return True
+    root = _workspace_root(f.parent)
+    return root is not None and any((root / l).exists() for l in locks)
+
+
+def _workspace_root(folder: Path):
+    """The nearest folder above that declares a workspace: `pnpm-workspace.yaml`, a `package.json` with
+    `workspaces`, a `pyproject.toml` with `[tool.uv.workspace]`, `lerna.json`; stops at a `.git` folder."""
+    for p in [folder, *folder.parents]:
+        if (p / "pnpm-workspace.yaml").exists() or (p / "lerna.json").exists() or _declares_workspaces(p / "package.json", '"workspaces"') or _declares_workspaces(p / "pyproject.toml", "[tool.uv.workspace]"):
+            return p
+        if (p / ".git").exists():
+            return None
+    return None
+
+
+def _declares_workspaces(manifest: Path, marker: str) -> bool:
+    return manifest.is_file() and marker in manifest.read_text(encoding="utf-8", errors="replace")
 
 
 def _unpinned_requirements(root: Path):

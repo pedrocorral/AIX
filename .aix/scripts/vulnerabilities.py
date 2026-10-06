@@ -22,7 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots
-from codesecurity import is_docs, is_test, register_rows
+from codesecurity import register_rows
+from findingtags import is_docs, is_test
 from taint import taint
 import jstaint
 import javataint

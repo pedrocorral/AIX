@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots, SKIP, is_vendored, rel
 import assembled
+from findingtags import _not_gated, _tag
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from secretscan import SECRET_ADVICE, secret_findings
 import secretscan
@@ -26,17 +27,6 @@ from depscan import scan_dependencies, scan_dockerfile
 
 
 # ---- scanning -----------------------------------------------------------------------------------------------------
-
-def is_test(p: Path) -> bool:
-    parts = p.parts
-    return any(part in ("tests", "test", "__tests__", "fixtures") for part in parts) or ("src", "it") in zip(parts, parts[1:]) \
-        or p.name.startswith("test_") or ".test." in p.name or ".spec." in p.name
-
-
-def is_docs(p: Path) -> bool:
-    """Documentation: an example key in a manual is listed, not gated (a real one there is still a leak: read it)."""
-    return "docs" in p.parts or p.suffix in (".md", ".rst", ".adoc")
-
 
 LITERAL = r"(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)"
 
@@ -193,23 +183,18 @@ def _vul_lines(vul: str, fxs: list, rows: dict) -> list:
     desc, status = rows.get(vul, ("(not in register)", "?"))
     lines = [f"  {vul}  {desc[:70]}  [register: {status}]"]
     for _, cwe, title, file, ln, snippet, advice, acc in sorted(fxs, key=lambda x: (x[3], x[4]))[:25]:
-        tag = "accepted: " + acc if acc else ("test" if is_test(ROOT / file) else "docs" if is_docs(ROOT / file) else "REVIEW")
+        tag = _tag((None, cwe, title, file, ln, snippet, advice, acc))
         lines += [f"    {file}:{ln}  {title} ({cwe})  [{tag}]", f"      {snippet}"]
         if not acc:
-            lines.append(f"      -> {advice}")
+            lines.append("      -> " + ("the file is git-ignored and untracked: nothing entered the repository; keep it ignored and ship a `.env.example` with placeholders" if tag.startswith("untracked") else advice))
     if len(fxs) > 25:
         lines.append(f"    ... {len(fxs) - 25} more")
     return lines + [""]
 
 
 def _summary_line(live, tests, accepted, covered, by_vul) -> str:
-    return (f"  findings to review {len(live)}" + (f"; in tests or docs (not gated, --strict to gate) {len(tests)}" if tests else "")
+    return (f"  findings to review {len(live)}" + (f"; in tests, docs or git-ignored files (not gated, --strict to gate) {len(tests)}" if tests else "")
             + (f"; accepted in code {len(accepted)}" if accepted else "") + f"; register rows with rules {len(covered)}, with findings {len(by_vul)}")
-
-
-def _not_gated(fx) -> bool:
-    """Tests and documentation are listed, not gated."""
-    return is_test(ROOT / fx[3]) or is_docs(ROOT / fx[3])
 
 
 def _classify(findings, strict: bool):
