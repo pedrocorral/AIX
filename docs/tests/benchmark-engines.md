@@ -1180,6 +1180,33 @@ in ABAP a secret is a quoted literal, so on an `.abap` file the matched value mu
 parameters, `request->get_form_field(`; sinks: the rows above); HTML built in strings without `escape(`, which is
 abapGit's whole UI and needs the walk to tell escaped from unescaped.
 
+### 26. The ABAP taint walk on abap2xlsx and abapGit (2.21.51, step 3b of the fifth language)
+
+No engine walks taint through ABAP to compare against, so the two projects are the negative controls and the planted
+file of `tests/test_abaptaint.py` the positive cases (`tests/benchmark/abaptaint.py`): a `PARAMETERS` field reaching
+dynamic SQL three calls away (the report's top-level code, its form, a method, a private method of the same class,
+across two files), stopped by `cl_abap_dyn_prg=>check_table_name_str`, by a `CASE` on the value, or by a literal in
+its place; `sy-ucomm` into `SUBMIT (lv)`; the parameter of a function module its `.fugr.xml` marks remote-enabled
+into `CALL 'SYSTEM'`, while the same code in a local module is no path; a request field into `html->add( )`
+without `escape( )` directly and through a string variable, and not with it.
+
+| project | sources in the code | step-3 findings | taint paths | read by hand |
+|---|---|---|---|---|
+| abap2xlsx | 5 `PARAMETERS` | 6 | 0 | the demo reports' parameters reach no sink: a library |
+| abapGit | 12 `PARAMETERS`, 4 `sy-ucomm`, 160 `ii_event->` reads | 41 | 1 | `zcl_abapgit_frontend_services:168`, a download path built from the package of a repository the user picked by key: the walk marks the loaded object tainted as a whole (`lo_repo = get( lv_key )`), the package name itself comes from the database; a candidate a reviewer dismisses, the same coarseness the JS and Java walks have |
+
+**What the numbers say.** abapGit's 41 step-3 lines are what section 25 expected: table names and program names
+from the repository's configuration, not from a screen; the walk confirms it for 40 of them. Its 237 HTML writes
+reach no path either, and for a reason the walk cannot see: the values go into attributes of page objects and are
+rendered later by other methods, more than two calls and one object away. The same holds for the JS and Java walks;
+a deeper or object-carrying walk is a step of its own, for every language.
+
+**What the first run taught, each a planted test.** A call on a fresh instance, `NEW zcl_reader( )->read( )`, was
+followed by nothing (added to abapcalls too, so it is an edge of section 24 now); a bare `fetch( iv_name = lv )`
+inside a class was not followed; the statement reader blanks `'SYSTEM'` to a placeholder, so the kernel-call sink
+reads the raw line; a report's logic lives in its forms, so its top-level code gets one hop more and the `PERFORM`
+into a form is free.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

@@ -32,7 +32,8 @@
   "defensive": 0,
   "graph": 300,
   "security": 6,
-  "style": 953
+  "style": 953,
+  "vulnerabilities": 0
  },
  "abapGit": {
   "clones": 293,
@@ -40,7 +41,8 @@
   "defensive": 0,
   "graph": 3051,
   "security": 75,
-  "style": 6289
+  "style": 6289,
+  "vulnerabilities": 1
  },
  "bat": {
   "clones": 43,

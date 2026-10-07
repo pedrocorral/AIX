@@ -16,6 +16,7 @@ from pyfuncgraph import RESOLUTION
 
 RECEIVER = re.compile(r"(?<![\w\-])(<?\w+>?)->(?:(\w+)~)?(\w+)\s*\(|\bCALL\s+METHOD\s+(<?\w+>?)->(?:(\w+)~)?(\w+)\b", re.I)
 STATIC = re.compile(r"(?<![\w\-])(\w+)=>(?:(\w+)~)?(\w+)\s*\(|\bCALL\s+METHOD\s+(\w+)=>(?:(\w+)~)?(\w+)\b", re.I)
+CONSTRUCTED = re.compile(r"\bNEW\s+(\w+)\s*\([^()]*\)->(?:(\w+)~)?(\w+)\s*\(", re.I)   # `NEW zcl_x( )->m( )`: a call on a fresh instance of the class
 BARE = re.compile(r"(?<![\w\->~=#])\s*(\w+)\s*\(", re.I)
 PERFORM = re.compile(r"\bPERFORM\s+(\w+)(?:\s+IN\s+PROGRAM\s+(\w+))?", re.I)
 CALL_FUNCTION = re.compile(r"\bCALL\s+FUNCTION\s+'(\w+)'", re.I)
@@ -39,7 +40,14 @@ class _Class:
         up = text.upper()
         self.methods[name] = dict(section=section, event=" FOR EVENT " in up, redefinition=" REDEFINITION" in up, testing=" FOR TESTING" in up,
                                   params={m.group(1).lower(): m.group(2).lower() for m in TYPED.finditer(text)},
-                                  returning=(RETURNING.search(text).group(1).lower() if RETURNING.search(text) else ""))
+                                  returning=(RETURNING.search(text).group(1).lower() if RETURNING.search(text) else ""),
+                                  importing=_importing(text))
+
+
+def _importing(definition: str) -> list:
+    """The IMPORTING parameter names of a METHODS line, in order (`m( x )` with one unnamed argument binds the first)."""
+    m = re.search(r"\bIMPORTING\b(.*?)(?=\b(?:EXPORTING|CHANGING|RETURNING|RAISING|EXCEPTIONS)\b|$)", definition, re.I | re.S)
+    return [n.lower() for n in re.findall(r"(?:^|\s)(?:VALUE\()?(\w+)\)?\s+(?:TYPE|LIKE)\b", m.group(1), re.I)] if m else []
 
 
 def _definition_statement(cls: _Class, word: str, text: str, section: str) -> str:
@@ -217,6 +225,8 @@ class _Unit:
             self._receiver(*_call_parts(m), edges)
         for m in STATIC.finditer(text):
             self._static(*_call_parts(m), edges)
+        for m in CONSTRUCTED.finditer(text):
+            self._static(m.group(1), m.group(2), m.group(3).lower(), edges)
         for m in BARE.finditer(re.sub(r"(?:->|=>)\s*(?:\w+~)?\w+\s*\(", " ", text)):
             self._bare(m.group(1), edges)
         for m in PERFORM.finditer(text):
@@ -254,6 +264,7 @@ def function_graph(paths: list) -> tuple:
 def _called_names(text: str) -> set:
     """The method and form names one statement calls, by every shape."""
     names = {_call_parts(m)[2] for m in RECEIVER.finditer(text)} | {_call_parts(m)[2] for m in STATIC.finditer(text)}
+    names |= {m.group(3).lower() for m in CONSTRUCTED.finditer(text)}
     return names | {m.group(1).lower() for m in BARE.finditer(text)} | {m.group(1).lower() for m in PERFORM.finditer(text)}
 
 

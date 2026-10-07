@@ -1,7 +1,7 @@
 aix code graph | complexity | dead | clones | style | defensive | security | vulnerabilities | stats   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (.aix/scripts/graph.py). All read the same dependency graph of the project's source
-(Python, JS/TS, Rust, Java; modules, or functions with --functions); PATH... limits the folders. ABAP: modules are abapGit objects, edges the names a file uses, --functions resolves calls through declared types, security has its own rows (aix help code security); the taint walk does not read it yet.
+(Python, JS/TS, Rust, Java; modules, or functions with --functions); PATH... limits the folders. ABAP: modules are abapGit objects, edges the names a file uses, --functions resolves calls through declared types, security has its own rows (aix help code security), the taint walk follows a screen field, sy-ucomm, a remote function module's parameter or a request field to those sinks (aix help code vulnerabilities).
   aix code graph      the modularity metric: A (the code) vs B (the ideal shape on the same nodes) = the edits,
                       cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.  alias: complexity
   aix code dead       dead code: modules no entry point reaches; with --functions, Python functions never referenced

@@ -197,7 +197,9 @@ def _sections(modes, paths, commits):
     """The report sections for the chosen modes; unreachable = OSV could not be queried."""
     sections, unreachable = [], False
     if "--taint" in modes:
-        sections.append(("taint paths (Python, JS/TS, Java)", taint(paths) + jstaint.taint(paths) + javataint.taint(paths), "input sources followed to sinks; Python and JS one call deep per file, Java two calls across files through the receiver's type"))
+        import abaptaint
+        sections.append(("taint paths (Python, JS/TS, Java, ABAP)", taint(paths) + jstaint.taint(paths) + javataint.taint(paths) + abaptaint.taint(paths),
+                         "input sources followed to sinks; Python and JS one call deep per file, Java and ABAP two calls across files through the receiver's type"))
     if "--cve" in modes:
         found, stats = cve()
         unreachable = found is None

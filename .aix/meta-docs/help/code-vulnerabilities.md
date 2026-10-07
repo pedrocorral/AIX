@@ -80,3 +80,14 @@ and accepted carries `# aix: accepted VUL-… <why>` on its line, as for aix cod
 `aix docs security` needs before a status changes. --gate fails on any finding to review.
 What this still is not: an authorisation or business-logic review (the security-audit-* skills), a runtime test,
 or a scan of the deployed environment.
+
+ABAP (2.21.51): sources are a `PARAMETERS` or `SELECT-OPTIONS` field of the program, `sy-ucomm`, the IMPORTING parameters
+of a function module its `.fugr.xml` marks remote-enabled, a request field (`get_form_field`, `get_header_field`, `get_cdata`)
+and abapGit's `ii_event->form_data( )`, `query( )`, `mv_action`. A value flows through `=`, MOVE, `&&`, a template `|{ v }|`,
+CONCATENATE, SPLIT, a structure field, and into a called method, form or function module through the argument it is bound
+to (`me->`, `NEW zcl_x( )->m( )`, a receiver of declared type, a static call, PERFORM USING, a bare call in the class), two
+calls deep across files; a report's top-level code gets one more, its PERFORM is free. A sanitiser ends the flow
+(`cl_abap_dyn_prg=>check_*`, `escape( val = ... )`, `cl_http_utility=>escape_url`), so does an allowlist (`CASE v`, `IF v IN`).
+Sinks: a dynamic Open SQL token, GENERATE SUBROUTINE POOL, INSERT REPORT, `CALL 'SYSTEM'`, cl_gui_frontend_services=>execute,
+`SUBMIT (v)`, `CALL FUNCTION v`, `CALL TRANSACTION v`, OPEN DATASET, gui_upload/gui_download, and HTML written through
+`html->add( )` without `escape( )` (VUL-WEB-001). Section 26 of docs/tests/benchmark-engines.md.
