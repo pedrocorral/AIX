@@ -8,6 +8,7 @@ TRY, one per run of like boolean operators in a condition, TRY is not a level), 
 import re
 from pathlib import Path
 
+import abaphygiene
 from codefiles import rel
 
 UNITS = {"METHOD": "ENDMETHOD", "FORM": "ENDFORM", "FUNCTION": "ENDFUNCTION", "MODULE": "ENDMODULE"}
@@ -307,11 +308,21 @@ def _record(src: _Source, unit: tuple) -> dict:
     params, public, documented = _definition_facts(src, kind, name, src.stmts[i][1], head_line - 1)
     magic, short = _advice(body, src.plain)
     fname = name.lower()
+    test = ".testclasses." in src.file.name or fname.startswith("test")
+    hygiene, forwards = abaphygiene.findings(body, src.raw, (kind, name.lower(), head_line), _method_facts(src, kind, name, cls), test)
     fx = dict(name=_unit_name(kind, name, cls, src.file), file=rel(src.file), line=head_line, head_line=head_line, lang="abap", lines=end_line - head_line + 1, params=params,
               docstring=documented, public=public, short_names=short, magic=magic, fname=fname, src="\n".join(src.raw[head_line - 1:end_line]), own="",
-              test=".testclasses." in src.file.name or fname.startswith("test"), decorated=False, passthrough=None, jsx=False, hygiene=[], cls=cls, src_head=src.stmts[i][1])
+              test=test, decorated=False, passthrough=forwards, jsx=False, hygiene=hygiene, cls=cls, src_head=src.stmts[i][1])
     fx.update(metrics(body, head_line))
     return fx
+
+
+def _method_facts(src: _Source, kind: str, name: str, cls: str) -> dict:
+    """The definition of a method (section, IMPORTING names, redefinition, event) through abapcalls; {} for the rest."""
+    if kind != "METHOD" or not cls:
+        return {}
+    import abapdefs
+    return abapdefs.definitions(src.stmts).get(cls.lower(), abapdefs._Class("")).methods.get(name.lower(), {})
 
 
 def functions(file: Path, text: str, plain: set) -> list:

@@ -43,7 +43,12 @@ a SELECT that ENDSELECT closes, AT, CATCH, CHECK, each AND/OR); cognitive by Cam
 their nesting, ELSE/ELSEIF 1, CATCH 1 plus the nesting outside the TRY, one per run of like operators, TRY is not a
 level); parameters from the definition (IMPORTING, EXPORTING, CHANGING; USING, CHANGING, TABLES of a FORM; the `*"`
 block of a function module; RETURNING is the result); abapdoc `"!` above the definition is the docstring; a
-`.testclasses.abap` file is a test. Checked against abaplint on abap2xlsx and abapGit (section 22 of
+`.testclasses.abap` file is a test. Hygiene (2.21.53): a CATCH with no statement and no comment is swallowed; a DATA,
+STATICS, FIELD-SYMBOLS, CONSTANTS or inline DATA( ) that no statement but its declaration names is a leftover
+(abaplint's definition; the components of a BEGIN OF ... END OF belong to their structure); an IMPORTING
+parameter of a private or protected method never named is a leftover (public, interface and redefined methods keep
+theirs); a method whose only statement forwards every parameter to one call is a pass-through. Section 27 against
+abaplint's unused_variables. Checked against abaplint on abap2xlsx and abapGit (section 22 of
 docs/tests/benchmark-engines.md): same statement counts, abaplint's own cyclomatic reproduced, ours kept as McCabe.
 Names are case-insensitive, so no naming advice. Graph, dead code and clones read ABAP since 2.21.48 (aix help code graph); security does not yet.
 

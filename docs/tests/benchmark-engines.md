@@ -1207,6 +1207,33 @@ inside a class was not followed; the statement reader blanks `'SYSTEM'` to a pla
 reads the raw line; a report's logic lives in its forms, so its top-level code gets one hop more and the `PERFORM`
 into a form is free.
 
+### 27. ABAP hygiene vs abaplint `unused_variables` (2.21.53)
+
+The four hygiene findings the other languages get, on ABAP units, with abaplint's `unused_variables` as the
+referee for the one it has (`tests/benchmark/abaphygiene.py`):
+
+| project | unused variables: ours / abaplint / same line | swallowed CATCH | unused private parameters | pass-through methods |
+|---|---|---|---|---|
+| abap2xlsx | 61 / 333 / 33 | 13 | 0 | 7 |
+| abapGit | 11 / 3 / 0 | 73 | 2 | 5 |
+
+**The definition, and why it changed during the build.** The first version used "written and never read", the
+rule of the Python and JavaScript hygiene, with the read-or-write of each mention guessed from the word before it.
+It reported 200 unused variables on abapGit, whose CI keeps abaplint's count at 3: `READ TABLE x` and
+`APPEND ... TO x` were read as writes, and a table filled and then handed on looked never read. The guess was wrong
+too often to gate on, so the rule is abaplint's: a variable that no statement but its declaration names, the
+components of a `BEGIN OF ... END OF` belonging to their structure. Under it, every "ours only" line read by hand is
+real: `<ls_upd>` declared and never used in `preview_database_changes`, `lv_mode` and `lv_branch` in chained
+declarations nothing names again, abap2xlsx's `lc_xml_attr_true` declared in `load_drawing_anchor` and used only in
+another method with its own declaration. abaplint's 300 lines beyond ours on abap2xlsx are class-level constants
+and attributes in the definition part, which is outside a unit and outside this rule, as for the other languages.
+
+**The three abaplint has no rule for.** An empty CATCH with no comment: 13 on abap2xlsx, 73 on abapGit, the
+largest hygiene finding on both; its `empty_structure` covers IF, WHEN, LOOP and ELSE, not a bare CATCH. An IMPORTING
+parameter of a private or protected method never named: 2 on abapGit (`iv_version` of `authorization_check`,
+`iv_package` of `get_language_version`), read by hand, both real. A method whose only statement forwards every
+parameter to one call: 7 on abap2xlsx (`zcl_excel_theme`'s setters onto its elements), 5 on abapGit.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

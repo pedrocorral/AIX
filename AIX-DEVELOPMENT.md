@@ -77,6 +77,8 @@ AIX/
 │   ├── graph.py             # `aix code graph|dead|clones`: the report, the gate, the selftest over the leaves above
 │   ├── stylemetrics.py      # leaf: cyclomatic, cognitive, nesting, params, names, magic numbers per function (Python by AST; JS/TS, Rust, Java by tokens)
 │   ├── abapstyle.py         # leaf: ABAP units (METHOD/FORM/FUNCTION/MODULE) and their style metrics by statements; the fifth language
+│   ├── abapdefs.py          # leaf: the DEFINITION part of ABAP classes and interfaces (sections, parameters, RETURNING, interfaces, parent)
+│   ├── abaphygiene.py       # leaf: ABAP hygiene per unit (swallowed CATCH, variable never used, unused private parameter, pass-through method)
 │   ├── abapdeps.py          # leaf: ABAP objects as graph nodes (parts folded), the names a file uses as edges, entry points, clone tokens
 │   ├── abapcalls.py         # leaf: ABAP call edges through declared types (--functions) and dead methods by visibility
 │   ├── abapsec.py           # leaf: the ABAP security rules that need the unit (dynamic SQL unless a literal, EXEC SQL, CALL TRANSACTION and AUTHORITY-CHECK)
