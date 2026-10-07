@@ -152,10 +152,12 @@ def _graph_gate(m, b: dict, max_distance):
 
 
 def _function_level(paths: list) -> tuple:
-    """The Python call graph (by AST) and the JS/TS, Rust and Java ones (by tokens), one graph."""
+    """The Python call graph (by AST), the JS/TS, Rust and Java ones (by tokens) and the ABAP one (by statements), one graph."""
+    import abapcalls
     nodes, edges = function_graph(paths)          # resets the resolution count
     more_nodes, more_edges = function_graph_tokens(paths)
-    return nodes | more_nodes, edges | more_edges
+    abap_nodes, abap_edges = abapcalls.function_graph(paths)
+    return nodes | more_nodes | abap_nodes, edges | more_edges | abap_edges
 
 
 def main(args):

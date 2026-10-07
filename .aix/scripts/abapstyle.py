@@ -25,26 +25,58 @@ LOOP_VARS = {"i", "j", "k", "n", "x", "y", "z", "_", "e", "f", "p", "m", "t"}
 
 # ---- statements -------------------------------------------------------------------------------------------------
 
+class _Stripper:
+    """Comments and strings out of one line, keeping the code inside a template's `{ }` (an embedded expression
+    such as `|...{ get_x( ) }...|` is code: calls, conditions, names)."""
+    def __init__(self, quote: str = None):
+        self.out, self.quote, self.braces, self.inner = [], quote, 0, None   # inner: a string inside an embedded expression
+
+    def feed(self, ch: str):
+        """One character, by state: inside a string of an embedded expression, inside the expression, inside a
+        string or template, or in code."""
+        if self.inner:
+            self.inner = None if ch == self.inner else self.inner
+            self.out.append("'S'") if not self.inner else None
+        elif self.quote == "|" and self.braces:
+            self._embedded(ch)
+        elif self.quote:
+            self._in_string(ch)
+        elif ch in "'`|":
+            self.quote = ch
+        else:
+            self.out.append(ch)
+
+    def _in_string(self, ch: str):
+        if ch == self.quote:
+            self.out.append("'S'"); self.quote = None
+        elif ch == "{":
+            self.braces = 1; self.out.append(" ")
+
+    def _embedded(self, ch: str):
+        if ch in "'`":
+            self.inner = ch
+        elif ch == "{":
+            self.braces += 1
+        elif ch == "}":
+            self.braces -= 1; self.out.append(" ")
+        else:
+            self.out.append(ch)
+
+
 def strip_line(line: str, quote: str = None) -> tuple:
     """(code, open template) of one line: a `*` comment line is empty, a `"` comment is cut, a string literal becomes
-    `'S'` so its periods, commas and words do not count. A `'` or a backtick string ends with the line; a template
-    `|...{ }...|` may continue on the next line inside its braces, so its state is handed on."""
+    `'S'` so its periods, commas and words do not count, the code inside a template's `{ }` stays. A `'` or a backtick
+    string ends with the line; a template `|...{ }...|` may continue on the next line, so its state is handed on."""
     if line.startswith("*"):
         return "", quote
-    out = []
+    st = _Stripper(quote)
     for ch in line:
-        if quote:
-            if ch == quote:
-                out.append("'S'"); quote = None
-        elif ch in "'`|":
-            quote = ch
-        elif ch == '"':
+        if ch == '"' and not st.quote and not st.inner:
             break
-        else:
-            out.append(ch)
-    if quote and quote != "|":
-        out.append("'S'"); quote = None
-    return "".join(out), quote
+        st.feed(ch)
+    if st.quote and st.quote != "|":
+        st.out.append("'S'"); st.quote = None
+    return "".join(st.out), st.quote
 
 
 class _Splitter:

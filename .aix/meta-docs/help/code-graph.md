@@ -96,8 +96,15 @@ TYPE`, `INHERITING FROM`, `INTERFACES`, `TYPE zif_x=>ty`, `RAISE EXCEPTION TYPE`
 `SUBMIT`, `PERFORM ... IN PROGRAM`. A name that is no object of the project (SAP standard cl_*/if_*/cx_*, a dictionary
 type, which lives in XML) is not an edge, never guessed. Entry points for dead code: a program (REPORT/PROGRAM), a
 function group, a class implementing if_oo_adt_classrun or if_apack_manifest, a test class. Clones compare units on
-their statements with the ABAP keyword list (section 23 of docs/tests/benchmark-engines.md). --functions does not
-read ABAP yet.
+their statements with the ABAP keyword list (section 23 of docs/tests/benchmark-engines.md). --functions (2.21.49): a
+call is an arc only through a known target: `me->m(` and a bare `m(` in the class, `super->m(`, `zcl_x=>m(`, a receiver
+declared TYPE REF TO a project class (in the unit, the method's parameters or the class attributes), `NEW zcl_x( )`, a
+factory's RETURNING type, a receiver typed with a project interface (every implementation), `PERFORM`, `CALL FUNCTION
+'Z'`, `CALL METHOD` in the same shapes; a SAP-typed receiver is not a project call, an unknown one is unresolved and
+counted, never guessed by name. Dead methods: private or protected and never named by any call shape or string
+literal anywhere (tests included); constructors, setup/teardown, FOR TESTING, event handlers, redefinitions and
+interface implementations are never candidates; a public method, a function module nobody calls carries the public
+note and is not gated; a FORM never performed is a candidate (section 24).
 
   --gate                exit 1 on any CUT (cycle, upward dependency); --max-distance N also fails past N edits (CI)
   --report              also write docs/tests/dependency-graph.md

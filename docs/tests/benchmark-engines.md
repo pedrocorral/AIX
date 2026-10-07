@@ -1116,6 +1116,43 @@ repeats on purpose per object type; the report says "merge only when they share 
 **Not yet.** `--functions` (dead methods, call edges by method name) against abaplint's `unused_methods`; the
 security rules and the taint walk (section 22's list). Cognitive complexity does not count COND/SWITCH branches.
 
+### 24. ABAP `--functions`: call edges through declared types and dead methods vs abaplint `unused_methods` (2.21.49)
+
+Nodes are the units of section 22; a call is an arc only through a known target (`tests/benchmark/abapcalls.py`).
+How the receiver and static calls of the two projects split by what the reader can know about them:
+
+| receiver | abap2xlsx | abapGit |
+|---|---|---|
+| typed with a SAP class or interface or a dictionary type: not a project call | 2 257 (iXML, mostly) | 1 038 |
+| `zcl_x=>m(` on a project class | 404 | 3 319 |
+| declared TYPE REF TO a project class, `NEW`, `CAST`, a factory's RETURNING type | 826 | 2 408 |
+| declared with a project interface: every implementation | 109 | 1 124 |
+| `me->`, `super->` | 234 | 123 |
+| not declared anywhere the reader looks (a structure field, a chained call, an interface method's parameter typed in another file): unresolved | 89 | 2 104 |
+| resolved calls | 2 059 of 2 200, 94 % | 10 683 of 13 735, 78 % |
+| units, call edges | 953, 1 385 | 6 052, 10 672 |
+
+**Dead methods.** abaplint's `unused_methods` judges private and protected methods only; ours does the same and
+notes a public one nobody calls without gating it, as the API of a library (a Rust `pub fn` gets the same note):
+
+| project | ours, private or protected (gated) | ours, public (noted) | abaplint | agreement |
+|---|---|---|---|---|
+| abap2xlsx | 2 | 72 | 2 | the same two: `zcl_excel_writer_2007.create_xl_drawings_vml`, `_rels` |
+| abapGit | 0 | 49 | 0 | exact |
+
+**What the first run taught, each a planted test.** Ours first listed 9 private methods on abapGit that abaplint
+did not: every one was called inside a string template's embedded expression, `|<tr{ get_item_class( is_item ) }>|`,
+which the statement reader of section 22 blanked with the string; the code inside a template's `{ }` is code now
+(calls, conditions, names), its own strings are still strings. The name of a `CALL FUNCTION 'Z_X'` and a method
+named in a string literal (`lv_name = 'PRIV_DYN'. CALL METHOD (lv_name).`) are read from the raw line for the same
+reason. A bare `m( )` that no class of the inheritance chain defines is a builtin (`lines( )`, `strlen( )`) or a
+constructor expression, not a call. The 72 and 49 public ones are setters and API of a library and of an injector
+meant for other repositories' tests, listed with the note.
+
+**Edges read by hand.** Ten of `zcl_excel_converter` and ten of `zcl_abapgit_apack_helper`: every one a real call
+(`bind_table -> zcl_excel_worksheet.bind_table` through `TYPE REF TO zcl_excel_worksheet`,
+`get_dependencies_met_status -> zcl_abapgit_version.check_dependant_version` through `zcl_abapgit_version=>`).
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

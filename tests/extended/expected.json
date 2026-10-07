@@ -35,12 +35,12 @@
   "style": 953
  },
  "abapGit": {
-  "clones": 297,
+  "clones": 293,
   "dead": 1,
   "defensive": 0,
-  "graph": 3040,
+  "graph": 3051,
   "security": 31,
-  "style": 6290
+  "style": 6289
  },
  "bat": {
   "clones": 43,

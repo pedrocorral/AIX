@@ -122,6 +122,9 @@ class AbapUnits(unittest.TestCase):
         self.assertEqual([w for w, _t, _l in chained_call], ["LO->SET(", "LO->SET(", "DATA", "DATA"], "a chain inside a call closes the head's parenthesis per item")
         template = abapstyle.statements(["lv = |Branch { get_name(", "    rs-name ) } |.", "MESSAGE lv TYPE 'S'."])
         self.assertEqual([(w, l) for w, _t, l in template], [("LV", 1), ("MESSAGE", 3)], "a template may span lines inside its braces")
+        self.assertIn("get_name(", template[0][1], "the code inside a template's braces stays: a call, a condition")
+        embedded = abapstyle.statements(["x = |a. b { cond #( when v = 'x' then '1' else '2' ) } c|."])
+        self.assertEqual(len(embedded), 1); self.assertIn("cond #(", embedded[0][1].lower()); self.assertNotIn("x' then", embedded[0][1])
 
     def test_class_methods_metrics(self):
         fx = self.analyse("zcl_demo.clas.abap", CLASS)

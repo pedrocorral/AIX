@@ -160,11 +160,12 @@ def render_dead(nodes, edges, paths, functions):
     lines.append(f"  DEAD MODULES {len(dead)}  (no entry module reaches them through imports)")
     lines += [f"    {n}" for n in dead[:40]]
     if functions:
-        df = sorted(dead_functions(paths) + deadtokens.dead_functions(paths, is_entry_module))
-        lines += [f"  DEAD FUNCTIONS {len(df)}  (name never referenced outside its definition: Python by AST, JS/TS, Rust and Java by tokens; annotated, exported, entry/test code excluded)"]
+        import abapcalls
+        df = sorted(dead_functions(paths) + deadtokens.dead_functions(paths, is_entry_module) + abapcalls.dead_functions(paths))
+        lines += [f"  DEAD FUNCTIONS {len(df)}  (name never referenced outside its definition: Python by AST, JS/TS, Rust and Java by tokens, ABAP by statements; annotated, exported, entry/test code excluded)"]
         lines += [f"    {q}  (line {ln})" + ("  (public: the API of a library, or dead in an application)" if public else "") for q, ln, public in df[:60]]
     else:
-        lines.append("  (add --functions for dead functions and methods: Python, JS/TS, Rust, Java)")
+        lines.append("  (add --functions for dead functions and methods: Python, JS/TS, Rust, Java, ABAP)")
     lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting. Fix with: skill refactor-dead")
     lines.append("  Live by convention: tests, main/lib/build, Django migrations/admin/apps/commands, Cargo benches/examples/bin, Maven src/it, scripts/, public/,")
     lines.append("  dot-files, *.config.*, container-managed Java classes (@Controller, @Service, @Entity, ...), folders named by a string in code, ABAP programs, function groups, classrun classes and objects named or prefixed by a string in code.")
