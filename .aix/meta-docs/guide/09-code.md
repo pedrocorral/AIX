@@ -40,6 +40,15 @@ not magic numbers. It detects the runtime version and suggests modern constructs
 `X | None`, `?.`, `let-else`). `aix code style FILE:FUNCTION` prints one function as a card with line-numbered
 advice. `--gate` fails on any function over a limit. Skills: `refactor-readability`, `refactor-modernise`.
 
+## Guards: `aix code defensive`
+Python only for now. Four counts: functions fully typed and functions with no typed parameter; pydantic models, how
+many are strict, value rules, validators and `@validate_call`; doors, the places outside data enters (`json.load`,
+`request.form`, a FastAPI handler parameter) and how many reach the code unchecked; asserts in production code and
+`open()` without `with`. Listed spots carry the fix. `--gate` fails on a function returning None under an
+annotation that promises a value and on an `open()` neither managed, returned nor closed; the rest is advice. The
+recommendation lines say what the counts call for: annotate first, add pydantic, make it strict, close the doors.
+Skill: `implement-code-python`.
+
 ## The shape: `aix code stats`
 A terminal histogram of function sizes, or of any style metric with `--metric`, with mean, spread, percentiles,
 the share over the limit, and the largest functions, files and folders.
@@ -54,4 +63,4 @@ dependencies (OSV, needs network), secrets in git history. `--audit` writes the 
 ## Reports and gates
 `--report` on graph, style, security, stats and vulnerabilities writes under `docs/tests/`; those files are
 generated and ignored by git. The gates, `aix code graph --gate`, `aix code style --gate`,
-`aix code security --gate`, `aix docs security --gate`, exit 1 for CI.
+`aix code defensive --gate`, `aix code security --gate`, `aix docs security --gate`, exit 1 for CI.

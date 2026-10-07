@@ -232,11 +232,12 @@ def _stale_reason(project: Path, seat: dict, force: bool):
     return None
 
 
-def _full_table(project: Path, seats: dict):
+def _full_table(project: Path, seats: dict) -> str:
+    """The message of a full table: every seat and who holds it, and the way out."""
     lines = [f"  {n}: {s.get('tool')} {s.get('user')}@{s.get('host')}, task {s.get('task')}, {s['state']}, heartbeat {int(age_seconds(s.get('heartbeat', '')) // 60)} min ago" for n, s in seats.items() if s]
     expired = [n for n, s in seats.items() if s and s["state"] == "expired"]
     hint = f"; {', '.join(expired)} expired on another machine: `aix agent claim --force` takes it" if expired else "; `aix agent set total N` adds seats"
-    sys.exit(f"aix agent: all {total(project)} seats are taken{hint}\n" + "\n".join(lines))
+    return f"aix agent: all {total(project)} seats are taken{hint}\n" + "\n".join(lines)
 
 
 def claim(project: Path = ROOT, force: bool = False) -> str:
@@ -257,7 +258,7 @@ def claim(project: Path = ROOT, force: bool = False) -> str:
         if why:
             info["took_over"] = f"{seat.get('tool')} {seat.get('user')}@{seat.get('host')} pid {seat.get('pid')}: {why}"
             return _take(project, name, info, f", taken over: {why}")
-    _full_table(project, seats)
+    sys.exit(_full_table(project, seats))
 
 
 def _touch(project: Path, name: str, task):

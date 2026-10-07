@@ -45,6 +45,11 @@ The code                              (aix code ...; all four: Python, JS/TS, Ru
   aix code clones [PATH...] [--similarity PCT] [--gate]
                                       duplicated functions: exact groups (same structure, other names/literals)
                                       and near-clones above the threshold (default 70 %)
+  aix code defensive [PATH...] [--all] [--gate] [--report]
+                                      how guarded the Python is: fully typed functions, pydantic models and
+                                      strict mode, outside data (json/yaml/toml loads, request attributes,
+                                      handler parameters) reaching the code unchecked, asserts in production
+                                      code, open() without with, None under an annotation; RETURN/OPEN gate
   aix code security [PATH...] [--strict] [--gate] [--audit] [--report] [--selftest]
                                       deterministic static checks mapped to the VUL register and CWEs: injection,
                                       shell/eval, unsafe deserialisation, secrets and tokens, TLS off, debug on,

@@ -20,6 +20,7 @@ TOOLS = {  # tool -> (arguments, the number to record: regex with one group)
     "graph": (["code", "graph"], r"nodes \d+, edges (\d+)"),
     "dead": (["code", "dead"], r"DEAD MODULES (\d+)"),
     "clones": (["code", "clones"], r"exact clone groups (\d+)"),
+    "defensive": (["code", "defensive"], r"listed (\d+)"),
     "security": (["code", "security"], r"findings to review (\d+)"),
     "vulnerabilities": (["code", "vulnerabilities", "--taint"], r"taint paths[^:]*: (\d+) finding"),
 }

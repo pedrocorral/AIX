@@ -4,6 +4,7 @@ in document bodies is checked against the shape of its prefix; a domain code mus
 file is named after its id; an id is defined once. Agents invent shapes (`TS-VUL-WEB-002`, `TS-AUTH-7`, `ts-auth-001`,
 `TEST-AUTH-001`, `VULN-INJ-1`): each is reported with the rule it breaks and the nearest correct form."""
 import re
+from typing import Optional
 from pathlib import Path
 
 NFR_CATS = ("PERF", "SEC", "A11Y", "OBS", "OPS", "DATA", "UX")
@@ -42,17 +43,17 @@ def reason(token: str, domains: set):
     return checker(token, parts, domains)
 
 
-def _numbered(token: str, parts: list, _domains) -> str:
+def _numbered(token: str, parts: list, _domains) -> Optional[str]:
     if len(parts) == 2 and re.fullmatch(r"\d{4}", parts[1]):
         return None
     return f"`{token}` is not `{SHAPES[parts[0]]}`: one block of exactly four digits (`{parts[0]}-{(parts[-1] if parts[-1].isdigit() else '1').zfill(4)[-4:]}`)"
 
 
-def _entity(token: str, parts: list, _domains) -> str:
+def _entity(token: str, parts: list, _domains) -> Optional[str]:
     return None if len(parts) == 2 and re.fullmatch(r"[A-Z][A-Za-z0-9]*", parts[1]) else f"`{token}` is not `DM-<Entity>`: one PascalCase entity name (`DM-User`)"
 
 
-def _categorised(token: str, parts: list, _domains) -> str:
+def _categorised(token: str, parts: list, _domains) -> Optional[str]:
     cats = NFR_CATS if parts[0] == "NFR" else VUL_CATS
     if len(parts) == 3 and parts[1] in cats and re.fullmatch(r"\d{3}", parts[2]):
         return None
@@ -61,7 +62,7 @@ def _categorised(token: str, parts: list, _domains) -> str:
     return f"`{token}` is not `{SHAPES[parts[0]]}`: CAT is one of {', '.join(cats)} and the number has three digits"
 
 
-def _domained(token: str, parts: list, domains: set) -> str:
+def _domained(token: str, parts: list, domains: set) -> Optional[str]:
     prefix = parts[0]
     if len(parts) != 3:
         return f"`{token}` is not `{SHAPES[prefix]}`: three parts, prefix, one domain code, three digits{_vul_hint(parts)}"

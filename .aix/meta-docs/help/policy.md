@@ -14,5 +14,5 @@ The kit ships: minimal (style, docs), standard (spec, tests, threat, implement, 
 docs, coverage, audit, review, drift), hotfix (test, fix, style, security, docs, review), release (adds
 vulnerabilities, dead code, clones, the register gate). A layer adds or replaces policies/<name>.yaml; a policy may
 define its own checks (`checks: {lint: npm run lint}`) and use them in `order`.
-Steps: spec, tests, threat, implement, unit-tests, audit, review, drift (skills); style, modularity, dead, clones,
-security, vulnerabilities, docs, coverage, register (checks). `aix policy show NAME` prints a policy's steps.
+Steps: spec, tests, threat, implement, unit-tests, audit, review, drift (skills); style, defensive, modularity, dead,
+clones, security, vulnerabilities, docs, coverage, register (checks). `aix policy show NAME` prints a policy's steps.

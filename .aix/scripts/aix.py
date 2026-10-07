@@ -143,7 +143,7 @@ ALIASES = {"graph": ["code", "graph"], "complexity": ["code", "graph"], "validat
 CODE_MODES = {"graph": [], "complexity": [], "dead": ["--dead"], "clones": ["--clones"]}
 
 
-CODE_TOOLS = {"find": "codefind", "style": "style", "security": "codesecurity", "stats": "stats", "vulnerabilities": "vulnerabilities", "licenses": "licenses", "licences": "licenses",
+CODE_TOOLS = {"find": "codefind", "style": "style", "defensive": "defensive", "security": "codesecurity", "stats": "stats", "vulnerabilities": "vulnerabilities", "licenses": "licenses", "licences": "licenses",
               "sbom": "sbom", "blackduck": "sbom"}
 
 
@@ -153,7 +153,7 @@ def _graph_args(args):
         return (args[0] if args else "graph"), (args[1:] if args else [])
     if args[0].startswith("-") or (ROOT / args[0]).exists():
         return "graph", args
-    sys.exit(f"aix code: unknown command '{args[0]}'. Commands: find, graph, complexity, dead, clones, style, security, vulnerabilities, stats "
+    sys.exit(f"aix code: unknown command '{args[0]}'. Commands: find, graph, complexity, dead, clones, style, defensive, security, vulnerabilities, stats "
              f"(a path may follow the command, e.g. aix code graph backend)")
 
 

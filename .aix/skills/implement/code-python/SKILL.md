@@ -9,6 +9,8 @@ Reading budget: `.aix/meta-docs/stacks/python/tooling.md`, `conventions/readabil
 ## Procedure
 1. Place the code in its layer (`architecture-structure-project` decides); no ORM/driver imports outside adapters.
 2. Types on every public function; `X | None`, builtin generics, dataclasses for records; no `Any` without a comment.
+   Outside data (a request body, a loaded JSON/YAML file) goes through a strict pydantic model (`ConfigDict(strict=True)`);
+   `aix code defensive FILE` lists the doors still unchecked, the asserts, the `open()` without `with`, the None under an annotation.
 3. Errors: raise the domain exception from `core/errors`; never swallow; log once at the boundary with ids, never secrets.
 4. Functions under the limits (`aix code style FILE:FUNC` after writing): guard clauses, one job, ≤ 5 params.
 5. Imports one-directional (`aix code graph --gate`); no sibling-domain import.

@@ -78,6 +78,8 @@ AIX/
 │   ├── stylemetrics.py      # leaf: cyclomatic, cognitive, nesting, params, names, magic numbers per function (Python by AST; JS/TS, Rust, Java by tokens)
 │   ├── modernise.py         # leaf: modernisation advice bounded by the detected runtime
 │   ├── style.py             # `aix code style`: findings, card, table, gate over stylemetrics + modernise
+│   ├── pyguards.py          # leaf: the defensive-programming facts of one Python file (annotations, pydantic, doors, asserts, open(), None returns)
+│   ├── defensive.py         # `aix code defensive`: the counts, the listed spots, the recommendation, the gate over pyguards
 │   ├── infrarules.py   # leaf: file-level rules over workflows, manifests, compose, sessions, pages, Spring (the categories semgrep adds)
 │   ├── securityrules.py, depscan.py, assembled.py   # leaves: the per-line rules (VUL rows, CWEs), the dependency hygiene and Dockerfile scan, the assembled-then-used rule
 │   ├── codesecurity.py      # `aix code security`: scan, report, audit evidence

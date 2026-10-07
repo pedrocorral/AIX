@@ -996,6 +996,35 @@ logging off, secrets in variables: about 250 of TerraGoat's 467 and 50 of CfnGoa
 of its own; or a plain statement in the report and the help page that the kit does not read cloud configuration and
 that Checkov does, with the command to run it.
 
+### 21. Run-time guards: pydantic, beartype, typeguard on the same function (run on 2026-10-07, behind `aix code defensive`)
+
+Python never checks an annotation at run time: `double("ab")` with `n: int` returns `"abab"`. A decorator that reads
+the annotations and checks every call is the only way to make them bite. The three libraries and a stdlib
+decorator (plain classes by `isinstance`, slots bound once at decoration) on `plain(f: Path, names: list[str],
+depth: int) -> str`, Python 3.13, 300 000 calls each (`tests/benchmark/guards.py`, the benchmark venv):
+
+| decorator | µs per call | `list[str]` items | value rules in the annotation | `"5"` for an `int` | own class as a type | extra packages | on disk |
+|---|---|---|---|---|---|---|---|
+| none | 0.06 | no | no | passes | yes | 0 | 0 |
+| stdlib decorator | 0.17 | no, `list` only | if written | rejected | yes | 0 | 0 |
+| beartype 0.22.9 | 0.29 | one random item per call | `Annotated[int, Is[...]]` | rejected | yes | 0 | 8.3 MB |
+| typeguard 4.6.0 | 4.88 | every item | no | rejected | yes | 1 | 0.3 MB |
+| pydantic 2.13.5 `validate_call` | 0.77 | every item | `Field(gt=0)`, validators | **converted to 5** | only with `arbitrary_types_allowed=True` | 4 | 9 MB |
+| pydantic, `strict=True` | 0.73 | every item | same | rejected | same | 4 | 9 MB |
+
+Releases in the twelve months to 2026-10-07: pydantic 20 (a company behind it), beartype 10 (one maintainer),
+typeguard 4. Import time: pydantic 23 ms, beartype 60 ms. beartype has one thing pydantic has not, a one-line
+whole-package mode (`beartype_this_package()`), and a cheaper call; both conveniences, not capabilities.
+
+**Decision.** For a project: pydantic in strict mode. It checks everything beartype checks, carries the value rule in
+the annotation, and most projects already depend on it; the two settings that make it a guard rather than a parser
+are `strict=True` (else `"5"` becomes 5 and no error is raised) and `arbitrary_types_allowed=True` (else a
+parameter typed with the project's own class fails at import). beartype for a project that has no pydantic and wants
+nothing heavy. For the kit itself neither: no dependencies, so a decorator of its own, the stdlib row. The gate
+`aix code defensive` (2.21.46) counts what a project has (models, strict ones, value rules, `validate_call`) and says
+which of these it calls for; its planted shapes were checked against flask, requests, pygoat and a FastAPI project
+(`return open(...)` hands the file to the caller, `-> Any` includes None, `sys.exit` ends a function).
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

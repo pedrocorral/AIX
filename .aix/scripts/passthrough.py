@@ -3,9 +3,10 @@ parameters, unchanged and in order, to one call: Python by AST, the other langua
 a decorated function, a factory naming a constructor, a trait or interface method, an adapter that adds, drops,
 reorders or transforms an argument."""
 import ast, re
+from typing import Optional
 
 
-def _forwarded_names(call) -> list:
+def _forwarded_names(call) -> Optional[list]:
     """The argument names of a call when every argument is a bare name (or a starred bare name); else None."""
     names = []
     for a in call.args:
@@ -21,12 +22,12 @@ def _forwarded_names(call) -> list:
 
 
 def _callee_name(func) -> str:
-    """`target`, `mod.target`, `self.other`: a function or method named directly; None for a computed expression."""
+    """`target`, `mod.target`, `self.other`: a function or method named directly; "" for a computed expression."""
     if isinstance(func, ast.Name):
         return func.id
     if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
         return f"{func.value.id}.{func.attr}"
-    return None
+    return ""
 
 
 def _single_call(fn):
