@@ -14,6 +14,7 @@ ASSEMBLED = re.compile(r"\bf\"|\bf'|\.format\(|String\.format\(|\bformat!\(|\$\{
 KIND_OF = (("sql", re.compile(r"^\s*(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b", re.I)), ("html", re.compile(r"<\w")),
            ("template", re.compile(r"\{\{|\{%")), ("url", re.compile(r"^\s*https?://|^\s*//")), ("path", re.compile(r"[/\\]")))
 PATH_BUILDERS = re.compile(r"os\.path\.join\(|path\.join\(|Paths\.get\(|Path::new\(|PathBuf::from\(")
+LANGS = ("py", "js", "java", "rust")   # the languages the sink table knows
 SINKS = {  # kind -> (row, cwe, title, advice, {lang: sink regex; `name` is the variable})
     "shell": ("VUL-INJ-002", "CWE-78", "command assembled from strings, run with a shell below", "argument list without a shell; validate each argument",
               {"py": r"(?:os\.system|os\.popen)\([^;]*\b{name}\b|subprocess\.\w+\([^;]*\b{name}\b[^;]*shell\s*=\s*True",

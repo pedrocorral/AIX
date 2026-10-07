@@ -1153,6 +1153,33 @@ meant for other repositories' tests, listed with the note.
 (`bind_table -> zcl_excel_worksheet.bind_table` through `TYPE REF TO zcl_excel_worksheet`,
 `get_dependencies_met_status -> zcl_abapgit_version.check_dependant_version` through `zcl_abapgit_version=>`).
 
+### 25. ABAP security rules vs abaplint `dangerous_statement` and `call_transaction_authority_check` (2.21.50)
+
+Until 2.21.50 an `.abap` file was not a scanned text at all. abaplint's two security rules are the reference
+(`tests/benchmark/abapsec.py`; the findings are read from the audit report, the screen lists 25 per row):
+
+| project | ours, ABAP findings | abaplint | at the same line in ours | ours beyond abaplint |
+|---|---|---|---|---|
+| abap2xlsx | 6 | 0 | 0 | 4 file paths in a variable (`OPEN DATASET lv_filename`, `gui_upload`/`gui_download`), 1 `cl_gui_frontend_services=>execute`, 1 `CALL FUNCTION l_function` |
+| abapGit | 45 | 38 | 38 of 38 | 3 `CALL FUNCTION`/`CALL TRANSACTION` named at run time, 2 file paths, 1 `CLIENT SPECIFIED`, 1 OS command |
+
+abapGit's 45 by rule: dynamic Open SQL 29, code generated at run time 9 (INSERT/DELETE REPORT, INSERT/DELETE
+TEXTPOOL), program or function named at run time 3, file path 2, cross-client 1, OS command 1. All are what abapGit
+is for, a generic reader and writer of repository objects, so every line is a finding to review and none a defect
+by itself; the taint walk that tells a screen field from a configuration value is the next step.
+
+**What the first run taught, each a planted test.** Dynamic SQL also puts the table right after the verb, `INSERT
+(iv_name) FROM TABLE`, `DELETE (lv) FROM TABLE`, `MODIFY (lv) FROM`, `UPDATE (lv) SET`, and the name may be a class
+constant, `FROM (zcl_x=>c_tabname)`, or a field, `(<ls_table>-tobj_name)`: eleven of abaplint's 38 were those shapes.
+`DELETE TEXTPOOL` joins the code-generation row. A bare program after `SUBMIT` is static, a quoted function or
+transaction is static; only `SUBMIT (lv)`, `CALL FUNCTION lv` and `CALL TRANSACTION lv` are chosen at run time. The
+generic secret rule, which runs on every text, read `key1 = ls_dm02l-entid` as an API key sixteen times on abapGit:
+in ABAP a secret is a quoted literal, so on an `.abap` file the matched value must sit inside quotes.
+
+**Not read yet.** The taint walk (sources: `PARAMETERS`, `SELECT-OPTIONS`, `sy-ucomm`, an RFC module's IMPORTING
+parameters, `request->get_form_field(`; sinks: the rows above); HTML built in strings without `escape(`, which is
+abapGit's whole UI and needs the walk to tell escaped from unescaped.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

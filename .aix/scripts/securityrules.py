@@ -5,7 +5,7 @@ import re
 
 
 TEXT_EXT = {".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".rs", ".java", ".kt", ".yml", ".yaml", ".json", ".toml", ".env",
-            ".ini", ".cfg", ".conf", ".txt", ".html", ".jinja", ".jinja2", ".j2", ".sh", ".properties", ".xml", ".tf"}
+            ".ini", ".cfg", ".conf", ".txt", ".html", ".jinja", ".jinja2", ".j2", ".sh", ".properties", ".xml", ".tf", ".abap"}
 ACCEPT = re.compile(r"aix:\s*accepted\s+(VUL-[A-Z]+-\d{3})(.*)$")
 SKIP_FILE = re.compile(r"aix:\s*skip-security-scan\b(.*)$")   # in the first MARKER_LINES lines: whole file skipped, listed as such
 MARKER_LINES = 30
@@ -13,6 +13,24 @@ MARKER_LINES = 30
 # (vul, cwe, title, languages or {"*"}, regex, advice)   regexes run per line, comments stripped first
 RULES = [
     # --- injection --------------------------------------------------------------------------------------------
+    ("VUL-INJ-002", "CWE-94", "ABAP code generated at run time", {"abap"},
+     r"^\s*(?:GENERATE\s+SUBROUTINE\s+POOL|INSERT\s+REPORT|INSERT\s+TEXTPOOL|DELETE\s+REPORT|DELETE\s+TEXTPOOL)\b",
+     "no code from strings at run time; a static program, or a generated one reviewed and transported like any other"),
+    ("VUL-INJ-002", "CWE-78", "OS command from ABAP", {"abap"},
+     r"\bCALL\s+'SYSTEM'|\bcl_gui_frontend_services=>execute\b|\bSXPG_COMMAND_EXECUTE\b",
+     "an external command defined in SM69 with fixed arguments; never a command or an argument from a variable"),
+    ("VUL-INJ-002", "CWE-470", "program, function or transaction chosen at run time", {"abap"},
+     r"^\s*SUBMIT\s+\(\w+\)|\bCALL\s+FUNCTION\s+(?:\(\w+\)|[a-z_]\w*)\b|\bCALL\s+TRANSACTION\s+(?:\(\w+\)|[a-z_]\w*)\b",   # a static program after SUBMIT is bare; a static function or transaction is quoted
+     "an allowlist of program, function and transaction names; never a name that arrives from input"),
+    ("VUL-AUTHZ-001", "CWE-284", "cross-client data access (CLIENT SPECIFIED)", {"abap"},
+     r"\bCLIENT\s+SPECIFIED\b",
+     "stay in the caller's client; a cross-client read or write needs its own authority check and a written reason"),
+    ("VUL-INJ-002", "CWE-22", "file path held in a variable", {"abap"},
+     r"^\s*OPEN\s+DATASET\s+(?:\(\w+\)|[a-z_]\w*)\b|\bcl_gui_frontend_services=>gui_(?:upload|download)\b",
+     "a logical file name (FILE_GET_NAME) or a path validated against an allowed directory; `..` and absolute paths rejected"),
+    ("VUL-SECRET-002", "CWE-319", "HTTP client to a plain http:// URL", {"abap"},
+     r"create_by_url\([^)]*url\s*=\s*'http://",
+     "https:// and an SSL client identity (ssl_id); plain HTTP carries credentials and data in clear"),
     ("VUL-INJ-001", "CWE-89", "SQL built from strings", {"py"},
      r"\.(?:execute|executemany|raw|executescript)\(\s*(?:f['\"]|['\"][^'\"]*['\"]\s*(?:%|\+|\.format\()|[A-Za-z_]\w*\s*(?:%|\+)\s*)",
      "parameterise: cursor.execute(sql, params); never interpolate values into SQL"),
@@ -145,11 +163,12 @@ DOCKER_RULES = [
     ("VUL-INFRA-001", "CWE-250", "container runs as root (no USER)", "add a non-root USER before the entrypoint"),
     ("VUL-DEP-001", "CWE-1104", "base image without a pinned tag", "pin FROM image:tag@sha256:... or at least a version tag, never :latest / untagged"),
 ]
-LANG = {".py": "py", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs": "js", ".rs": "rust", ".java": "java", ".kt": "java"}
+LANG = {".py": "py", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs": "js", ".rs": "rust", ".java": "java", ".kt": "java", ".abap": "abap"}
 
 
 # taint advice per CWE, shared by the Python and JS/TS taint leaves
-ADVICE = {"CWE-470": "never load a class named by input; an allowlist of class names", "CWE-501": "validate before storing in the session: what sits there is trusted by every later read", "CWE-90": "escape the LDAP filter value (ESAPI encodeForLDAP) or bind it as a parameter", "CWE-643": "an XPathVariableResolver for the value, never a concatenated expression", "CWE-78": "argument list without a shell; validate each argument", "CWE-95": "never eval input; a dispatch table or ast.literal_eval",
+ADVICE = {"CWE-94": "no code from strings at run time", "CWE-862": "an authority check before the action, its sy-subrc read", "CWE-285": "read sy-subrc after AUTHORITY-CHECK", "CWE-284": "stay in the caller's client", "CWE-319": "https:// with an SSL client identity",
+          "CWE-470": "never load a class named by input; an allowlist of class names", "CWE-501": "validate before storing in the session: what sits there is trusted by every later read", "CWE-90": "escape the LDAP filter value (ESAPI encodeForLDAP) or bind it as a parameter", "CWE-643": "an XPathVariableResolver for the value, never a concatenated expression", "CWE-78": "argument list without a shell; validate each argument", "CWE-95": "never eval input; a dispatch table or ast.literal_eval",
           "CWE-89": "parameterised query: execute(sql, params)", "CWE-22": "resolve against a base directory and reject anything outside it",
           "CWE-601": "allow-list targets or relative paths only", "CWE-1336": "render a file template with a context",
           "CWE-502": "json / yaml.safe_load; never deserialise input", "CWE-918": "allow-list hosts; block private ranges and redirects",

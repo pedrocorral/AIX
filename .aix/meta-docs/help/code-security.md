@@ -4,7 +4,7 @@ DETERMINISTIC SECURITY SCAN, mapped to the vulnerability register. Every rule na
 CWE it detects, so a finding is evidence the register can act on. Rules follow bandit, semgrep, gitleaks and
 eslint-plugin-security; categories follow the OWASP Top 10 and the seeded register. No dependencies.
 
-What it checks (Python, JS/TS, Rust, Java, plus Dockerfiles, compose, manifests, env files)
+What it checks (Python, JS/TS, Rust, Java, ABAP, plus Dockerfiles, compose, manifests, env files)
   VUL-INJ-001/002    SQL built from strings; shell commands (shell=True, exec/system); eval; template strings;
                      paths from request input                                             CWE-89/78/95/1336/22
   VUL-INPUT-001/002  pickle/marshal/yaml.load without SafeLoader, ObjectInputStream, XML entities  CWE-502/20
@@ -110,3 +110,14 @@ the report says so and names the reader: "not read by this scan: 47 Terraform fi
 terraform`); 1 Helm chart (…)". Benchmark section 20 measured the gap: Checkov reports 467 findings on TerraGoat and
 68 on CfnGoat, ours none in those files. Nothing is invented and nothing is silent; a reader for those files is a
 family of its own, to build when that line shows up on a project that matters.
+
+ABAP (2.21.50): dynamic Open SQL, a table or a clause held in a variable (`FROM (lv)`, `WHERE (lv)`, `SET (lv)`, `INTO (lv)`),
+unless the variable holds a literal assigned in the same unit; `EXEC SQL`; code generated at run time (GENERATE SUBROUTINE
+POOL, INSERT/DELETE REPORT, INSERT TEXTPOOL); an OS command (`CALL 'SYSTEM'`, cl_gui_frontend_services=>execute,
+SXPG_COMMAND_EXECUTE); a program, function or transaction named at run time (`SUBMIT (lv)`, `CALL FUNCTION lv`, `CALL
+TRANSACTION lv`; a bare program after SUBMIT and a quoted function or transaction are static); `CALL TRANSACTION` with no
+`WITH AUTHORITY-CHECK` and no AUTHORITY-CHECK in the unit; an AUTHORITY-CHECK whose next statement does not read sy-subrc;
+`CLIENT SPECIFIED`; a file path held in a variable (OPEN DATASET, gui_upload/download); a client to a plain http:// URL.
+The `*` rules (secrets, tokens, TLS off, debug) run on ABAP files as on every text. `*` in column 1 and `"` to the end of
+the line are comments. Measured against abaplint's dangerous_statement and call_transaction_authority_check (section
+25 of docs/tests/benchmark-engines.md). The taint walk does not read ABAP yet.

@@ -31,7 +31,7 @@
   "dead": 10,
   "defensive": 0,
   "graph": 300,
-  "security": 0,
+  "security": 6,
   "style": 953
  },
  "abapGit": {
@@ -39,7 +39,7 @@
   "dead": 1,
   "defensive": 0,
   "graph": 3051,
-  "security": 31,
+  "security": 75,
   "style": 6289
  },
  "bat": {

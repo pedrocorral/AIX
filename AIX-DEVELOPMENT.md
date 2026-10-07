@@ -79,6 +79,7 @@ AIX/
 │   ├── abapstyle.py         # leaf: ABAP units (METHOD/FORM/FUNCTION/MODULE) and their style metrics by statements; the fifth language
 │   ├── abapdeps.py          # leaf: ABAP objects as graph nodes (parts folded), the names a file uses as edges, entry points, clone tokens
 │   ├── abapcalls.py         # leaf: ABAP call edges through declared types (--functions) and dead methods by visibility
+│   ├── abapsec.py           # leaf: the ABAP security rules that need the unit (dynamic SQL unless a literal, EXEC SQL, CALL TRANSACTION and AUTHORITY-CHECK)
 │   ├── modernise.py         # leaf: modernisation advice bounded by the detected runtime
 │   ├── style.py             # `aix code style`: findings, card, table, gate over stylemetrics + modernise
 │   ├── pyguards.py          # leaf: the defensive-programming facts of one Python file (annotations, pydantic, doors, asserts, open(), None returns)

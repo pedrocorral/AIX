@@ -35,6 +35,8 @@ def strip_comment(line: str, lang: str) -> str:
     """The line without its trailing comment; a `#` or `//` inside a string literal (a URL, a colour) is not one."""
     if lang is None:
         return line
+    if lang == "abap":
+        return "" if line.startswith("*") else re.sub(LITERAL + "|" + r'".*$', lambda m: m.group(1) or "", line)
     marker = r"#.*$" if lang == "py" else r"//.*$|/\*.*?\*/"
     return re.sub(LITERAL + "|" + marker, lambda m: m.group(1) or "", line)
 
@@ -80,8 +82,11 @@ def scan_file(f: Path):
     if skipped:
         return [skipped]
     found = _rule_findings(f, lines, lang, langs)
-    if lang and not assembled.exempt(f):
+    if lang in assembled.LANGS and not assembled.exempt(f):
         found += assembled.findings(f, lines, lang, lambda l: strip_comment(l, lang))
+    if lang == "abap":
+        import abapsec
+        found += abapsec.findings(f, lines)
     return _inline_tests_tagged(found, lines, lang)
 
 

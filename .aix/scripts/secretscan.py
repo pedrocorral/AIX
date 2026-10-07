@@ -101,9 +101,14 @@ def find(path: str, line: str) -> list:
     """[(rule id, description, secret)] for one line of one file; a specific rule wins over the generic one."""
     if path_allowed(path):
         return []
-    hits = [h for h in (_hit(rule, path, line) for rule in _candidates(line)) if h]
+    hits = [h for h in (_hit(rule, path, line) for rule in _candidates(line)) if h and _literal_in_abap(path, line, h[2])]
     specific = [h for h in hits if h[0] != "generic-api-key"]
     return specific or hits
+
+
+def _literal_in_abap(path: str, line: str, secret: str) -> bool:
+    """In ABAP a secret is a quoted literal; an unquoted right-hand side is a variable name, nothing secret."""
+    return not path.endswith(".abap") or secret in "".join(re.findall(r"'[^']*'|`[^`]*`|\|[^|]*\|", line))
 
 
 def path_secret(path: str):
