@@ -100,7 +100,7 @@ def report(roots, show_all: bool = False) -> tuple:
     gated = sum(_count(t, k) for k in GATED)
     pct = round(100 * t["full"] / t["funcs"]) if t["funcs"] else 0
     lines = [f"Defensive programming — {', '.join(roots)}", "",
-             f"  Python: {plural(t['files'], 'file')}, {plural(t['funcs'], 'function')} (tests excluded); JS/TS, Rust and Java are not read yet",
+             f"  Python: {plural(t['files'], 'file')}, {plural(t['funcs'], 'function')} (tests excluded); JS/TS, Rust, Java and ABAP are not read yet",
              f"  annotations   {t['full']} fully typed ({pct} %), {t['untyped']} with no typed parameter, {_count(t, 'RETURN')} returning None under an annotation that promises a value",
              f"  guards        {_guards_line(t)}",
              f"  doors         {plural(t['doors'], 'read')} of outside data (json, yaml, toml, request bodies, untyped handler parameters), {t['unchecked']} unchecked",

@@ -26,6 +26,16 @@
   "style": 2429,
   "vulnerabilities": 27
  },
+ "abap2xlsx": {
+  "defensive": 0,
+  "security": 0,
+  "style": 953
+ },
+ "abapGit": {
+  "defensive": 0,
+  "security": 31,
+  "style": 6290
+ },
  "bat": {
   "clones": 43,
   "dead": 2,

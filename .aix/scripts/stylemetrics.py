@@ -4,7 +4,7 @@ Java by tokens and braces; plus the targets (`dir`, `file`, `file:func`) and the
 import ast, re
 from pathlib import Path
 
-from codefiles import CODE_ROOTS, ROOT, EXT, rel, source_files
+from codefiles import STYLE_EXT, CODE_ROOTS, ROOT, EXT, rel, source_files
 from tokenwalk import TOKEN_RX, _TokenWalk
 from heads import FUNC_HEAD, blank_children, brace_block, children_of, context_label, head_body, js_units
 from depedges import iter_functions
@@ -18,7 +18,8 @@ TEST_LINES_FACTOR = 2      # a test is a sequential story: twice the line limit,
 JSX = re.compile(r"</|/>")
 LOOP_VARS = {"i", "j", "k", "n", "x", "y", "z", "_", "e", "f", "p", "m", "t"}
 CASE = {"python": ("snake", re.compile(r"^_{0,2}[a-z][a-z0-9_]*$")), "rust": ("snake", re.compile(r"^[a-z][a-z0-9_]*$")),
-        "js": ("camel", re.compile(r"^[a-z$_][A-Za-z0-9$_]*$")), "java": ("camel", re.compile(r"^[a-z][A-Za-z0-9]*$"))}
+        "js": ("camel", re.compile(r"^[a-z$_][A-Za-z0-9$_]*$")), "java": ("camel", re.compile(r"^[a-z][A-Za-z0-9]*$")),
+        "abap": ("snake", re.compile(r"^[a-z0-9_~/]+$"))}   # ABAP names are case-insensitive: read in lower case, never a finding
 
 
 def thresholds():
@@ -189,7 +190,7 @@ def magic_py(fn):
 def is_test(file: Path, name: str) -> bool:
     p = file.resolve()
     return "tests" in p.parts or "test" in p.parts or "__tests__" in p.parts or p.name.startswith("test_") \
-        or p.name.endswith(("_test.py", ".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.js")) or name.startswith("test")
+        or p.name.endswith(("_test.py", ".test.ts", ".test.tsx", ".test.js", ".spec.ts", ".spec.js", ".testclasses.abap")) or name.startswith("test")
 
 
 def analyse_py(file: Path, cls, fn, lang="python", lines: list = None):
@@ -324,10 +325,13 @@ def _js_functions(file: Path, text: str) -> list:
 
 
 def functions_in(file: Path):
-    lang = EXT.get(file.suffix)
+    lang = STYLE_EXT.get(file.suffix)
     if not lang or file.name.endswith(".d.ts"):   # type declarations have no bodies
         return []
     text = file.read_text(encoding="utf-8", errors="replace")
+    if lang == "abap":
+        import abapstyle
+        return abapstyle.functions(file, text, PLAIN_NUMBERS)
     return _python_functions(file, text) if lang == "python" else _token_functions(file, text, lang)
 
 

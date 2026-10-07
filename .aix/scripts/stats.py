@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from codefiles import ROOT, default_roots, source_files
+from codefiles import ROOT, STYLE_EXT, default_roots, source_files
 from style import limit
 from stylemetrics import functions_in, thresholds
 
@@ -155,7 +155,7 @@ def _functions_under(paths) -> list:
     fxs = []
     for p in paths:
         base = (ROOT / p) if not Path(p).is_absolute() else Path(p)
-        for f in ([base] if base.is_file() else source_files([str(base)])):
+        for f in ([base] if base.is_file() else source_files([str(base)], STYLE_EXT)):
             fxs += functions_in(f)
     return fxs
 

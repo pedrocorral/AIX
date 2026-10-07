@@ -15,6 +15,8 @@ ENABLED = os.environ.get("AIX_TEST_EXTENDED") == "1"
 RECORD = os.environ.get("AIX_TEST_RECORD") == "1"
 TIME_LIMIT = 120.0   # seconds per tool per project
 BAND = 0.10          # a recorded number may move this much before the test fails
+GRAPH_LANGS = {"python", "js", "rust", "java"}   # the languages the graph engine reads; ABAP is style only so far
+TOOL_LANGS = {"graph": GRAPH_LANGS, "dead": GRAPH_LANGS, "clones": GRAPH_LANGS, "vulnerabilities": GRAPH_LANGS}   # absent: every project
 TOOLS = {  # tool -> (arguments, the number to record: regex with one group)
     "style": (["code", "style"], r"functions analysed (\d+)"),
     "graph": (["code", "graph"], r"nodes \d+, edges (\d+)"),
@@ -120,6 +122,8 @@ class Extended(unittest.TestCase):
         copy = working_copy(clone, self.home)
         got, problems = {}, []
         for tool, (args, rx) in TOOLS.items():
+            if tool in TOOL_LANGS and not TOOL_LANGS[tool] & set(project["langs"]):
+                continue   # the tool reads none of the project's languages: nothing to run or record
             r = run_tool(copy, self.home, args)
             got[tool] = _number(r["out"], rx)
             if r["traceback"]:

@@ -237,7 +237,7 @@ class Defensive(unittest.TestCase):
         self.plant("app.js", "function f(a) { return a }\n")
         r = self.run_tool("--gate")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("Python: 0 files, 0 functions (tests excluded); JS/TS, Rust and Java are not read yet", r.stdout, r.stdout)
+        self.assertIn("Python: 0 files, 0 functions (tests excluded); JS/TS, Rust, Java and ABAP are not read yet", r.stdout, r.stdout)
         self.assertIn("listed 0 (0 gated)", r.stdout)
 
     def test_report_file(self):

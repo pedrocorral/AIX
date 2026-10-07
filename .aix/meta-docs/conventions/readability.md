@@ -65,5 +65,5 @@ An OVER metric → skill `refactor-readability` (one metric per change, the card
 ## Tooling
 `aix code style [TARGET...]` — ranked table for a folder or file, a full card for one function
 (`file:func`, `file/func`, `file::Class.method`; extension optional), `--gate` for CI (fails on limits only; names,
-docstrings and magic numbers are advice). Python is measured exactly; JS/TS, Rust, Java approximately.
+docstrings and magic numbers are advice). Python is measured exactly; JS/TS, Rust, Java and ABAP approximately.
 The stack linters enforce the same limits in the editor: see `stacks/<lang>/tooling` for the rule names.

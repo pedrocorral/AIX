@@ -102,12 +102,12 @@ _DOC_STATE = {}
 def _not_code(raw: str, i: int, lines: list, lang) -> bool:
     """A definition line names a thing, it does not use it; a Python docstring line is prose. The docstring state
     is tracked per file, line 1 resets it."""
+    if i == 1:
+        _DOC_STATE["open"] = False   # before any early return: a file whose first line is a `def` must reset it too
     if DEFINITION.match(raw):
         return True
     if lang != "py":
         return False
-    if i == 1:
-        _DOC_STATE["open"] = False
     quotes = raw.count('"""') + raw.count("'''")
     prose = _DOC_STATE["open"] or quotes > 0
     if quotes % 2:

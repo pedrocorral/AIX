@@ -11,7 +11,7 @@ import ast, re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from codefiles import ROOT, CODE_ROOTS, default_roots, rel, source_files
+from codefiles import ROOT, CODE_ROOTS, STYLE_EXT, default_roots, rel, source_files
 from depedges import iter_functions
 from stylemetrics import CASE, DEFAULTS, TEST_LINES_FACTOR, analyse_py, file_hygiene, file_lines, functions_in, parse_target, thresholds
 from hygiene import ADVICE as HYGIENE_ADVICE
@@ -284,7 +284,7 @@ def _collect_one(t, fxs: list, files: list, cards: list):
     if t[0] == "func":
         cards += _function_hits(t[1], t[2])
         return
-    for f in (source_files([str(t[1])]) if t[0] == "dir" else [t[1]]):
+    for f in (source_files([str(t[1])], STYLE_EXT) if t[0] == "dir" else [t[1]]):
         fxs += functions_in(f); files.append((f, file_lines(f)))
 
 

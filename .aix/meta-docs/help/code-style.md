@@ -36,6 +36,17 @@ Feedback is concrete: "72 lines: the deepest block is lines 40-58, extract it", 
 line 12 (loop, nesting +2) ...", "nesting 5 at lines 44-52: invert the condition and return early",
 "6 parameters: group them into one object".
 
+ABAP (2.21.47, style only so far): a unit is a METHOD, FORM, FUNCTION or MODULE up to its END word; statements end
+with a period and `DATA: a, b.` is two; comments (`*` in column 1, `"` to the end of the line) and strings do not
+count; lines from the head to the END word; cyclomatic by McCabe (IF, ELSEIF, each WHEN but OTHERS, LOOP, DO, WHILE,
+a SELECT that ENDSELECT closes, AT, CATCH, CHECK, each AND/OR); cognitive by Campbell (a block and a CHECK cost 1 plus
+their nesting, ELSE/ELSEIF 1, CATCH 1 plus the nesting outside the TRY, one per run of like operators, TRY is not a
+level); parameters from the definition (IMPORTING, EXPORTING, CHANGING; USING, CHANGING, TABLES of a FORM; the `*"`
+block of a function module; RETURNING is the result); abapdoc `"!` above the definition is the docstring; a
+`.testclasses.abap` file is a test. Checked against abaplint on abap2xlsx and abapGit (section 22 of
+docs/tests/benchmark-engines.md): same statement counts, abaplint's own cyclomatic reproduced, ours kept as McCabe.
+Names are case-insensitive, so no naming advice. Graph, dead code, clones and security do not read ABAP yet.
+
 Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust and Java are measured from
 tokens and braces: lines, parameters (a list over several lines included) and nesting exact; cyclomatic as Checkstyle
 counts it (each branch and each boolean operator); cognitive by Campbell's rules (a branch plus its nesting level,

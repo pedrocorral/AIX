@@ -1025,6 +1025,47 @@ nothing heavy. For the kit itself neither: no dependencies, so a decorator of it
 which of these it calls for; its planted shapes were checked against flask, requests, pygoat and a FastAPI project
 (`return open(...)` hands the file to the caller, `-> Any` includes None, `sys.exit` ends a function).
 
+### 22. ABAP style: ours vs abaplint 2.120.70 on abap2xlsx and abapGit (2.21.47, the fifth language)
+
+ABAP lives in git through abapGit, one file per object (`zcl_x.clas.abap`, `.intf.abap`, `.prog.abap`,
+`.testclasses.abap` for its unit tests). Two real projects joined the extended suite at their release tags: abap2xlsx
+v7.16.0 (98 files, 782 units) and abapGit v1.125.0 (623 files, 4 813 units). The reference is abaplint, open source,
+200 default rules, the linter both projects run in CI (both are clean against their own configuration; with every
+rule on, abap2xlsx gets 15 405 findings, 2 773 of them `no_prefixes`, 1 229 `remove_descriptions`: naming and layout).
+Its three metric rules were run at our limits (`tests/benchmark/abapstyle.py`, the toolchain in BENCH_DIR):
+
+| project | units | ours over: lines 60 / cognitive 15 / cyclomatic 10 / nesting 4 / params 5 | abaplint: statements > 60 / its cyclomatic > 10 / nesting > 4 | same numbers on the methods it flags | ours s | abaplint s |
+|---|---|---|---|---|---|---|
+| abap2xlsx | 782 | 101 / 62 / 60 / 21 / 32 | 63 / 37 / 10 | statements 59 of 59, cyclomatic by its definition 37 of 37 | 0.7 | 1.4 |
+| abapGit | 4 813 | 303 / 93 / 134 / 12 / 42 | 157 / 45 / 11 | statements 54 of 54, cyclomatic by its definition 45 of 45 | 2.1 | 3.2 |
+
+**What was learnt on the way, each one a planted test.** A chained statement counts per item (`DATA: a, b.` is
+two); a chain may sit inside a call (`obj->m( : a = 1 ), a = 2 ).`), where every item closes the head's open
+parenthesis; a string template `|...{ }...|` may continue on the next line inside its braces; `*` in column 1 and
+`"` to the end of the line are comments, and a period in either is not a statement end. Before the chain-in-call
+rule, every statement count after the first such chain in a file was low (abap2xlsx's writer: 932 for 1 148).
+
+**Where the definitions differ, and what ours keeps.** abaplint's cyclomatic counts IF, ELSEIF, WHILE, CASE, LOOP,
+CATCH, CHECK, ASSERT, CLEANUP, ENDAT and a SELECT loop, with no base 1, no DO, no WHEN, no AND/OR, limit 20; ours is
+McCabe as Checkstyle counts Java: `1 +` IF, ELSEIF, each WHEN but OTHERS, LOOP, DO, WHILE, SELECT loop, AT, CATCH,
+CHECK, each AND/OR (the OR of `WHEN 'A' OR 'B'` is two labels). Ours reproduces abaplint's number exactly when asked
+to, which is the proof the unit reader and the statement splitter read the same code; the gate uses McCabe. Length:
+abaplint counts statements (limit 100), ours lines from the head to the END word (limit 60), as for the other four
+languages. Nesting: same blocks, abaplint reports one finding per file at depth 5, ours per unit at 4. Cognitive
+complexity, the metric built for readability, abaplint does not have: 62 methods of abap2xlsx and 93 of abapGit are
+over 15, led by `zcl_excel_ole.bind_alv_ole2` (1 978 lines, cognitive 469, 12 parameters) and
+`zcl_excel_worksheet.change_cell_style` (109 parameters). Parameters: abaplint has no rule; ours reads the
+definition (IMPORTING, EXPORTING, CHANGING; RETURNING is the result; USING, CHANGING, TABLES of a FORM; the `*"`
+interface block of a function module). Names are case-insensitive, so ours gives no naming advice; abapdoc `"!`
+above the definition is the docstring.
+
+**Not read yet.** Graph, dead code, clones and security: an ABAP file is a style file only (`STYLE_EXT`); the
+dependency reader (class names used, interfaces, INCLUDE, function modules called) and the security rules (dynamic
+WHERE and table names, EXEC SQL, `CALL 'SYSTEM'`, SUBMIT with a variable, CALL TRANSACTION without AUTHORITY-CHECK,
+CLIENT SPECIFIED, GENERATE SUBROUTINE POOL) are the next steps; abaplint's `sql_escape_host_variables` (17 on
+abap2xlsx with every rule on), `select_add_order_by` (4) and `check_subrc` (91) are its overlapping rows. Cognitive
+complexity does not yet count the branches of a COND or SWITCH expression.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

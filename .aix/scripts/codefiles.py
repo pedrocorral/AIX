@@ -49,24 +49,26 @@ def default_roots():
         print("code_roots: none of the configured folders exists here; scanning the whole project (`aix code find` sets them)", file=sys.stderr)
     return CODE_ROOTS
 EXT = {".py": "python", ".js": "js", ".jsx": "js", ".ts": "js", ".tsx": "js", ".mjs": "js", ".rs": "rust", ".java": "java"}
+STYLE_EXT = {**EXT, ".abap": "abap"}   # ABAP: style only so far (units and metrics); graph, dead, clones and security come later
 HUB_FAN = 3
 
 
 # ---- file discovery -------------------------------------------------------------------------------------
 
-def _is_source(f: Path, base: Path) -> bool:
+def _is_source(f: Path, base: Path, ext: dict = EXT) -> bool:
     """A non-empty source file whose path below `base` crosses no skipped or hidden folder."""
     inner = f.relative_to(base).parts[:-1] if base.is_dir() else ()
-    return f.is_file() and f.suffix in EXT and not is_vendored(f) and not any(s in SKIP or s.startswith(".") for s in inner) and f.stat().st_size > 0
+    return f.is_file() and f.suffix in ext and not is_vendored(f) and not any(s in SKIP or s.startswith(".") for s in inner) and f.stat().st_size > 0
 
 
-def source_files(roots):
+def source_files(roots, ext: dict = EXT):
+    """The source files below the roots; `ext` says which suffixes count (STYLE_EXT adds the style-only languages)."""
     for root in roots:
         base = (ROOT / root) if not Path(root).is_absolute() else Path(root)
         if not base.exists():
             continue
         for f in ([base] if base.is_file() else base.rglob("*")):  # SKIP applies below the given base only: an explicit `.aix/scripts` target is measured
-            if _is_source(f, base):
+            if _is_source(f, base, ext):
                 yield f  # empty files (bare __init__.py) are not nodes
 
 

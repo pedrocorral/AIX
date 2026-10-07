@@ -10,7 +10,7 @@ import os, re, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from codefiles import EXT, SKIP, ROOT
+from codefiles import STYLE_EXT as EXT, SKIP, ROOT   # every language any tool reads, ABAP included
 
 MARKERS = {"pyproject.toml": "python project", "setup.py": "python project", "package.json": "node package", "Cargo.toml": "rust crate",
            "pom.xml": "maven project", "build.gradle": "gradle project", "build.gradle.kts": "gradle project", "go.mod": "go module"}

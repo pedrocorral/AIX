@@ -150,5 +150,25 @@
    "java",
    "js"
   ]
+ },
+ {
+  "name": "abap2xlsx",
+  "url": "https://github.com/abap2xlsx/abap2xlsx.git",
+  "ref": "v7.16.0",
+  "commit": "ef47a724e73b0ef0cc58865debd7906d1b598db8",
+  "kind": "clean",
+  "langs": [
+   "abap"
+  ]
+ },
+ {
+  "name": "abapGit",
+  "url": "https://github.com/abapGit/abapGit.git",
+  "ref": "v1.125.0",
+  "commit": "e92a41c132774907b865a9d10043a5a3de1d12e1",
+  "kind": "clean",
+  "langs": [
+   "abap"
+  ]
  }
 ]
