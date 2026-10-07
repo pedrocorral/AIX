@@ -41,7 +41,7 @@ with a period and `DATA: a, b.` is two; comments (`*` in column 1, `"` to the en
 count; lines from the head to the END word; cyclomatic by McCabe (IF, ELSEIF, each WHEN but OTHERS, LOOP, DO, WHILE,
 a SELECT that ENDSELECT closes, AT, CATCH, CHECK, each AND/OR); cognitive by Campbell (a block and a CHECK cost 1 plus
 their nesting, ELSE/ELSEIF 1, CATCH 1 plus the nesting outside the TRY, one per run of like operators, TRY is not a
-level); parameters from the definition (IMPORTING, EXPORTING, CHANGING; USING, CHANGING, TABLES of a FORM; the `*"`
+level; a COND expression 1 plus nesting plus its further WHENs and ELSE, a SWITCH expression 1 plus nesting, 2.21.55); parameters from the definition (IMPORTING, EXPORTING, CHANGING; USING, CHANGING, TABLES of a FORM; the `*"`
 block of a function module; RETURNING is the result); abapdoc `"!` above the definition is the docstring; a
 `.testclasses.abap` file is a test. Hygiene (2.21.53): a CATCH with no statement and no comment is swallowed; a DATA,
 STATICS, FIELD-SYMBOLS, CONSTANTS or inline DATA( ) that no statement but its declaration names is a leftover

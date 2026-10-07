@@ -21,6 +21,7 @@ CLASS = '''CLASS zcl_demo DEFINITION PUBLIC.
     METHODS: chained_a IMPORTING iv_x TYPE i, chained_b IMPORTING iv_y TYPE i iv_z TYPE i.
   PRIVATE SECTION.
     METHODS helper IMPORTING iv_v TYPE i.
+    METHODS expressions IMPORTING iv_x TYPE i iv_y TYPE i.
 ENDCLASS.
 
 CLASS zcl_demo IMPLEMENTATION.
@@ -67,6 +68,15 @@ CLASS zcl_demo IMPLEMENTATION.
     DATA lv_offset TYPE string.
     lv_offset = iv_v+1(2).
     v = 3.
+  ENDMETHOD.
+
+  METHOD expressions.
+    DATA(a) = COND #( WHEN iv_x = 1 THEN 'one' WHEN iv_x = 2 THEN 'two' ELSE 'many' ).
+    IF iv_x > 0.
+      DATA(b) = COND string( WHEN iv_x > 5 AND iv_x < 9 THEN 'mid' ).
+    ENDIF.
+    DATA(c) = SWITCH #( iv_x WHEN 1 THEN 'a' WHEN 2 THEN 'b' WHEN 3 THEN 'c' ).
+    DATA(d) = COND #( WHEN iv_x = 1 THEN COND #( WHEN iv_y = 1 THEN 'x' ELSE 'y' ) ).
   ENDMETHOD.
 ENDCLASS.
 '''
@@ -131,7 +141,7 @@ class AbapUnits(unittest.TestCase):
     def test_class_methods_metrics(self):
         fx = self.analyse("zcl_demo.clas.abap", CLASS)
         m = fx["count_rows"]
-        self.assertEqual((m["line"], m["lines"]), (13, 30))
+        self.assertEqual((m["line"], m["lines"]), (14, 30))
         # 1 + IF + AND + OR + LOOP + WHEN A + WHEN B + its OR (two labels) + CHECK + ELSEIF + CATCH + SELECT loop = 12; WHEN OTHERS, SELECT SINGLE, the comment and the string count nothing
         self.assertEqual(m["cyclomatic"], 12, m["cognitive_items"])
         # IF 1 + runs AND,OR 2 + LOOP (nesting 1) 2 + CASE (nesting 2) 3 + CHECK (nesting 3) 4 + ELSEIF 1 + ELSE 1 + CATCH 1 + SELECT loop 1 = 16; the OR of a WHEN is not a condition
@@ -139,12 +149,18 @@ class AbapUnits(unittest.TestCase):
         self.assertEqual(m["nesting"], 3)
         self.assertEqual(m["params"], 3, "iv_a, iv_b, ev_c; RETURNING is the result")
         self.assertTrue(m["public"]); self.assertTrue(m["docstring"], "abapdoc above the definition")
-        self.assertEqual(m["magic"], [(16, 7.0), (22, 42.0), (24, 3.0), (35, 99.0)])
+        self.assertEqual(m["magic"], [(17, 7.0), (23, 42.0), (25, 3.0), (36, 99.0)])
         self.assertEqual((fx["chained_a"]["params"], fx["chained_b"]["params"]), (1, 2), "a chained METHODS: definition")
         self.assertFalse(fx["helper"]["public"]); self.assertEqual(fx["helper"]["params"], 1)
-        self.assertEqual(fx["helper"]["short_names"], [(52, "v")])
-        self.assertEqual(fx["helper"]["magic"], [(55, 3.0)], "an offset/length `+1(2)` is not a magic number")
+        self.assertEqual(fx["helper"]["short_names"], [(53, "v")])
+        self.assertEqual(fx["helper"]["magic"], [(56, 3.0)], "an offset/length `+1(2)` is not a magic number")
         self.assertEqual(fx["chained_b"]["lines"], 2)
+        e = fx["expressions"]
+        # a: COND, 2 WHENs + ELSE at nesting 0 = 1 + 1 + 1 = 3; b: COND inside an IF (nesting 1), 1 WHEN = 2, its AND = 1, the IF itself = 1;
+        # c: SWITCH, 3 WHENs = 1; d: outer COND 1 WHEN = 1, inner COND one level deeper, 1 WHEN + ELSE = 1 + 1 + 1 = 3  -> 3 + 2 + 1 + 1 + 1 + 1 + 3 = 12
+        self.assertEqual(e["cognitive"], 12, e["cognitive_items"])
+        # cyclomatic: 1 + 2 + 1 (IF) + 1 (WHEN) + 1 (AND) + 3 + 1 + 1 = 11
+        self.assertEqual(e["cyclomatic"], 11, e["cognitive_items"])
 
     def test_classic_units(self):
         fx = self.analyse("zdemo.prog.abap", REPORT)
@@ -170,10 +186,10 @@ class AbapThroughTheTool(unittest.TestCase):
         (self.project / "src/zcl_demo.clas.abap").write_text(CLASS)
         (self.project / "src/zcl_demo.clas.testclasses.abap").write_text("CLASS ltcl DEFINITION FOR TESTING.\nENDCLASS.\nCLASS ltcl IMPLEMENTATION.\n  METHOD test_it.\n    IF 1 = 1.\n    ENDIF.\n  ENDMETHOD.\nENDCLASS.\n")
         out = project_cmd(self.project, self.home, "code", "style", "src", check=False).stdout
-        self.assertIn("functions analysed 5", out, out)
+        self.assertIn("functions analysed 6", out, out)
         self.assertIn("src/zcl_demo.clas.abap:count_rows", out, out)
         card = project_cmd(self.project, self.home, "code", "style", "src/zcl_demo.clas.abap:count_rows", check=False).stdout
-        self.assertIn("(line 13, abap)", card, card)
+        self.assertIn("(line 14, abap)", card, card)
         self.assertIn("cyclomatic complexity    12   limit 10    OVER", card, card)
         self.assertIn("parameters                3   limit 5     ok", card, card)
         gate = project_cmd(self.project, self.home, "code", "style", "src", "--gate", check=False)

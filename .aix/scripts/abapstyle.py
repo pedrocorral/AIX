@@ -4,7 +4,8 @@ them (`DATA: a, b.` is two); `*` in column 1 and `"` to the end of a line are co
 case-insensitive. The metrics are the ones of the other languages: lines (head to END word), McCabe cyclomatic
 (`1 +` IF, ELSEIF, each WHEN but OTHERS, LOOP, DO, WHILE, SELECT loop, AT, CATCH, CHECK, each AND/OR), Campbell
 cognitive (a block and a CHECK cost 1 plus their nesting, ELSE/ELSEIF cost 1, CATCH 1 plus the nesting outside the
-TRY, one per run of like boolean operators in a condition, TRY is not a level), nesting depth, parameters read from the definition."""
+TRY, one per run of like boolean operators in a condition, TRY is not a level, a COND expression 1 plus nesting plus
+its further WHENs and ELSE, a SWITCH expression 1 plus nesting), nesting depth, parameters read from the definition."""
 import re
 from pathlib import Path
 
@@ -155,6 +156,16 @@ class _Walk:
             self._simple(word, line)
         self.cyc += len(re.findall(r"\bWHEN\b(?!\s+OTHERS\b)", up))
         self._booleans(up, line, cognitive=word != "WHEN")   # `WHEN 'A' OR 'B'` is two case labels: paths, not a condition to read
+        self._expressions(up, line)
+
+    def _expressions(self, up: str, line: int):
+        """A COND is an IF ladder as an expression: 1 plus the nesting, each further WHEN 1, the ELSE 1; a SWITCH is a
+        CASE as an expression: 1 plus the nesting; one inside another's branch sits one level deeper (Sonar's rule for
+        a conditional expression)."""
+        for kind, whens, elses, depth in conditional_expressions(up):
+            inc = 1 + self.nest + depth + ((max(0, whens - 1) + min(elses, 1)) if kind == "COND" else 0)
+            self.cog += inc
+            self.items.append((line, inc, f"{kind.lower()} expression (+1, nesting +{self.nest + depth}, {whens} when)" if self.nest + depth else f"{kind.lower()} expression (+1, {whens} when)"))
 
     def _simple(self, word: str, line: int):
         """ELSEIF and ELSE cost 1; CHECK is a hidden if (`IF NOT x. RETURN. ENDIF.`): a path and 1 plus the nesting."""
@@ -195,6 +206,33 @@ class _Walk:
         runs = sum(1 for i, op in enumerate(ops) if i == 0 or op != ops[i - 1]) if cognitive else 0
         self.cog += runs
         self.items += [(line, 1, "boolean operator (+1)")] * runs
+
+
+EXPRESSION = re.compile(r"\b(COND|SWITCH)\s+(?:#|\w+)\s*\(", re.I)
+
+
+def _expression_counts(up: str, start: int) -> tuple:
+    """(WHENs, ELSEs, end) of the expression whose parenthesis opens before `start`, counted at its own level only."""
+    k, level, whens, elses = start, 1, 0, 0
+    while k < len(up) and level:
+        level += (up[k] == "(") - (up[k] == ")")
+        if level == 1 and not up[k - 1].isalnum():
+            whens += up.startswith("WHEN", k)
+            elses += up.startswith("ELSE", k)
+        k += 1
+    return whens, elses, k
+
+
+def conditional_expressions(up: str) -> list:
+    """(kind, WHENs, ELSEs, depth) of every COND/SWITCH expression of a statement, each counted inside its own
+    parentheses only, with the depth of enclosing expressions."""
+    found, out = [], []
+    for m in EXPRESSION.finditer(up):
+        whens, elses, end = _expression_counts(up, m.end())
+        depth = sum(1 for s, e in found if s < m.start() < e)
+        found.append((m.start(), end))
+        out.append((m.group(1).upper(), whens, elses, depth))
+    return out
 
 
 def metrics(stmts: list, start_line: int) -> dict:

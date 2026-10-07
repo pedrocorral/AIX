@@ -1066,6 +1066,15 @@ CLIENT SPECIFIED, GENERATE SUBROUTINE POOL) are the next steps; abaplint's `sql_
 abap2xlsx with every rule on), `select_add_order_by` (4) and `check_subrc` (91) are its overlapping rows. Cognitive
 complexity does not yet count the branches of a COND or SWITCH expression.
 
+**Addendum, 2.21.55: `COND` and `SWITCH` expressions.** Section 22 left them uncounted because abap2xlsx and
+abapGit declare ABAP 7.02 and use none. code-pal-for-abap (7.40, in the suite since 2.21.54) holds 14 in 12 units,
+the referee. Sonar's rule for a conditional expression: a `COND` is an IF ladder as an expression and costs 1 plus the
+nesting of its statement, each further WHEN 1, the ELSE 1; a `SWITCH` is a CASE as an expression and costs 1 plus
+the nesting; one inside another's branch sits one level deeper; cyclomatic already counted every WHEN. On code-pal
+the twelve units change and none crosses the limit: `try_new_created_on` 1 to 9 (two four-way CONDs on the object
+type), `try_new_exemption` 2 to 6, `get_issue_count` 0 to 3, `get_parameter_reference` 25 to 28, already over.
+Each one read by hand against the rule; the card names the cost (`cond expression (+1, nesting +1, 3 when)`).
+
 ### 23. ABAP module graph, dead objects and clones on abap2xlsx and abapGit (2.21.48, step 2 of the fifth language)
 
 No engine builds a module graph for ABAP, so the reference here is the code itself: the references by shape and how
