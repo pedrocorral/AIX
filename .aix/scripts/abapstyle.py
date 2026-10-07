@@ -28,9 +28,11 @@ LOOP_VARS = {"i", "j", "k", "n", "x", "y", "z", "_", "e", "f", "p", "m", "t"}
 
 class _Stripper:
     """Comments and strings out of one line, keeping the code inside a template's `{ }` (an embedded expression
-    such as `|...{ get_x( ) }...|` is code: calls, conditions, names)."""
-    def __init__(self, quote: str = None):
-        self.out, self.quote, self.braces, self.inner = [], quote, 0, None   # inner: a string inside an embedded expression
+    such as `|...{ get_x( ) }...|` is code: calls, conditions, names). `state` is (quote, braces) handed from the
+    line before: a template, and an embedded expression inside it, may continue on the next line."""
+    def __init__(self, state=None):
+        quote, braces = state if state else (None, 0)
+        self.out, self.quote, self.braces, self.inner = [], quote, braces, None   # inner: a string inside an embedded expression
 
     def feed(self, ch: str):
         """One character, by state: inside a string of an embedded expression, inside the expression, inside a
@@ -64,20 +66,21 @@ class _Stripper:
             self.out.append(ch)
 
 
-def strip_line(line: str, quote: str = None) -> tuple:
-    """(code, open template) of one line: a `*` comment line is empty, a `"` comment is cut, a string literal becomes
-    `'S'` so its periods, commas and words do not count, the code inside a template's `{ }` stays. A `'` or a backtick
-    string ends with the line; a template `|...{ }...|` may continue on the next line, so its state is handed on."""
+def strip_line(line: str, state=None) -> tuple:
+    """(code, state) of one line: a `*` comment line is empty, a `"` comment is cut, a string literal becomes `'S'`
+    so its periods, commas and words do not count, the code inside a template's `{ }` stays. A `'` or a backtick
+    string ends with the line; a template `|...{ }...|` and an expression embedded in it may continue on the next
+    line, so (quote, braces) is handed on and None means plain code."""
     if line.startswith("*"):
-        return "", quote
-    st = _Stripper(quote)
+        return "", state
+    st = _Stripper(state)
     for ch in line:
-        if ch == '"' and not st.quote and not st.inner:
+        if ch == '"' and not st.quote and not st.inner and not st.braces:
             break
         st.feed(ch)
     if st.quote and st.quote != "|":
         st.out.append("'S'"); st.quote = None
-    return "".join(st.out), st.quote
+    return "".join(st.out), ((st.quote, st.braces) if st.quote else None)
 
 
 class _Splitter:
@@ -114,9 +117,9 @@ class _Splitter:
 
 
 def statements(lines: list, first_line: int = 1) -> list:
-    sp, quote = _Splitter(first_line), None
+    sp, state = _Splitter(first_line), None
     for raw in lines:
-        code, quote = strip_line(raw, quote)
+        code, state = strip_line(raw, state)
         sp.feed(code)
     return sp.out
 
@@ -204,18 +207,24 @@ def metrics(stmts: list, start_line: int) -> dict:
 
 # ---- the definition: parameters, visibility, abapdoc ------------------------------------------------------------
 
-def _method_definition(stmts: list, name: str):
-    """The `METHODS name ...` statement of a method (`zif~name` looks for `name`) and its section, or (None, None)."""
-    plain = name.split("~")[-1].upper()
-    section = "PUBLIC"
+def method_definitions(stmts: list) -> dict:
+    """method name -> (its METHODS statement, the section it sits in), over a file's statements, read once."""
+    out, section = {}, "PUBLIC"
     for word, text, _line in stmts:
         up = text.upper()
         m = SECTION.search(up)
         if m:
             section = m.group(1)
-        if word in ("METHODS", "CLASS-METHODS") and re.match(rf"(?:CLASS-)?METHODS\s+{re.escape(plain)}\b", up):
-            return text, section
-    return None, None
+        if word in ("METHODS", "CLASS-METHODS") and len(text.split()) > 1:
+            out.setdefault(text.split()[1].lower(), (text, section))
+    return out
+
+
+def _method_definition(src, name: str):
+    """The `METHODS name ...` statement of a method (`zif~name` looks for `name`) and its section, or (None, None)."""
+    if src.methods is None:
+        src.methods = method_definitions(src.stmts)
+    return src.methods.get(name.split("~")[-1].lower(), (None, None))
 
 
 def _method_params(definition: str) -> int:
@@ -279,13 +288,14 @@ class _Source:
     def __init__(self, file: Path, text: str, plain: set):
         self.file, self.raw, self.plain = file, text.splitlines(), plain
         self.stmts = statements(self.raw)
+        self.definitions = self.methods = None   # the DEFINITION part and the METHODS lines, read once on first use (a generated class may hold 1 600 methods)
 
 
 def _definition_facts(src: _Source, kind: str, name: str, head: str, head_index: int) -> tuple:
     """(parameters, public, documented) of a unit from its definition or its head."""
     documented = _abapdoc_above(src.raw, head_index)
     if kind == "METHOD":
-        definition, section = _method_definition(src.stmts, name)
+        definition, section = _method_definition(src, name)
         if definition is not None:
             def_line = next(line for _w, text, line in src.stmts if text is definition)
             documented = documented or _abapdoc_above(src.raw, def_line - 1)
@@ -322,7 +332,9 @@ def _method_facts(src: _Source, kind: str, name: str, cls: str) -> dict:
     if kind != "METHOD" or not cls:
         return {}
     import abapdefs
-    return abapdefs.definitions(src.stmts).get(cls.lower(), abapdefs._Class("")).methods.get(name.lower(), {})
+    if src.definitions is None:
+        src.definitions = abapdefs.definitions(src.stmts)
+    return src.definitions.get(cls.lower(), abapdefs._Class("")).methods.get(name.lower(), {})
 
 
 def functions(file: Path, text: str, plain: set) -> list:

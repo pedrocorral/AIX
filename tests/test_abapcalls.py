@@ -18,13 +18,13 @@ FILES = {
     "src/zcl_base.clas.abap": (
         "CLASS zcl_base DEFINITION PUBLIC.\n  PUBLIC SECTION.\n    INTERFACES zif_api.\n    METHODS constructor.\n    METHODS run.\n    METHODS api_setter IMPORTING iv_x TYPE i.\n"
         "    METHODS on_change FOR EVENT changed OF zcl_util.\n    DATA mo_attr TYPE REF TO zcl_util.\n"
-        "  PROTECTED SECTION.\n    METHODS also_never.\n  PRIVATE SECTION.\n    METHODS step.\n    METHODS step2.\n    METHODS helper.\n    METHODS never_called.\n    METHODS tested_only IMPORTING io_api TYPE REF TO zif_api.\n"
+        "  PROTECTED SECTION.\n    METHODS also_never.\n  PRIVATE SECTION.\n    METHODS step.\n    METHODS step2.\n    METHODS helper.\n    METHODS never_called.\n    METHODS tested_only IMPORTING io_api TYPE REF TO zif_api.\n    METHODS in_template IMPORTING iv_n TYPE i.\n"
         "ENDCLASS.\nCLASS zcl_base IMPLEMENTATION.\n"
         "  METHOD constructor.\n  ENDMETHOD.\n"
         "  METHOD run.\n    DATA lo_api TYPE REF TO zif_api.\n    me->step( ).\n    helper( ).\n    zcl_util=>tool( ).\n    lo_api->go( ).\n    DATA(lo) = NEW zcl_util( ).\n    lo->other( ).\n"
         "    DATA(lo2) = zcl_util=>make( ).\n    lo2->other( ).\n    CALL METHOD me->step2.\n    mo_attr->other( ).\n    lo_unknown->mystery( ).\n    DATA(lv) = lines( mt_rows ).\n  ENDMETHOD.\n"
         "  METHOD api_setter.\n  ENDMETHOD.\n  METHOD on_change.\n  ENDMETHOD.\n  METHOD also_never.\n  ENDMETHOD.\n  METHOD step.\n  ENDMETHOD.\n  METHOD step2.\n  ENDMETHOD.\n"
-        "  METHOD helper.\n  ENDMETHOD.\n  METHOD never_called.\n  ENDMETHOD.\n  METHOD tested_only.\n    io_api->go( ).\n  ENDMETHOD.\n  METHOD zif_api~go.\n  ENDMETHOD.\nENDCLASS.\n"),
+        "  METHOD helper.\n  ENDMETHOD.\n  METHOD never_called.\n  ENDMETHOD.\n  METHOD tested_only.\n    io_api->go( ).\n  ENDMETHOD.\n  METHOD in_template.\n  ENDMETHOD.\n  METHOD zif_api~go.\n    DATA(lv) = |{ in_template(\n      iv_n = 1 ) }|.\n  ENDMETHOD.\nENDCLASS.\n"),
     "src/zcl_base.clas.testclasses.abap": "CLASS ltcl DEFINITION FOR TESTING.\n  PRIVATE SECTION.\n    METHODS test_it FOR TESTING.\nENDCLASS.\nCLASS ltcl IMPLEMENTATION.\n  METHOD test_it.\n    DATA lo TYPE REF TO zcl_base.\n    lo->tested_only( ).\n  ENDMETHOD.\nENDCLASS.\n",
     "src/zcl_sub.clas.abap": "CLASS zcl_sub DEFINITION PUBLIC INHERITING FROM zcl_base.\n  PUBLIC SECTION.\n    METHODS run REDEFINITION.\nENDCLASS.\nCLASS zcl_sub IMPLEMENTATION.\n  METHOD run.\n    super->run( ).\n  ENDMETHOD.\nENDCLASS.\n",
     "src/zcl_util.clas.abap": (
@@ -79,7 +79,7 @@ class AbapDeadMethods(unittest.TestCase):
         self.assertIn("src/zcl_util.clas.abap:priv_dead  (line", out, out)
         self.assertIn("src/zprog_rep.prog.abap:unused  (line", out, out)
         self.assertRegex(out, r"src/zcl_base\.clas\.abap:api_setter  \(line \d+\)  \(public", "a public method nobody calls carries the note")
-        for live in ("constructor", "on_change", "zif_api~go", "tested_only", "priv_dyn", "step2", "zcl_sub.clas.abap:run", "test_it", "calc", "z_fm", ":run "):
+        for live in ("constructor", "on_change", "zif_api~go", "tested_only", "priv_dyn", "step2", "zcl_sub.clas.abap:run", "test_it", "calc", "z_fm", ":run ", "in_template"):
             self.assertNotIn(live if ":" in live else f":{live}  (line", out, f"{live} is live\n" + out)
         self.assertIn("DEAD FUNCTIONS 5", out, out)
 

@@ -123,6 +123,8 @@ class AbapUnits(unittest.TestCase):
         template = abapstyle.statements(["lv = |Branch { get_name(", "    rs-name ) } |.", "MESSAGE lv TYPE 'S'."])
         self.assertEqual([(w, l) for w, _t, l in template], [("LV", 1), ("MESSAGE", 3)], "a template may span lines inside its braces")
         self.assertIn("get_name(", template[0][1], "the code inside a template's braces stays: a call, a condition")
+        two_lines = abapstyle.statements(["x = |{ find_params(", "    ls_op ) }{ other( ) }|."])
+        self.assertEqual(len(two_lines), 1); self.assertIn("find_params(", two_lines[0][1]); self.assertIn("other(", two_lines[0][1])
         embedded = abapstyle.statements(["x = |a. b { cond #( when v = 'x' then '1' else '2' ) } c|."])
         self.assertEqual(len(embedded), 1); self.assertIn("cond #(", embedded[0][1].lower()); self.assertNotIn("x' then", embedded[0][1])
 

@@ -170,5 +170,15 @@
   "langs": [
    "abap"
   ]
+ },
+ {
+  "name": "code-pal-for-abap",
+  "url": "https://github.com/SAP/code-pal-for-abap.git",
+  "ref": "1.17",
+  "commit": "92c36539b15f9af3163e9c2bd786551eeb9cdea4",
+  "kind": "clean",
+  "langs": [
+   "abap"
+  ]
  }
 ]

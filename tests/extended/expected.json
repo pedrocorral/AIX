@@ -36,12 +36,12 @@
   "vulnerabilities": 0
  },
  "abapGit": {
-  "clones": 293,
+  "clones": 292,
   "dead": 1,
   "defensive": 0,
-  "graph": 3051,
+  "graph": 3053,
   "security": 75,
-  "style": 6289,
+  "style": 6288,
   "vulnerabilities": 1
  },
  "bat": {
@@ -51,6 +51,15 @@
   "graph": 85,
   "security": 24,
   "style": 1116,
+  "vulnerabilities": 0
+ },
+ "code-pal-for-abap": {
+  "clones": 62,
+  "dead": 6,
+  "defensive": 0,
+  "graph": 261,
+  "security": 6,
+  "style": 1369,
   "vulnerabilities": 0
  },
  "commons-lang": {

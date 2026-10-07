@@ -73,10 +73,10 @@ def node_of(f: Path, idx: dict) -> Path:
 
 def _code(text: str) -> tuple:
     """(code without comments and strings, the function modules called): the CALL FUNCTION name lives in a string."""
-    code, quote, called = [], None, set()
+    code, state, called = [], None, set()
     for raw in text.splitlines():
         called |= {m.group(1).lower() for m in CALL_FUNCTION.finditer(raw)}
-        line, quote = strip_line(raw, quote)
+        line, state = strip_line(raw, state)
         code.append(line)
     return "\n".join(code), called
 
