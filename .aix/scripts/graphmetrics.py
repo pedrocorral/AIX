@@ -25,7 +25,7 @@ def is_test(node: str) -> bool:
     """A test file by its path or name."""
     p = Path(node)
     return bool({"tests", "test", "__tests__", "spec", "it"} & set(p.parts)) or p.name.startswith("test_") or ".test." in p.name \
-        or ".spec." in p.name or p.name.endswith("_test.py")
+        or ".spec." in p.name or p.name.endswith("_test.py") or ".testclasses." in p.name
 
 
 def is_root_or_test(node: str) -> bool:

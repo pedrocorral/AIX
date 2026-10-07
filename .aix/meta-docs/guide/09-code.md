@@ -6,7 +6,7 @@ title: The code tools
 
 All of them read the same folders: `paths.code_roots` in `.aix/config.yaml`, set by `aix code find`. When none of
 the configured folders exists they scan the whole project and say so. A path on the command line narrows any of
-them: `aix code style backend`. Python, JavaScript, TypeScript, Rust and Java are parsed; ABAP by `aix code style` only so far.
+them: `aix code style backend`. Python, JavaScript, TypeScript, Rust, Java and ABAP are parsed (ABAP: style, graph, dead code and clones; not yet security).
 
 ## Which folders: `aix code find`
 Lists every top-level folder with source files, and the root itself when files sit there, with files per language

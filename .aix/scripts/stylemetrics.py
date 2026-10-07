@@ -4,7 +4,7 @@ Java by tokens and braces; plus the targets (`dir`, `file`, `file:func`) and the
 import ast, re
 from pathlib import Path
 
-from codefiles import STYLE_EXT, CODE_ROOTS, ROOT, EXT, rel, source_files
+from codefiles import CODE_ROOTS, ROOT, EXT, rel, source_files
 from tokenwalk import TOKEN_RX, _TokenWalk
 from heads import FUNC_HEAD, blank_children, brace_block, children_of, context_label, head_body, js_units
 from depedges import iter_functions
@@ -325,7 +325,7 @@ def _js_functions(file: Path, text: str) -> list:
 
 
 def functions_in(file: Path):
-    lang = STYLE_EXT.get(file.suffix)
+    lang = EXT.get(file.suffix)
     if not lang or file.name.endswith(".d.ts"):   # type declarations have no bodies
         return []
     text = file.read_text(encoding="utf-8", errors="replace")

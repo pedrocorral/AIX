@@ -78,6 +78,9 @@ def _python_units(f: Path, text: str) -> list:
 def _token_units(f: Path, text: str, lang: str) -> list:
     if lang == "js":
         return _js_clone_units(f, text)
+    if lang == "abap":
+        import abapdeps
+        return abapdeps.clone_units(f, text, rel(f), MIN_LINES)
     out = []
     for m in FUNC_HEAD[lang].finditer(text):
         hb = head_body(text, m, lang)

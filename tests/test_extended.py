@@ -15,8 +15,7 @@ ENABLED = os.environ.get("AIX_TEST_EXTENDED") == "1"
 RECORD = os.environ.get("AIX_TEST_RECORD") == "1"
 TIME_LIMIT = 120.0   # seconds per tool per project
 BAND = 0.10          # a recorded number may move this much before the test fails
-GRAPH_LANGS = {"python", "js", "rust", "java"}   # the languages the graph engine reads; ABAP is style only so far
-TOOL_LANGS = {"graph": GRAPH_LANGS, "dead": GRAPH_LANGS, "clones": GRAPH_LANGS, "vulnerabilities": GRAPH_LANGS}   # absent: every project
+TOOL_LANGS = {"vulnerabilities": {"python", "js", "rust", "java"}}   # the taint walk does not read ABAP yet; absent: every project
 TOOLS = {  # tool -> (arguments, the number to record: regex with one group)
     "style": (["code", "style"], r"functions analysed (\d+)"),
     "graph": (["code", "graph"], r"nodes \d+, edges (\d+)"),

@@ -3,7 +3,7 @@ METHOD/FORM/FUNCTION/MODULE up to their END word; a chained statement counts per
 count; cyclomatic is McCabe (each WHEN but OTHERS, each AND/OR, CHECK, CATCH, a SELECT that ENDSELECT closes);
 cognitive follows Campbell (TRY is not a level, CATCH costs 1 plus the nesting outside); parameters come from the
 definition (IMPORTING/EXPORTING/CHANGING, not RETURNING; USING/CHANGING/TABLES of a FORM; the `*"` block of a
-function module); a `.testclasses.abap` file is a test. Other tools (graph, dead, clones) do not read ABAP yet."""
+function module); a `.testclasses.abap` file is a test. Graph, dead code and clones: test_abapdeps.py."""
 import sys, unittest
 from pathlib import Path
 
@@ -175,14 +175,13 @@ class AbapThroughTheTool(unittest.TestCase):
         self.assertIn("GATE FAILED", gate.stdout + gate.stderr)
         self.assertIn("test: doubled", project_cmd(self.project, self.home, "code", "style", "src/zcl_demo.clas.testclasses.abap:test_it", check=False).stdout)
 
-    def test_other_tools_leave_abap_alone(self):
+    def test_the_other_tools_read_abap_without_a_traceback(self):
         (self.project / "src/zcl_demo.clas.abap").write_text(CLASS)
         (self.project / "src/app.py").write_text("def f(a):\n    return a\n")
-        for tool in (["code", "graph"], ["code", "dead"], ["code", "clones"], ["code", "security"]):
+        for tool in (["code", "graph"], ["code", "dead"], ["code", "clones"], ["code", "security"], ["code", "stats"]):
             r = project_cmd(self.project, self.home, *tool, "src", check=False)
             self.assertNotIn("Traceback", r.stderr, tool)
-            self.assertNotIn("zcl_demo", r.stdout, tool)
-
+        self.assertIn("nodes 2, edges 0", project_cmd(self.project, self.home, "code", "graph", "src", check=False).stdout, "the class and the script are nodes (test_abapdeps.py covers the edges)")
 
 if __name__ == "__main__":
     unittest.main()

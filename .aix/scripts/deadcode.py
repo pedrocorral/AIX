@@ -45,8 +45,20 @@ def is_entry_module(node: str) -> bool:
     Java package-info files, Spring Data fragment implementations, Angular environment files."""
     p = Path(node)
     return is_root_or_test(node) or p.stem.lower() in ENTRY_STEMS or p.name.endswith(ENTRY_SUFFIX) or p.name in FACADE_NAMES \
-        or p.name.startswith(".") or bool(ENTRY_FOLDERS & set(p.parts[:-1])) or has_main_guard(node) \
-        or p.name == "package-info.java" or p.name.startswith("environment.") or _fragment_impl(p)
+        or p.name.startswith(".") or bool(ENTRY_FOLDERS & set(p.parts[:-1])) or has_main_guard(node) or _entry_by_language(p)
+
+
+def _entry_by_language(p: Path) -> bool:
+    """Java package-info and Spring Data fragments, Angular environment files, ABAP programs, function groups and runnable classes."""
+    return p.name == "package-info.java" or p.name.startswith("environment.") or _fragment_impl(p) or _abap_entry(p)
+
+
+def _abap_entry(p: Path) -> bool:
+    """A program, a function group, a class the ADT console or apack runs (abapdeps.is_entry)."""
+    if p.suffix != ".abap":
+        return False
+    import abapdeps
+    return abapdeps.is_entry(ROOT / p)
 
 
 PATH_LITERAL = re.compile(r"""['"](?:\./)?((?=[\w.@/-]*/)[\w@][\w.@-]*(?:/[\w.@-]+)*/?)['"]""")   # a literal with a slash: a path
@@ -75,7 +87,15 @@ def dead_modules(nodes, edges):
     _, reach = reach_sets(nodes, edges)
     data = data_folders(nodes)
     live = set(roots) | {x for r in roots for x in reach[r]} | {n for n in nodes if any(n.startswith(d + "/") for d in data)}
+    live |= _named_live(nodes, edges, reach)
     return roots, sorted(n for n in nodes if n not in live), data
+
+
+def _named_live(nodes, edges, reach) -> set:
+    """ABAP objects a string in code names or prefixes (created by name at run time), and what they reach."""
+    import abapdeps
+    named = abapdeps.live_by_string(list(nodes), ROOT)
+    return named | {x for r in named for x in reach[r]}
 
 
 IMPLICIT_NAMES = {"main", "setup", "teardown", "setUp", "tearDown"}
@@ -147,5 +167,5 @@ def render_dead(nodes, edges, paths, functions):
         lines.append("  (add --functions for dead functions and methods: Python, JS/TS, Rust, Java)")
     lines.append("  Every line is a candidate: confirm nothing reaches it by string, reflection or a framework before deleting. Fix with: skill refactor-dead")
     lines.append("  Live by convention: tests, main/lib/build, Django migrations/admin/apps/commands, Cargo benches/examples/bin, Maven src/it, scripts/, public/,")
-    lines.append("  dot-files, *.config.*, container-managed Java classes (@Controller, @Service, @Entity, ...), folders named by a string in code.")
+    lines.append("  dot-files, *.config.*, container-managed Java classes (@Controller, @Service, @Entity, ...), folders named by a string in code, ABAP programs, function groups, classrun classes and objects named or prefixed by a string in code.")
     return "\n".join(lines), len(dead) + (len(df) if functions else 0)

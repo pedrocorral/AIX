@@ -1066,6 +1066,56 @@ CLIENT SPECIFIED, GENERATE SUBROUTINE POOL) are the next steps; abaplint's `sql_
 abap2xlsx with every rule on), `select_add_order_by` (4) and `check_subrc` (91) are its overlapping rows. Cognitive
 complexity does not yet count the branches of a COND or SWITCH expression.
 
+### 23. ABAP module graph, dead objects and clones on abap2xlsx and abapGit (2.21.48, step 2 of the fifth language)
+
+No engine builds a module graph for ABAP, so the reference here is the code itself: the references by shape and how
+many name an object of the project, the graph, every dead candidate read by hand, the clones
+(`tests/benchmark/abapdeps.py`). A node is one abapGit object with its part files folded in; an edge is one file
+naming another object (section 22's statement reader strips comments and strings first, the `CALL FUNCTION` name
+is read before that).
+
+| shape | abap2xlsx: refs / project / SAP standard | abapGit: refs / project / SAP standard |
+|---|---|---|
+| `zcl_x=>` static call or constant | 1 249 / 810 / 424 | 9 702 / 7 239 / 2 236 |
+| `TYPE REF TO zcl_x` | 1 219 / 592 / 544 | 3 331 / 1 911 / 824 |
+| `NEW zcl_x(`, `CREATE OBJECT ... TYPE zcl_x` | 4 / 2 / 0 | 289 / 254 / 3 |
+| `INHERITING FROM`, `INTERFACES` | 29 / 24 / 3 | 510 / 483 / 18 |
+| `RAISE EXCEPTION TYPE`, `CATCH` | 139 / 87 / 38 | 803 / 296 / 504 |
+| `CALL FUNCTION 'X'`, `INCLUDE`, `SUBMIT` | 34 / 0 / 0 | 570 / 5 / 0 |
+
+The rest name dictionary types (`zexcel_cell_row`, `tadir`), which live in XML, and SAP function modules.
+
+| project | nodes | edges | cycles | hubs | distance A -> B | dead candidates | exact clone groups / near |
+|---|---|---|---|---|---|---|---|
+| abap2xlsx | 90 | 300 | 3 (one of 21 nodes) | 15 | 30 edits | 10 | 38 (23 in tests) / 173 |
+| abapGit | 601 | 3 026 | 2 (one of 132 nodes) | 93 | 142 edits | 0 | 297 (97 in tests) / 3 153 |
+
+**Edges read by hand.** Ten of `zcl_abapgit_apack_helper` and ten of `zcl_excel_converter` against the code: every one
+is a real use (`zcl_abapgit_popups=>center(`, `zcl_abapgit_hash=>sha1_blob(`, `TYPE zif_abapgit_git_definitions=>ty_file`,
+`zcl_abapgit_version=>check_dependant_version(`). `deps/cl_package_factory.clas.abap -> deps/if_package.intf.abap` is
+right too: abapGit ships stubs of those SAP objects, so they are project files.
+
+**Dead candidates read by hand.** abapGit's first run listed 40: 5 type pools (`deps/seoc.type.abap`), 19 object
+handlers `zcl_abapgit_object_*`, 3 background classes, 13 eCATT classes reached only from the handlers, 1 injector.
+All real code, none dead, four causes, each now a rule with a planted test: a type pool is referenced through any
+`seoc_...` name or `TYPE-POOLS seoc`; an object whose name a string in code equals (`ls_method-class =
+'ZCL_ABAPGIT_BACKGROUND_PULL'`) or whose name a string prefix built with `&&` or CONCATENATE starts
+(`'ZCL_ABAPGIT_OBJECT_' && lv_type`, then `CREATE OBJECT ... TYPE (lv_class)`) is live by convention, the same rule as
+a folder named by a string in Python; the strings are read in the object's part files too (the prefix sat in a
+`locals_imp`); `GLOBAL FRIENDS zcl_abapgit_objects_injector` is a reference. After the four: 0. abap2xlsx's 10
+stay: six `zcl_excel_converter_*` classes under `not_cloud/` form a cluster that names itself and that no program,
+test or other class reaches, and `zcl_excel_writer_csv`, `_xlsm`, `_huge_file` and `zcl_excel_reader_xlsm` are the
+library's public API for its users, named in no project code (the XSLT names one). Both are what the line says, a
+candidate for the person to confirm, as for a Python library's public modules.
+
+**Clones.** Units of section 22 on their statements, keywords from the ABAP list, identifiers to ID, literals to
+STR/NUM; the same fingerprints and thresholds as the other languages. abapGit's 297 exact groups are mostly the
+object handlers' `zif_abapgit_object~changed_by`, `~exists`, `~get_metadata` implementations, the shape abapGit
+repeats on purpose per object type; the report says "merge only when they share a purpose".
+
+**Not yet.** `--functions` (dead methods, call edges by method name) against abaplint's `unused_methods`; the
+security rules and the taint walk (section 22's list). Cognitive complexity does not count COND/SWITCH branches.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

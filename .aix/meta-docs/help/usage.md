@@ -31,7 +31,7 @@ The kit
                                       Python, PATH. Each problem comes with its fix
   aix about | version | help [CMD]    the full story | kit version | detailed help (e.g. aix help code dead)
 
-The code                              (aix code ...; Python, JS/TS, Rust, Java; ABAP in style; --report writes docs/tests/)
+The code                              (aix code ...; Python, JS/TS, Rust, Java, ABAP; --report writes docs/tests/)
   aix code graph [PATH...]            the modularity metric (alias: aix code complexity): A, the dependency graph
                                       of the code; B, the ideal shape on the same nodes (leaves and composers, arcs
                                       downward, no cycle, no hub); the distance = the edits (CUT, SPLIT) with reasons

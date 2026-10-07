@@ -89,6 +89,16 @@ Clones (--clones)
 
 Options
   aix code dead         the dead-code report (see above); aix code clones the clone report (--similarity PCT)
+ABAP (2.21.48): a node is one abapGit object, a class with its locals_def/locals_imp/macros files folded in, an interface,
+a program or include, a function group with its function-module and include files folded in; a .testclasses.abap file
+is a test node. An edge is one file naming another object: `zcl_x=>`, `TYPE REF TO`, `NEW zcl_x(`, `CREATE OBJECT ...
+TYPE`, `INHERITING FROM`, `INTERFACES`, `TYPE zif_x=>ty`, `RAISE EXCEPTION TYPE`, `CATCH`, `CALL FUNCTION 'Z_X'`, `INCLUDE`,
+`SUBMIT`, `PERFORM ... IN PROGRAM`. A name that is no object of the project (SAP standard cl_*/if_*/cx_*, a dictionary
+type, which lives in XML) is not an edge, never guessed. Entry points for dead code: a program (REPORT/PROGRAM), a
+function group, a class implementing if_oo_adt_classrun or if_apack_manifest, a test class. Clones compare units on
+their statements with the ABAP keyword list (section 23 of docs/tests/benchmark-engines.md). --functions does not
+read ABAP yet.
+
   --gate                exit 1 on any CUT (cycle, upward dependency); --max-distance N also fails past N edits (CI)
   --report              also write docs/tests/dependency-graph.md
   --selftest            run the built-in cases with known answers (chain, diamond, direct arc, cycle, reuse, layer

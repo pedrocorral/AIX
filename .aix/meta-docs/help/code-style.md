@@ -45,7 +45,7 @@ level); parameters from the definition (IMPORTING, EXPORTING, CHANGING; USING, C
 block of a function module; RETURNING is the result); abapdoc `"!` above the definition is the docstring; a
 `.testclasses.abap` file is a test. Checked against abaplint on abap2xlsx and abapGit (section 22 of
 docs/tests/benchmark-engines.md): same statement counts, abaplint's own cyclomatic reproduced, ours kept as McCabe.
-Names are case-insensitive, so no naming advice. Graph, dead code, clones and security do not read ABAP yet.
+Names are case-insensitive, so no naming advice. Graph, dead code and clones read ABAP since 2.21.48 (aix help code graph); security does not yet.
 
 Python is measured exactly (stdlib parser, Sonar's cognitive rules). JS/TS, Rust and Java are measured from
 tokens and braces: lines, parameters (a list over several lines included) and nesting exact; cyclomatic as Checkstyle

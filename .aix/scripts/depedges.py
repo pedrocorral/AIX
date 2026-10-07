@@ -259,20 +259,26 @@ def _java_index(files) -> dict:
     return idx
 
 
-def _edges_of(f: Path, py_idx, java_idx) -> list:
+def _edges_of(f: Path, idx: dict) -> list:
     lang = EXT[f.suffix]
     if lang == "python":
-        return py_module_edges(f, py_idx)
+        return py_module_edges(f, idx["py"])
     if lang == "js":
         return js_module_edges(f)
-    return rust_module_edges(f) if lang == "rust" else java_module_edges(f, java_idx)
+    if lang == "abap":
+        import abapdeps
+        return abapdeps.module_edges(f, idx["abap"])
+    return rust_module_edges(f) if lang == "rust" else java_module_edges(f, idx["java"])
 
 
 def module_graph(roots):
+    """(nodes, edges) over the files of the roots; an ABAP object's part files fold into the file that stands for it."""
+    import abapdeps
     files = list(source_files(roots))
-    py_idx, java_idx = python_index(files), _java_index(files)
-    nodes = {rel(f) for f in files}
-    edges = {(rel(f), rel(t)) for f in files for t in _edges_of(f, py_idx, java_idx) if t.resolve() != f.resolve() and rel(t) in nodes}
+    idx = {"py": python_index(files), "java": _java_index(files), "abap": abapdeps.index(files)}
+    node_of = {f: rel(abapdeps.node_of(f, idx["abap"])) for f in files}
+    nodes = set(node_of.values())
+    edges = {(node_of[f], node_of.get(t, rel(t))) for f in files for t in _edges_of(f, idx) if node_of.get(t, rel(t)) != node_of[f] and node_of.get(t, rel(t)) in nodes}
     return nodes, edges  # an import of an asset (lock.svg, package.json) or of a file outside the roots is not an edge
 
 

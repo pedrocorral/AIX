@@ -76,7 +76,8 @@ AIX/
 │   ├── deadcode.py, clones.py   # `aix code dead` (unreachable modules and functions), `aix code clones` (exact and near clones)
 │   ├── graph.py             # `aix code graph|dead|clones`: the report, the gate, the selftest over the leaves above
 │   ├── stylemetrics.py      # leaf: cyclomatic, cognitive, nesting, params, names, magic numbers per function (Python by AST; JS/TS, Rust, Java by tokens)
-│   ├── abapstyle.py         # leaf: ABAP units (METHOD/FORM/FUNCTION/MODULE) and their style metrics by statements; the fifth language, style only so far
+│   ├── abapstyle.py         # leaf: ABAP units (METHOD/FORM/FUNCTION/MODULE) and their style metrics by statements; the fifth language
+│   ├── abapdeps.py          # leaf: ABAP objects as graph nodes (parts folded), the names a file uses as edges, entry points, clone tokens
 │   ├── modernise.py         # leaf: modernisation advice bounded by the detected runtime
 │   ├── style.py             # `aix code style`: findings, card, table, gate over stylemetrics + modernise
 │   ├── pyguards.py          # leaf: the defensive-programming facts of one Python file (annotations, pydantic, doors, asserts, open(), None returns)
