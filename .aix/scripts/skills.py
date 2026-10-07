@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from catalog import (ROOT, SKILLS, catalogue, always_on, disabled, set_disabled, set_use, installed_in, unlink_everywhere)
 import linkfs
+from guard import checked
 
 
 def level(flat, info, always):
@@ -20,13 +21,18 @@ def state_of(flat, always, off, cat=None):
     return "manual" if cat and cat.get(flat, {}).get("manual") else "on-demand"
 
 
+@checked
+def _registry_entries(registry: dict) -> dict:
+    return registry
+
+
 def available_from_registry(cat):
     """Registry skills not yet downloaded, so they show up in the list with state `available`."""
     import json
     reg = SKILLS / "extern" / "registry.json"
     if not reg.exists():
         return {}
-    entries = json.loads(reg.read_text(encoding="utf-8"))
+    entries = _registry_entries(json.loads(reg.read_text(encoding="utf-8")))
     return {n: {"category": "extern", "group": e.get("group", "specific"), "description": e["description"],
                 "available": "recommended" if e.get("recommended") else "available"}
             for n, e in entries.items() if not n.startswith("_") and n not in cat}

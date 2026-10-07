@@ -5,6 +5,7 @@ A pinned version's full dependency graph (`resolve`) and the versions a Maven pa
 `FETCH` is the one function that touches the network; tests replace it."""
 import json, os, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
+from guard import checked
 
 CACHE = Path(os.environ.get("AIX_CACHE") or (Path.home() / ".cache" / "aix")) / "depsdev"
 SYSTEM = {"PyPI": "pypi", "npm": "npm", "Maven": "maven", "crates.io": "cargo", "Go": "go"}
@@ -12,12 +13,17 @@ ECOSYSTEM = {v: k for k, v in SYSTEM.items()}
 API = "https://api.deps.dev"
 
 
+@checked
+def _answer(data: dict) -> dict:
+    return data
+
+
 def fetch_json(url: str, timeout=20):
     """One GET; {} when deps.dev does not know the package or version (a fact, cached), None when the network or
     the service is not there (never cached)."""
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
-            return json.loads(r.read().decode())
+            return _answer(json.loads(r.read().decode()))
     except urllib.error.HTTPError as e:
         return {} if e.code == 404 else None
     except Exception:
@@ -30,7 +36,10 @@ FETCH = fetch_json
 def _cached(kind: str, system: str, name: str, version: str, url: str):
     key = CACHE / kind / system / f"{urllib.parse.quote(name, safe='')}@{urllib.parse.quote(version, safe='')}.json"
     if key.exists():
-        return json.loads(key.read_text(encoding="utf-8"))
+        try:
+            return _answer(json.loads(key.read_text(encoding="utf-8")))
+        except (ValueError, TypeError):
+            pass   # a corrupt cache entry: fetched again below
     data = FETCH(url)
     if data is not None:
         key.parent.mkdir(parents=True, exist_ok=True)

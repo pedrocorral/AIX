@@ -24,6 +24,7 @@ import secretscan
 import authz, cloudconfig, infrarules
 import pushscan
 from depscan import scan_dependencies, scan_dockerfile
+from guard import checked
 
 
 # ---- scanning -----------------------------------------------------------------------------------------------------
@@ -363,7 +364,8 @@ def _write_report(text: str):
     print(f"\n  wrote {out.relative_to(ROOT)}")
 
 
-def main(args):
+@checked
+def main(args: list):
     if "--push" in args:
         return pushscan.main(gate="--gate" in args)
     if "--selftest" in args:

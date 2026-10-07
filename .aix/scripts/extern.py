@@ -13,6 +13,7 @@ class folder (coach-grill-me); `aix skills use CLASS default` goes back to the k
 import io, json, re, shutil, sys, tarfile, urllib.request
 from datetime import date
 from pathlib import Path
+from guard import checked
 
 ROOT = Path(__file__).resolve().parents[2]
 EXTERN = ROOT / ".aix" / "skills" / "extern"
@@ -29,8 +30,18 @@ ALWAYS_FILES = {
 }
 
 
+@checked
+def _entries(registry: dict) -> dict:
+    return {k: v for k, v in registry.items() if not k.startswith("_")}
+
+
+@checked
+def _source(src: dict) -> dict:
+    return src
+
+
 def registry():
-    return {k: v for k, v in json.loads(REGISTRY.read_text(encoding="utf-8")).items() if not k.startswith("_")}
+    return _entries(json.loads(REGISTRY.read_text(encoding="utf-8")))
 
 
 def fetch_repo(repo: str):
@@ -199,7 +210,7 @@ def cmd_remove(names):
         dest = EXTERN / name
         if not dest.exists():
             sys.exit(f"{name} is not installed under .aix/skills/extern/")
-        src = json.loads((dest / ".aix-source").read_text(encoding="utf-8")) if (dest / ".aix-source").exists() else {}
+        src = _source(json.loads((dest / ".aix-source").read_text(encoding="utf-8"))) if (dest / ".aix-source").exists() else {}
         if src.get("class"):
             flat = src["class"].replace("/", "-")
             shutil.rmtree(dest)
@@ -215,7 +226,7 @@ def cmd_remove(names):
 def cmd_update(names):
     targets = names or [p.name for p in EXTERN.iterdir() if (p / ".aix-source").exists()]
     for name in targets:
-        src = json.loads((EXTERN / name / ".aix-source").read_text(encoding="utf-8"))
+        src = _source(json.loads((EXTERN / name / ".aix-source").read_text(encoding="utf-8")))
         install_one(name, {k: src[k] for k in ("repo", "path", "group", "class") if k in src})
 
 

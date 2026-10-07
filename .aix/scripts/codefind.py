@@ -11,6 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import EXT, SKIP, ROOT
+from guard import checked
 
 MARKERS = {"pyproject.toml": "python project", "setup.py": "python project", "package.json": "node package", "Cargo.toml": "rust crate",
            "pom.xml": "maven project", "build.gradle": "gradle project", "build.gradle.kts": "gradle project", "go.mod": "go module"}
@@ -216,7 +217,8 @@ def run(project: Path, yes: bool = False, list_only: bool = False, title: str = 
     return before != chosen
 
 
-def main(args):
+@checked
+def main(args: list):
     if any(a not in ("--yes", "--list") for a in args):
         sys.exit("usage: aix code find [--list | --yes]")
     run(ROOT, yes="--yes" in args, list_only="--list" in args)

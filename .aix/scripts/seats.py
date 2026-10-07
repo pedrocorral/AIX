@@ -12,6 +12,8 @@ taken over silently with a notice; a lease-expired seat elsewhere only with --fo
 Nothing free and nothing stale: refused, with the list of who is working."""
 import datetime, json, os, re, socket, subprocess, sys
 from pathlib import Path
+from guard import checked, has_keys
+from typing import Annotated
 
 ROOT = Path(__file__).resolve().parents[2]
 KNOWN_AGENTS = {"claude": "claude", "code": "copilot", "code-insiders": "copilot", "copilot": "copilot", "cursor": "cursor",
@@ -184,14 +186,19 @@ def binding_file(project: Path) -> Path:
     return sessions_dir(project) / (re.sub(r"[^A-Za-z0-9._-]", "_", key) + ".json")
 
 
+@checked
+def _seat_of(binding: Annotated[dict, has_keys("seat")]) -> str:
+    return binding["seat"]
+
+
 def _bound_seat(project: Path):
     """The seat name this session bound locally, or None."""
     f = binding_file(project)
     if not f.exists():
         return None
     try:
-        return json.loads(f.read_text(encoding="utf-8"))["seat"]
-    except (ValueError, KeyError):
+        return _seat_of(json.loads(f.read_text(encoding="utf-8")))
+    except (ValueError, TypeError):
         return None
 
 

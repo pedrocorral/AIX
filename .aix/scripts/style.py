@@ -16,6 +16,7 @@ from depedges import iter_functions
 from stylemetrics import CASE, DEFAULTS, TEST_LINES_FACTOR, analyse_py, file_hygiene, file_lines, functions_in, parse_target, thresholds
 from hygiene import ADVICE as HYGIENE_ADVICE
 from modernise import modern_py, modernisations
+from guard import checked
 
 
 
@@ -324,7 +325,8 @@ def _print_table(fxs, files, run: _Run) -> int:
     return n_over
 
 
-def main(args):
+@checked
+def main(args: list):
     if "--selftest" in args:
         return selftest()
     run = _Run(args, [a for a in args if not a.startswith("--")] or default_roots())

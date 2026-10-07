@@ -9,6 +9,8 @@ from codefiles import ROOT
 import cvss
 import depsdev
 from manifests import lockfile_dependencies, pinned_requirements, poms, read_gradle
+from guard import checked, has_keys
+from typing import Annotated
 
 BATCH = 1000   # OSV's querybatch limit
 OSV_CACHE = Path(os.environ.get("AIX_CACHE") or (Path.home() / ".cache" / "aix")) / "osv"
@@ -87,11 +89,21 @@ def all_dependencies(root: Path) -> tuple:
 
 # ---- OSV -------------------------------------------------------------------------------------------------------------
 
+@checked
+def _results_of(answer: Annotated[dict, has_keys("results")]) -> list:
+    return answer["results"]
+
+
+@checked
+def _vuln_record(record: Annotated[dict, has_keys("id")]) -> dict:
+    return record
+
+
 def _post(body: bytes):
     req = urllib.request.Request("https://api.osv.dev/v1/querybatch", data=body, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=25) as r:
-            return json.loads(r.read().decode()).get("results", [])
+            return _results_of(json.loads(r.read().decode()))
     except Exception:
         return None
 
@@ -122,7 +134,7 @@ def _version_key(s: str) -> list:
 def _fetch_vuln(vid: str, timeout=15):
     try:
         with urllib.request.urlopen(f"https://api.osv.dev/v1/vulns/{vid}", timeout=timeout) as r:
-            return json.loads(r.read().decode())
+            return _vuln_record(json.loads(r.read().decode()))
     except Exception:
         return None
 
@@ -134,7 +146,10 @@ def osv_vuln(vid: str) -> dict:
     """The advisory record, cached on disk for a day; {} when it cannot be read."""
     key = OSV_CACHE / f"{vid}.json"
     if key.exists() and time.time() - key.stat().st_mtime < OSV_TTL:
-        return json.loads(key.read_text(encoding="utf-8"))
+        try:
+            return _vuln_record(json.loads(key.read_text(encoding="utf-8")))
+        except (ValueError, TypeError):
+            pass   # a corrupt cache entry: fetched again below
     v = FETCH_VULN(vid)
     if v is not None:
         key.parent.mkdir(parents=True, exist_ok=True)

@@ -6,13 +6,14 @@ import sys
 from codefiles import ROOT, default_roots, rel, source_files
 from findingtags import is_test
 import pyguards
+from guard import checked
 
 GATED = ("RETURN", "OPEN")
 ORDER = {"RETURN": 0, "OPEN": 1, "DOOR": 2, "ASSERT": 3}
 ADVICE = {"DOOR": "parse it into a strict pydantic model, or check its shape", "ASSERT": "`python -O` removes it; raise ValueError",
           "OPEN": "`with open(...) as f:`", "RETURN": "annotate `-> {ann} | None` or raise"}
 HANDLER_ADVICE = "annotate it; FastAPI checks what is typed"
-COUNTS = ("funcs", "full", "untyped", "models", "strict_models", "rules", "validators", "calls", "strict_calls", "doors", "unchecked")
+COUNTS = ("funcs", "full", "untyped", "models", "strict_models", "rules", "validators", "calls", "strict_calls", "doors", "unchecked", "checked")
 MAX_ROWS = 30
 
 
@@ -35,7 +36,10 @@ def collect(roots) -> dict:
     """The totals over every non-test Python file under the roots, with the spots carrying their file."""
     total = {key: 0 for key in COUNTS}
     total.update(files=0, pydantic=False, spots=[])
-    for f in _python_files(roots):
+    files = _python_files(roots)
+    pyguards.CHECKED_NAMES.clear()
+    pyguards.CHECKED_NAMES.update(_checked_names(files))   # known before the scan: a door may feed a @checked function of another file
+    for f in files:
         facts = pyguards.scan(f.read_text(encoding="utf-8", errors="replace"))
         if facts is not None:
             total["files"] += 1
@@ -44,13 +48,25 @@ def collect(roots) -> dict:
     return total
 
 
+def _checked_names(files: list) -> set:
+    import ast
+    names = set()
+    for f in files:
+        try:
+            names |= pyguards.checked_functions(ast.parse(f.read_text(encoding="utf-8", errors="replace")))
+        except SyntaxError:
+            continue
+    return names
+
+
 def _count(total: dict, kind: str) -> int:
     return sum(1 for s in total["spots"] if s[0] == kind)
 
 
 def _guards_line(t: dict) -> str:
+    own = f"@checked on {plural(t['checked'], 'function')}; " if t["checked"] else ""
     if not t["pydantic"]:
-        return "pydantic not imported: nothing checks an argument at run time"
+        return own + ("pydantic not imported" if own else "pydantic not imported: nothing checks an argument at run time")
     return (f"pydantic: {plural(t['models'], 'model')} ({t['strict_models']} strict, {plural(t['rules'], 'field')} with a value rule, "
             f"{plural(t['validators'], 'validator')}), {plural(t['calls'], 'function')} under validate_call ({t['strict_calls']} strict)")
 
@@ -64,19 +80,27 @@ def _not_strict(t: dict) -> list:
     return parts
 
 
+def _types_first(t: dict) -> str:
+    n = t["untyped"]
+    return f"{n} function{'s carry' if n != 1 else ' carries'} no parameter type: annotate {'them' if n != 1 else 'it'} first, no checker works without types" if n else ""
+
+
+def _guard_advice(t: dict) -> str:
+    """Add a guard, make it strict, or close the open doors, whichever the counts call for."""
+    if not t["pydantic"] and not t["checked"] and t["funcs"]:
+        return ("add pydantic: `@validate_call(config=ConfigDict(strict=True))` on the functions behind the doors, outside data parsed into models;"
+                " a project that allows no dependencies writes one decorator of its own (the kit's .aix/scripts/guard.py is the shape)")
+    if _not_strict(t):
+        return " and ".join(_not_strict(t)) + " are not strict: pydantic converts '5' to 5 silently; set `ConfigDict(strict=True)`"
+    if t["unchecked"]:
+        into = "a @checked function" if t["checked"] and not t["pydantic"] else "a model"
+        return f"{plural(t['unchecked'], 'door')} unchecked: pass each parsed value into {into}, or check its shape where it is read"
+    return ""
+
+
 def recommendations(t: dict) -> list:
     """What the counts call for, one line each: types first, then a guard, then strictness, then the open doors."""
-    out = []
-    if t["untyped"]:
-        out.append(f"{t['untyped']} function{'s carry' if t['untyped'] != 1 else ' carries'} no parameter type: annotate {'them' if t['untyped'] != 1 else 'it'} first, no checker works without types")
-    if not t["pydantic"] and t["funcs"]:
-        out.append("add pydantic: `@validate_call(config=ConfigDict(strict=True))` on the functions behind the doors, outside data parsed into models;"
-                   " a project that allows no dependencies writes one decorator of its own")
-    elif _not_strict(t):
-        out.append(" and ".join(_not_strict(t)) + " are not strict: pydantic converts '5' to 5 silently; set `ConfigDict(strict=True)`")
-    elif t["unchecked"]:
-        out.append(f"{t['unchecked']} door{'s' if t['unchecked'] != 1 else ''} unchecked: parse each into a model, or check its shape where it is read")
-    return [f"  Recommendation: {line}" for line in out]
+    return [f"  Recommendation: {line}" for line in (_types_first(t), _guard_advice(t)) if line]
 
 
 def _advice(kind: str, what: str) -> str:
@@ -111,7 +135,8 @@ def report(roots, show_all: bool = False) -> tuple:
     return "\n".join(lines + recommendations(t)), gated
 
 
-def main(args):
+@checked
+def main(args: list):
     roots = [a for a in args if not a.startswith("--")] or default_roots()
     text, gated = report(roots, "--all" in args)
     print(text)

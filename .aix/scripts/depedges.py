@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from codefiles import ROOT, CODE_ROOTS, EXT, rel, source_files
+from guard import checked
 
 
 # ---- module-level edges per language ----------------------------------------------------------------------
@@ -86,10 +87,15 @@ JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs")
 _TS_CONFIGS = {}   # folder -> {"baseUrl": Path, "paths": {pattern: [targets]}} or None, once per run
 
 
+@checked
+def _tsconfig(data: dict) -> dict:
+    return data
+
+
 def _jsonc(text: str):
     """tsconfig.json is JSON with comments and trailing commas."""
     text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-    return json.loads(re.sub(r",\s*([}\]])", r"\1", text))
+    return _tsconfig(json.loads(re.sub(r",\s*([}\]])", r"\1", text)))
 
 
 def _own_options(data: dict, cfg: Path) -> dict:

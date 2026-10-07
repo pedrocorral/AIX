@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT, default_roots, source_files
 from style import limit
 from stylemetrics import functions_in, thresholds
+from guard import checked
 
 BINS = {
     "lines": [(1, 5), (6, 10), (11, 20), (21, 30), (31, 40), (41, 60), (61, 100), (101, 200), (201, None)],
@@ -160,7 +161,8 @@ def _functions_under(paths) -> list:
     return fxs
 
 
-def main(args):
+@checked
+def main(args: list):
     if "--selftest" in args:
         return selftest()
     metric = "lines"

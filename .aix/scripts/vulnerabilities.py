@@ -30,6 +30,7 @@ import javataint
 from cvecheck import cve, dependencies
 from secrethistory import history
 import secretrules
+from guard import checked
 
 
 
@@ -244,7 +245,8 @@ def _commits_flag(args, default=None):
     return value
 
 
-def main(args):
+@checked
+def main(args: list):
     if "--selftest" in args:
         return selftest()
     modes = {m for m in ("--taint", "--cve", "--history") if m in args} or {"--taint", "--cve", "--history"}

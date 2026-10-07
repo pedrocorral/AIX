@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from codefiles import SKIP, rel
+from guard import checked
 
 LOCK_TOML = re.compile(r'\[\[package\]\]\s*\nname\s*=\s*"([^"]+)"\s*\nversion\s*=\s*"([^"]+)"')
 PNPM_LINE = re.compile(r"^\s{2}['\"]?/?(@?[A-Za-z0-9_.\-]+(?:/[A-Za-z0-9_.\-]+)?)@(\d[0-9A-Za-z.\-+]*)", re.M)
@@ -30,10 +31,15 @@ def _text(f: Path) -> str:
     return f.read_text(encoding="utf-8", errors="replace")
 
 
+@checked
+def _object(data: dict) -> dict:
+    return data
+
+
 def _json(f: Path):
     try:
-        return json.loads(_text(f))
-    except json.JSONDecodeError:
+        return _object(json.loads(_text(f)))
+    except (json.JSONDecodeError, TypeError):
         return {}
 
 

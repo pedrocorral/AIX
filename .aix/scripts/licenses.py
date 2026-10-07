@@ -10,6 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from codefiles import ROOT
+from guard import checked
 
 PERMISSIVE = ("MIT", "BSD", "APACHE", "ISC", "0BSD", "UNLICENSE", "ZLIB", "PSF", "PYTHON", "CC0", "BLUEOAK", "WTFPL", "BOOST", "BSL-1", "X11", "MIT-0", "PUBLIC DOMAIN", "ARTISTIC", "MPL-1")
 WEAK = ("LGPL", "MPL", "EPL", "CDDL", "CPL", "OSL", "CC-BY", "EUROPEAN UNION PUBLIC")
@@ -67,13 +68,18 @@ def _python_licence(meta: str) -> str:
     return field.group(1).strip() if field and field.group(1).strip().upper() != "UNKNOWN" else ""
 
 
+@checked
+def _package(data: dict) -> dict:
+    return data
+
+
 def _npm_installed(root: Path) -> list:
     """(name, version, licence, 'npm') from every package.json inside a node_modules folder (scoped ones included)."""
     out = []
     for f in list(root.rglob("node_modules/*/package.json")) + list(root.rglob("node_modules/@*/*/package.json")):
         try:
-            data = json.loads(f.read_text(encoding="utf-8", errors="replace"))
-        except ValueError:
+            data = _package(json.loads(f.read_text(encoding="utf-8", errors="replace")))
+        except (ValueError, TypeError):
             continue
         lic = data.get("license") or data.get("licenses") or ""
         lic = lic.get("type", "") if isinstance(lic, dict) else " OR ".join(x.get("type", "") for x in lic) if isinstance(lic, list) else lic
@@ -121,9 +127,9 @@ def declared_not_installed(root: Path, installed: set) -> list:
     pkg = root / "package.json"
     if pkg.exists():
         try:
-            data = json.loads(pkg.read_text(encoding="utf-8", errors="replace"))
+            data = _package(json.loads(pkg.read_text(encoding="utf-8", errors="replace")))
             names |= set(data.get("dependencies", {})) | set(data.get("devDependencies", {}))
-        except ValueError:
+        except (ValueError, TypeError):
             pass   # a package.json that is not JSON declares nothing we can name
     return sorted(n for n in names if n.lower() not in installed)
 
@@ -172,7 +178,8 @@ def render(root: Path, table: list, missing: list) -> str:
     return "\n".join(lines)
 
 
-def main(args):
+@checked
+def main(args: list):
     root = ROOT
     cfg = config_licenses()
     table = rows(root, cfg)

@@ -116,10 +116,19 @@ def _door(node) -> str:
     return m.group(1) if m else ""
 
 
+CHECKED_NAMES = set()   # the project's `@checked` functions (guard.py), filled by the caller before a scan: a call to one checks its argument
+
+
+def checked_functions(tree) -> set:
+    """Names of the functions a `@checked` decorator guards (the kit's guard.py, or a project's copy of it)."""
+    return {n.name for n in ast.walk(tree) if isinstance(n, FUNCS) and any(_tail(d) == "checked" for d in n.decorator_list)}
+
+
 def _is_guard(call) -> bool:
-    """A call that checks or parses its argument: a constructor (`Config(**data)`), a pydantic parse, isinstance, int, float."""
+    """A call that checks or parses its argument: a constructor (`Config(**data)`), a pydantic parse, isinstance, int, float,
+    a function under `@checked`."""
     tail = _tail(call)
-    return tail in GUARD_TAILS or (tail[:1].isupper() and tail != tail.upper())
+    return tail in GUARD_TAILS or tail in CHECKED_NAMES or (tail[:1].isupper() and tail != tail.upper())
 
 
 def _guard_args(call) -> set:
@@ -273,7 +282,7 @@ def scan(text: str):
         return None
     fns = [n for n in ast.walk(tree) if isinstance(n, FUNCS)]
     facts = annotation_counts(fns)
-    facts.update(pydantic_facts(tree, fns), doors=0, unchecked=0)
+    facts.update(pydantic_facts(tree, fns), doors=0, unchecked=0, checked=len(checked_functions(tree)))
     fastapi = imports(tree, "fastapi")
     facts["spots"] = [s for fn in fns for s in _spots_of(fn, fastapi, facts)]
     return facts

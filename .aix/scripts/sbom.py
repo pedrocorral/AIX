@@ -18,6 +18,7 @@ import cvss
 from cvecheck import all_dependencies, fixed_version, osv_query, osv_vuln, severity
 from licenses import config_licenses, rows as licence_rows
 import layers
+from guard import checked
 
 PURL = {"PyPI": "pypi", "npm": "npm", "Maven": "maven", "crates.io": "cargo", "RubyGems": "gem", "Packagist": "composer", "Go": "golang"}
 ECO_OF_INSTALLED = {"python": "PyPI", "npm": "npm", "cargo": "crates.io", "maven": "Maven"}
@@ -172,7 +173,8 @@ def _gate(bill: dict, threshold: str):
     print("GATE PASSED" + ("  (OSV or deps.dev unreachable: partial bill)" if bill["unreachable"] else ""))
 
 
-def main(args):
+@checked
+def main(args: list):
     """Write the bill, print the report, apply the policy when asked."""
     if "--selftest" in args:
         return selftest()

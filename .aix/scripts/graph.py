@@ -25,6 +25,7 @@ from funcgraph import function_graph_tokens
 from graphmetrics import STABLE_MAX, measure
 from deadcode import render_dead
 from clones import SIMILARITY, render_clones
+from guard import checked
 
 
 
@@ -160,7 +161,8 @@ def _function_level(paths: list) -> tuple:
     return nodes | more_nodes | abap_nodes, edges | more_edges | abap_edges
 
 
-def main(args):
+@checked
+def main(args: list):
     if "--selftest" in args:
         return selftest()
     o = _Options(args)

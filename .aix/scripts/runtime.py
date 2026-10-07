@@ -8,6 +8,7 @@ Java     pom.xml maven.compiler.release/source | build.gradle(.kts) languageVers
 Returns {lang: (version_tuple_or_None, human_label, source)}; unknown versions are reported, never guessed."""
 import json, re, shutil, subprocess
 from pathlib import Path
+from guard import checked
 
 
 def _min_version(spec: str):
@@ -69,10 +70,15 @@ def _node_year(major: int) -> int:
     return 2022 if major >= 18 else 2020 if major >= 14 else 2018 if major >= 10 else 2015
 
 
+@checked
+def _engines(pkg: dict):
+    return pkg.get("engines", {}).get("node")
+
+
 def _engines_node(f: Path):
     try:
-        return json.loads(f.read_text(encoding="utf-8", errors="replace")).get("engines", {}).get("node")
-    except json.JSONDecodeError:
+        return _engines(json.loads(f.read_text(encoding="utf-8", errors="replace")))
+    except (json.JSONDecodeError, TypeError, AttributeError):
         return None
 
 

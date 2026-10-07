@@ -33,6 +33,9 @@ Recommendation lines, in this order, only when the counts call for them
   N functions carry no parameter type: annotate them first
   add pydantic: `@validate_call(config=ConfigDict(strict=True))` on the functions behind the doors, outside data
   parsed into models; a project that allows no dependencies writes one decorator of its own
+  (the kit's own is `.aix/scripts/guard.py`: `@checked` reads the annotations once and checks every argument on every
+  call, a plain class by isinstance, `Optional` allows None, a generic by its container, `Annotated[int, between(0, 100)]`
+  by its conditions; a door whose parsed value goes into a `@checked` function is checked; the guards line counts them)
   N of M models are not strict: set `ConfigDict(strict=True)`
   N doors unchecked: parse each into a model, or check its shape where it is read
 

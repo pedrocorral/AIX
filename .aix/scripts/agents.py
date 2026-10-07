@@ -4,6 +4,8 @@ selected. `agents: [claude, copilot]` in .aix/config.yaml; no line means all of 
 install, upgrade, doctor and the skills commands read it here."""
 import re, shutil
 from pathlib import Path
+from guard import checked, has_keys
+from typing import Annotated
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -142,11 +144,16 @@ def remove_deselected(project: Path, keep: list) -> list:
     return removed
 
 
+@checked
+def _indexed_skills(index: Annotated[dict, has_keys("skills")]) -> set:
+    return set(index["skills"])
+
+
 def _indexed(project: Path) -> set:
     import json
     try:
-        return set(json.loads((project / ".aix" / "index.json").read_text(encoding="utf-8")).get("skills", {}))
-    except (OSError, ValueError):
+        return _indexed_skills(json.loads((project / ".aix" / "index.json").read_text(encoding="utf-8")))
+    except (OSError, ValueError, TypeError):
         return set()
 
 

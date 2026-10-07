@@ -25,6 +25,7 @@ USER_DIR = Path(os.environ.get("AIX_USER_DIR") or (Path.home() / ".config" / "ai
 LAYER_NAMES = ("kit", "org", "user", "project")
 from yamlmini import front_matter, parse_yaml
 from lessons import NOTES_CLASS
+from guard import checked
 
 
 
@@ -272,9 +273,14 @@ def write_index(project: Path = ROOT):
     return active, disabled, ins
 
 
+@checked
+def _index(data: dict) -> dict:
+    return data
+
+
 def read_index(project: Path = ROOT):
     f = project / ".aix" / "index.json"
-    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+    return _index(json.loads(f.read_text(encoding="utf-8"))) if f.exists() else None
 
 
 def drift(project: Path = ROOT):

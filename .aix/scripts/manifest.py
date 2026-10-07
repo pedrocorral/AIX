@@ -3,6 +3,7 @@ local edit (lost on the next upgrade) from kit text."""
 from pathlib import Path
 
 import payload
+from guard import checked
 
 
 def kit_owned_files(project: Path):
@@ -19,13 +20,18 @@ def write_manifest(project: Path):
     return len(digest)
 
 
+@checked
+def _recorded_files(manifest: dict) -> dict:
+    return manifest.get("files", {})
+
+
 def modified_kit_files(project: Path):
     """Kit-owned files whose content differs from the manifest (edited locally: lost on the next upgrade)."""
     import hashlib, json
     m = project / ".aix" / "manifest.json"
     if not m.exists():
         return None
-    recorded = json.loads(m.read_text(encoding="utf-8")).get("files", {})
+    recorded = _recorded_files(json.loads(m.read_text(encoding="utf-8")))
     out = []
     for f in kit_owned_files(project):
         rel = f.relative_to(project).as_posix()

@@ -15,6 +15,7 @@ SKILLS = ROOT / ".aix" / "skills"
 MANIFEST = ROOT / ".aix" / "config.yaml"
 AGENTS = ROOT / "AGENTS.md"
 import agents
+from guard import checked
 TARGETS = [a["skills"] for a in agents.AGENTS.values() if a["skills"]]
 
 
@@ -35,12 +36,22 @@ def front_matter(text: str, key: str) -> str:
     return " ".join(lines)
 
 
+@checked
+def _groups_of(registry: dict) -> dict:
+    return {k: v.get("group", "specific") for k, v in registry.items() if not k.startswith("_")}
+
+
 def registry_groups():
     import json
     reg = SKILLS / "extern" / "registry.json"
     if not reg.exists():
         return {}
-    return {k: v.get("group", "specific") for k, v in json.loads(reg.read_text(encoding="utf-8")).items() if not k.startswith("_")}
+    return _groups_of(json.loads(reg.read_text(encoding="utf-8")))
+
+
+@checked
+def _source_group(source: dict) -> str:
+    return source.get("group", "")
 
 
 def skill_group(md: Path, text: str, flat: str, reg: dict) -> str:
@@ -48,7 +59,7 @@ def skill_group(md: Path, text: str, flat: str, reg: dict) -> str:
     import json
     g = front_matter(text, "group")
     if not g and (md.parent / ".aix-source").exists():
-        g = json.loads((md.parent / ".aix-source").read_text(encoding="utf-8")).get("group", "")
+        g = _source_group(json.loads((md.parent / ".aix-source").read_text(encoding="utf-8")))
     return g or reg.get(flat, "specific")
 
 
