@@ -1,5 +1,5 @@
 aix skills [list|general|specific [category]] | info NAME | show NAME | enable|disable NAME...
-           | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] [--force] | remove NAME... | update [NAME...]
+           | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] [--force] | remove NAME... | update [NAME...] [--force]
            | always NAME | on-demand NAME | use NAME ID | use NAME default
            | security [NAME...] [--gate]
 
@@ -22,10 +22,10 @@ Groups (filters): general = behaviour that applies to every session (style, meth
   security  scan the skills and the project's instruction files (SKILL.md, scripts, AGENTS.md, CLAUDE.md,
             .cursor/rules) for six dangerous shapes: a hidden character (zero-width or a direction control), a
             comment that carries an instruction to the agent, a long base64 blob in prose, fetch-and-run in a
-            script, a script that reads a secret place and sends to an outside host, and an override phrase
+            script, a fenced block or an inline code span, a script that reads a secret place and sends to an outside host, and an override phrase
             ("ignore previous instructions", "do not tell the user"). A name scans only that skill. --gate exits 1
-            on a finding. `aix skills add` runs the same scan before it keeps a download and refuses a skill with a
-            finding unless --force. To list the `security` category of skills, use `aix skills list security`.
+            on a finding. `aix skills add` and `update` run the same scan on the download, staged outside the project,
+            before it replaces anything, and refuse a skill with a finding unless --force (the installed copy stays). To list the `security` category of skills, use `aix skills list security`.
 
 Overrides (layers, AIX-DEVELOPMENT.md §11-12): a skill folder at the same class path in .aix/custom/skills/
 (this project, committed) or ~/.config/aix/skills/ (you; applied only in a terminal session, never in CI, off with

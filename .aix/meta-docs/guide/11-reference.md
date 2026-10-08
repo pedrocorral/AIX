@@ -33,7 +33,7 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 | `aix skills use NAME ID`, `use NAME default` | Pin an implementation of a class, or unpin |
 | `aix skills enable\|disable NAME...` | Link or unlink everywhere |
 | `aix skills always NAME`, `on-demand NAME` | Name it in every session, or not |
-| `aix skills registry`, `add NAME... [--always\|--on-demand] [--extra a,b] [--force]`, `update [NAME...]`, `remove NAME...` | Third-party skills with evidence; `add` scans a download and refuses an unsafe one unless `--force` |
+| `aix skills registry`, `add NAME... [--always\|--on-demand] [--extra a,b] [--force]`, `update [NAME...] [--force]`, `remove NAME...` | Third-party skills with evidence; `add` and `update` scan a download and refuse an unsafe one unless `--force` |
 | `aix skills security [NAME...] [--gate]` | Scan skills and instruction files (SKILL.md, scripts, AGENTS.md, CLAUDE.md, .cursor/rules) for injection, fetch-and-run, exfiltration |
 
 ## The documentation

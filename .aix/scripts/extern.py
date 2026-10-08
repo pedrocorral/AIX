@@ -10,7 +10,7 @@ Two kinds of entry. Without `class`, the skill keeps its bare name (caveman, pon
 for. With `class` (e.g. "coach/grill-me"), the download is one more implementation of that kit class: its SKILL.md gets
 `name: <class flat>`, `class:` and `id: "@owner/name"`, `add` selects it (config `use:`) and the runtimes see it as the
 class folder (coach-grill-me); `aix skills use CLASS default` goes back to the kit's; `remove` drops the selection."""
-import io, json, re, shutil, sys, tarfile, urllib.request
+import io, json, re, shutil, sys, tarfile, tempfile, urllib.request
 from datetime import date
 from pathlib import Path
 from guard import checked
@@ -93,9 +93,8 @@ def runtime_tools():
     return linkfs, catalog
 
 
-def _download(name: str, entry: dict) -> Path:
-    """Fetch the skill into .aix/skills/extern/<name>, fix its name or class, write its provenance."""
-    dest = EXTERN / name
+def _download(name: str, entry: dict, dest: Path) -> Path:
+    """Fetch the skill into DEST (a staging folder, never the installed copy), fix its name or class, write its provenance."""
     if dest.exists():
         shutil.rmtree(dest)
     tar, top = fetch_repo(entry["repo"])
@@ -129,26 +128,35 @@ def _link(name: str, entry: dict, dest: Path):
     print(f"  {name}: {where} (linked into all runtimes)")
 
 
-def _security_check(name: str, dest: Path, force: bool):
-    """Scan the downloaded skill for the dangerous shapes (skillsec.py); refuse it unless --force."""
+def _security_check(name: str, staged: Path, force: bool):
+    """Scan the staged download for the dangerous shapes (skillsec.py) before it replaces anything; refuse it unless
+    --force. A refusal leaves the installed copy, if any, exactly as it was."""
     import skillsec
-    from codefiles import rel
-    findings = skillsec.scan_dir(dest, rel)
+    findings = skillsec.scan_dir(staged, lambda p: f"{name}/{p.relative_to(staged)}")
     if not findings:
         return
-    print(f"  {name}: {len(findings)} skill-security finding(s) (`aix skills security {name}` for the detail):")
+    print(f"  {name}: {len(findings)} skill-security finding(s) in the download:")
     for _row, cwe, title, file, ln, snippet, _advice, _acc in sorted(findings, key=lambda x: (x[3], x[4]))[:10]:
         print(f"    {file}:{ln}  {title} ({cwe})")
     if force:
         print(f"  {name}: kept anyway (--force)")
         return
-    shutil.rmtree(dest, ignore_errors=True)
-    sys.exit(f"  {name}: not installed; review the findings, or re-run with --force to keep it")
+    sys.exit(f"  {name}: not installed, the installed copy (if any) is untouched; review the findings, or re-run with --force to keep it")
 
 
 def install_one(name: str, entry: dict, force: bool = False):
-    dest = _download(name, entry)
-    _security_check(name, dest, force)
+    """Download into a staging folder outside the project, scan it, then swap it in under .aix/skills/extern/<name>:
+    nothing unscanned ever sits where an agent reads skills, and a refused download changes nothing."""
+    staging = Path(tempfile.mkdtemp(prefix=f"aix-skill-{name}-"))
+    try:
+        staged = _download(name, entry, staging / name)
+        _security_check(name, staged, force)
+        dest = EXTERN / name
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.move(str(staged), str(dest))
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
     _link(name, entry, dest)
 
 
@@ -242,11 +250,15 @@ def cmd_remove(names):
         print(f"  removed {name}")
 
 
-def cmd_update(names):
+def cmd_update(names, force: bool = False):
+    """Re-download the named skills (all installed ones by default); the download is scanned like `add`, and one
+    with a finding is refused, the installed copy kept, unless --force."""
     targets = names or [p.name for p in EXTERN.iterdir() if (p / ".aix-source").exists()]
     for name in targets:
+        if not (EXTERN / name / ".aix-source").exists():
+            sys.exit(f"{name} is not installed under .aix/skills/extern/")
         src = _source(json.loads((EXTERN / name / ".aix-source").read_text(encoding="utf-8")))
-        install_one(name, {k: src[k] for k in ("repo", "path", "group", "class") if k in src})
+        install_one(name, {k: src[k] for k in ("repo", "path", "group", "class") if k in src}, force)
 
 
 def cmd_always(name: str, on: bool):
@@ -256,7 +268,7 @@ def cmd_always(name: str, on: bool):
     print(f"  {name}: {'always-on' if on else 'on-demand'}")
 
 
-USAGE = "usage: aix skills registry | add NAME... [--always|--on-demand] [--extra a,b] | remove NAME... | update [NAME...] | always NAME | on-demand NAME"
+USAGE = "usage: aix skills registry | add NAME... [--always|--on-demand] [--extra a,b] [--force] | remove NAME... | update [NAME...] [--force] | always NAME | on-demand NAME"
 
 
 def main(args):
@@ -271,7 +283,7 @@ def main(args):
         "registry": lambda: cmd_registry(),
         "add": lambda: cmd_add(rest, always, on_demand, extra, force),
         "remove": lambda: cmd_remove(rest),
-        "update": lambda: cmd_update(rest),
+        "update": lambda: cmd_update(rest, force),
         "always": lambda: cmd_always(rest[0], True),
         "on-demand": lambda: cmd_always(rest[0], False),
     }

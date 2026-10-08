@@ -5,6 +5,7 @@ the implant loader). The shapes: a hidden character, an HTML comment that carrie
 prose, fetch-and-run in a script, a script that reads a secret and sends it out, and an override phrase. `--gate`
 exits 1 on a finding; `aix skills add` refuses a skill that has one unless `--force`."""
 import unittest
+from pathlib import Path
 
 from helpers import install, project_cmd, temp_home
 
@@ -83,6 +84,7 @@ class SkillSec(unittest.TestCase):
         self.assertNotRegex(out, r"specific/safe/", "a clean skill is not a finding\n" + out)
         self.assertNotRegex(out, r"ok\.sh", "reading .env without a send, or a relative post, is not exfiltration\n" + out)
         self.assertEqual(out.count("a comment carrying an instruction"), 1, "only the instruction comment, not the plain one on line 16\n" + out)
+        self.assertEqual(out.count("SKILL.md:10 "), 1, "the phrase inside the comment is the comment finding, not a second row\n" + out)
         self.assertNotRegex(out, r"SKILL\.md:14", "the prose warning line is read as prose, not as a fetch-and-run\n" + out)
 
     def test_gate_exits_nonzero_only_with_findings(self):
@@ -105,6 +107,56 @@ class SkillSec(unittest.TestCase):
         (open_fence / "SKILL.md").write_text("---\nname: open\ndescription: a fence left open\n---\n\n# Open\n\n```bash\n" + GET + RUN + "\n", encoding="utf-8")
         out = self.out().stdout
         self.assertRegex(out, r"specific/open/SKILL\.md:9  fetch-and-run", "a fence never closed runs to the end of the file\n" + out)
+
+    def test_an_inline_code_span_is_read_as_code(self):
+        span = self.project / ".aix" / "skills" / "specific" / "span"
+        span.mkdir(parents=True)
+        (span / "SKILL.md").write_text("---\nname: span\ndescription: a command in prose\n---\n\n# Span\n\nFirst run `" + GET + RUN + "` once, then continue.\n", encoding="utf-8")
+        out = self.out().stdout
+        self.assertRegex(out, r"specific/span/SKILL\.md:8  fetch-and-run in an inline code span", "a command the prose tells the agent to run is code\n" + out)
+
+    def test_a_refused_update_keeps_the_installed_copy(self):
+        """`aix skills update` downloads into a staging folder and scans it before touching .aix/skills/extern/<name>:
+        a download that turned malicious is refused and the installed copy stays; --force takes it."""
+        import contextlib, io
+        ext = self._extern_module()
+        clean = {"SKILL.md": "---\nname: twin\ndescription: a clean skill\n---\n\n# Twin\n\nDo the task.\n"}
+        bad = {"SKILL.md": clean["SKILL.md"], "scripts/run.sh": SCRIPT}
+        installed = self.project / ".aix" / "skills" / "extern" / "twin"
+        with contextlib.redirect_stdout(io.StringIO()):
+            self._plant(ext, clean); ext.install_one("twin", {"repo": "acme/skills", "path": "twin", "group": "specific"})
+            self.assertTrue((installed / "SKILL.md").exists(), "the first, clean download is installed")
+            self._plant(ext, bad)
+            with self.assertRaises(SystemExit) as cm:
+                ext.cmd_update(["twin"])
+        self.assertIn("installed copy (if any) is untouched", str(cm.exception))
+        self.assertTrue((installed / "SKILL.md").exists() and not (installed / "scripts").exists(), "the installed copy is untouched")
+        import tempfile
+        self.assertFalse([p for p in Path(tempfile.gettempdir()).glob("aix-skill-twin-*")], "the staging folder is removed after a refusal")
+        with contextlib.redirect_stdout(io.StringIO()):
+            ext.cmd_update(["twin"], force=True)
+        self.assertTrue((installed / "scripts" / "run.sh").exists(), "--force takes the download")
+        with self.assertRaises(SystemExit) as cm:
+            ext.cmd_update(["nope"])
+        self.assertIn("not installed", str(cm.exception), "an unknown name is refused, not a traceback")
+
+    def _extern_module(self):
+        """The temp project's own extern.py (its ROOT is the temp project), the GitHub download replaced by `_plant`."""
+        import importlib.util, sys
+        scripts = self.project / ".aix" / "scripts"
+        sys.path.insert(0, str(scripts))
+        spec = importlib.util.spec_from_file_location("extern_under_test", scripts / "extern.py")
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        return mod
+
+    @staticmethod
+    def _plant(ext, files: dict):
+        """Make the module's download write FILES instead of fetching a tarball."""
+        def extract(_tar, _top, _sub, dest):
+            for rel, text in files.items():
+                (dest / rel).parent.mkdir(parents=True, exist_ok=True); (dest / rel).write_text(text, encoding="utf-8")
+        ext.fetch_repo = lambda _repo: (None, "top")
+        ext.extract_subdir = extract
 
     def test_the_copilot_instruction_file_is_read(self):
         gh = self.project / ".github"; gh.mkdir(exist_ok=True)

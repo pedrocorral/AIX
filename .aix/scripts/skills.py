@@ -155,9 +155,6 @@ def split_filters(rest):
     return group, category
 
 
-SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME | security [NAME...] [--gate]]"
-
-
 def _extern(_args):
     import extern
     return extern
@@ -203,7 +200,7 @@ def _print_security(findings: list):
     print(f"  findings to review {len(findings)}" + ("" if findings else "; the skills and instruction files are clean"))
 
 
-SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME | security [NAME...] [--gate]]"
+SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] [--force] | remove NAME | update [--force] | always|on-demand NAME | security [NAME...] [--gate]]"
 EXTERN_COMMANDS = ("add", "remove", "update", "always", "on-demand")
 NEEDS_NAME = ("show", "info", "disable", "enable")
 

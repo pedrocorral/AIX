@@ -1,8 +1,8 @@
 """Leaf: the dangerous shapes of a skill or an instruction file, for `aix skills security` (benchmark section 29,
 NVIDIA SkillSpector the referee). Shape-based, not a word list: a hidden character (zero-width or a bidi control), an
 HTML or link comment that carries an instruction to the agent (a comment that is plain prose is not), a long base64
-blob in prose (an image data URI is not), fetch-and-run in a skill script or a fenced block (a prose line that warns
-against it is not), a script that reads a secret place and also sends data to an external host (reading `.env` alone,
+blob in prose (an image data URI is not), fetch-and-run in a skill script, a fenced block or an inline code span (a
+prose line that warns against it is not), a script that reads a secret place and also sends data to an external host (reading `.env` alone,
 or posting to a relative path alone, is not), and the four override phrases that have no honest use. The text an agent
 reads as instructions is SKILL.md and the scripts beside it, plus AGENTS.md, CLAUDE.md and the other instruction
 files. Findings to review, never proof."""
@@ -17,6 +17,7 @@ HIDDEN = re.compile("[​-‍⁠﻿‪-‮⁦-⁩]")
 COMMENT = re.compile(r"<!--(.*?)-->|^\[//\]:\s*#\s*\((.*?)\)", re.S | re.M)
 B64 = re.compile(r"[A-Za-z0-9+/]{200,}={0,2}")
 FENCE = re.compile(r"^[ \t]*(?:```|~~~)")
+INLINE = re.compile(r"`([^`\n]+)`")
 # fetch a remote thing and run it, or run inline code the file carries
 _SH = r"(?:ba|z|da)?sh"
 FETCH = re.compile(
@@ -93,6 +94,18 @@ def _code_regions(text: str, is_markdown: bool) -> list:
     return out
 
 
+def _inline_spans(text: str):
+    """(line, span text) of every `inline code` span outside the fences of a markdown file: a command the prose
+    tells the agent to run."""
+    inside = False
+    for i, l in enumerate(text.splitlines(), 1):
+        if FENCE.match(l):
+            inside = not inside
+        elif not inside:
+            for m in INLINE.finditer(l):
+                yield i, m.group(1)
+
+
 # ---- the shapes of one file ---------------------------------------------------------------------------------------
 
 def _line_finding(rel: str, i: int, l: str):
@@ -118,14 +131,19 @@ def _comment_findings(rel: str, text: str) -> list:
 
 
 def _prose_findings(rel: str, text: str) -> list:
-    """Shapes that live in the prose an agent reads: hidden characters, carried-instruction comments, base64, phrases."""
+    """Shapes that live in the prose an agent reads: hidden characters, carried-instruction comments, base64, phrases.
+    A phrase inside a comment is the comment finding, not a second one."""
+    comments = _comment_findings(rel, text)
+    comment_lines = {fx[4] for fx in comments}
     lines = [_line_finding(rel, i, l) for i, l in enumerate(text.splitlines(), 1)]
-    return [fx for fx in lines if fx] + _comment_findings(rel, text)
+    return [fx for fx in lines if fx and not (fx[4] in comment_lines and fx[2].startswith("a phrase"))] + comments
 
 
 def _code_findings(rel: str, text: str, is_markdown: bool) -> list:
-    """Fetch-and-run anywhere in the code, and a block that both reaches a secret place and sends to an outside host."""
-    out = []
+    """Fetch-and-run anywhere in the code (a fenced block, a script, an inline span), and a block that both reaches a
+    secret place and sends to an outside host."""
+    out = [_finding(CWE_FETCH, "fetch-and-run in an inline code span", (rel, i), span, "fetch")
+           for i, span in (_inline_spans(text) if is_markdown else ()) if FETCH.search(span)]
     for start, block in _code_regions(text, is_markdown):
         for i, l in enumerate(block, start):
             if FETCH.search(l):

@@ -1301,7 +1301,7 @@ shape and its safe twin:
 
 | | ours | SkillSpector |
 |---|---|---|
-| malicious skill | 7: hidden character, instruction comment, base64 blob, two fetch-and-run lines, the exfiltration script, the override phrase | CRITICAL, 10 |
+| malicious skill | 6: hidden character, the instruction comment (its override phrase is that finding, not a second one; 2.21.57 counted 7), base64 blob, two fetch-and-run lines, the exfiltration script | CRITICAL, 10 |
 | safe twin (reads `.env` but sends nothing; posts to a local path but reads no secret) | 0 | MEDIUM, 3 (PE3 for the word `.env`, E1 for the local `curl`, LP3) |
 
 Both catch the malicious skill. The safe twin separates them: ours stays quiet, SkillSpector raises three on a clean

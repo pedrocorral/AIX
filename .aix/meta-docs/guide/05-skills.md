@@ -50,8 +50,9 @@ scans every installed skill and the project's instruction files (SKILL.md and it
 `.cursor/rules`) for six shapes: a hidden character (a zero-width space or a direction control), a comment that
 carries an instruction to the agent, a long base64 blob in prose, fetch-and-run in a script (`curl ... | sh`,
 `node -e`), a script that reads a secret place (`~/.ssh`, `.env`, `printenv`) and also sends to an outside host, and
-an override phrase ("ignore previous instructions", "do not tell the user"). `aix skills add` runs the same scan
-before it keeps a download and refuses a skill with a finding unless you pass `--force`. `--gate` exits non-zero for
+an override phrase ("ignore previous instructions", "do not tell the user"). `aix skills add` and `aix skills update` run the
+same scan on the download before it replaces anything and refuse a skill with a finding unless you pass `--force`;
+a refused update leaves the installed copy as it was. `--gate` exits non-zero for
 CI; it is an advised step of the standard and release policies.
 
 ## Writing your own
