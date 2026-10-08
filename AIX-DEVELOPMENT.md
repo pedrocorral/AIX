@@ -83,6 +83,7 @@ AIX/
 │   ├── abapcalls.py         # leaf: ABAP call edges through declared types (--functions) and dead methods by visibility
 │   ├── abapsec.py           # leaf: the ABAP security rules that need the unit (dynamic SQL unless a literal, EXEC SQL, CALL TRANSACTION and AUTHORITY-CHECK)
 │   ├── implants.py          # leaf: supply-chain implants (PolinRider): padded config files, code after the export, folder-open tasks, text fonts, install hooks, history growth
+│   ├── skillsec.py          # leaf: the dangerous shapes of a skill or instruction file (hidden character, instruction comment, base64 blob, fetch-and-run, read-secret-and-send, override phrase) for `aix skills security` and `aix skills add`
 │   ├── abaptaint.py         # leaf: the ABAP taint walk (sources, propagation, sanitisers, sinks incl. HTML output) over abapcalls' resolution, two calls deep
 │   ├── guard.py             # leaf: `@checked`, the kit's run-time guard (types from annotations, conditions through typing.Annotated); on every door's consumer and tool entry
 │   ├── modernise.py         # leaf: modernisation advice bounded by the detected runtime

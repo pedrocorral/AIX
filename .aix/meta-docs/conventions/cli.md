@@ -39,7 +39,8 @@ Outside any project only `help`, `about`, `version`, `install --into` and `skill
 | `aix skills info NAME` / `show NAME` | Details (group, level, runtimes, source) / the SKILL.md | Before invoking an unfamiliar skill |
 | `aix skills enable\|disable NAME` | Link/unlink everywhere; recorded in `.aix/config.yaml` `disabled_skills` | Trimming a project's skill set |
 | `aix skills use NAME ID` / `use NAME default` | Pick which implementation of a class is linked; recorded in `.aix/config.yaml` `use:`; `default` returns to profile then layer precedence | An organisation ships two implementations of one class |
-| `aix skills registry` / `add NAME [--on-demand\|--always] [--extra a,b]` / `remove` / `update` | Third-party skills (below) | Adopting caveman, ponytail, … |
+| `aix skills registry` / `add NAME [--on-demand\|--always] [--extra a,b] [--force]` / `remove` / `update` | Third-party skills (below); `add` scans the download and refuses one with a finding unless `--force` | Adopting caveman, ponytail, … |
+| `aix skills security [NAME...] [--gate]` | Scan the skills and the instruction files (SKILL.md, scripts, AGENTS.md, CLAUDE.md, GEMINI.md, `.github/copilot-instructions.md`, `.cursor/rules`) for an injection, a fetch-and-run or an exfiltration shape | Before trusting a downloaded skill; CI |
 | `aix skills always\|on-demand NAME` | Add/remove the always-on wiring for any skill | Making a behaviour permanent |
 | `aix lessons [index\|check]` | The agents' lessons, `.aix/custom/skills/core/lessons-learnt-notes/`: one file per lesson under `lessons/`, the SKILL.md index generated from them; `check` reports missing fields, a stale index, more than 20 lessons. Created empty by `aix install` when missing, never copied | After `core-lessons-learnt` adds, merges or prunes a lesson |
 

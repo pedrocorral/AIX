@@ -95,6 +95,22 @@ class SkillSec(unittest.TestCase):
     def test_scan_one_named_skill(self):
         out = project_cmd(self.project, self.home, "skills", "security", "safe", check=False).stdout
         self.assertNotRegex(out, r"run\.sh", "naming `safe` scans only that skill\n" + out)
+        flat = project_cmd(self.project, self.home, "skills", "security", "specific-sample", check=False).stdout
+        self.assertRegex(flat, r"run\.sh:4  fetch-and-run", "the flat name every `aix skills` subcommand uses names the skill too\n" + flat)
+        self.assertNotRegex(flat, r"specific/safe/", flat)
+
+    def test_an_unclosed_fence_is_still_read_as_code(self):
+        open_fence = self.project / ".aix" / "skills" / "specific" / "open"
+        open_fence.mkdir(parents=True)
+        (open_fence / "SKILL.md").write_text("---\nname: open\ndescription: a fence left open\n---\n\n# Open\n\n```bash\n" + GET + RUN + "\n", encoding="utf-8")
+        out = self.out().stdout
+        self.assertRegex(out, r"specific/open/SKILL\.md:9  fetch-and-run", "a fence never closed runs to the end of the file\n" + out)
+
+    def test_the_copilot_instruction_file_is_read(self):
+        gh = self.project / ".github"; gh.mkdir(exist_ok=True)
+        (gh / "copilot-instructions.md").write_text("Read AGENTS.md first.\n\n" + IGNORE + ".\n", encoding="utf-8")
+        out = self.out().stdout
+        self.assertRegex(out, r"\.github/copilot-instructions\.md:3  a phrase", "the Copilot file lives under .github/\n" + out)
 
 
 if __name__ == "__main__":

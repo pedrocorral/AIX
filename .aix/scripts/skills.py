@@ -164,7 +164,11 @@ def _extern(_args):
 
 
 def _skill_dir(name: str):
-    """The folder of an installed skill named NAME (its SKILL.md's folder), or None."""
+    """The folder of an installed skill: by its flat name as the catalogue has it (core-sdd-workflow, ponytail), or by
+    its folder name (sdd-workflow); None when neither."""
+    entry = catalogue().get(name)
+    if entry:
+        return entry["path"]
     for f in SKILLS.rglob("SKILL.md"):
         if f.parent.name == name:
             return f.parent

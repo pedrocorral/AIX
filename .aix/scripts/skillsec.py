@@ -58,7 +58,7 @@ ADVICE = {
     "exfil": "this reads a secret place and sends to an outside host: the exfiltration shape; delete it and rotate anything it could read",
     "phrase": "a skill that tells the agent to ignore its instructions or to hide its actions from the user is an injection; delete the skill",
 }
-INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", "copilot-instructions.md")
+INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md")
 TEXT_SUFFIX = {".md", ".markdown", ".mdc", ".txt", ".rst", ".sh", ".bash", ".zsh", ".py", ".js", ".mjs", ".cjs", ".ts", ".ps1", ".rb", ".pl"}
 MARKDOWN_SUFFIX = {".md", ".markdown", ".mdc", ".rst", ".txt"}
 
@@ -88,6 +88,8 @@ def _code_regions(text: str, is_markdown: bool) -> list:
             continue
         if inside:
             buf.append(l)
+    if inside and buf:   # a fence left open runs to the end of the file; the agent reads it all the same
+        out.append((start, buf))
     return out
 
 
