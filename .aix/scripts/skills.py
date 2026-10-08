@@ -155,7 +155,7 @@ def split_filters(rest):
     return group, category
 
 
-SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME]"
+SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME | security [NAME...] [--gate]]"
 
 
 def _extern(_args):
@@ -163,7 +163,43 @@ def _extern(_args):
     return extern
 
 
-SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME]"
+def _skill_dir(name: str):
+    """The folder of an installed skill named NAME (its SKILL.md's folder), or None."""
+    for f in SKILLS.rglob("SKILL.md"):
+        if f.parent.name == name:
+            return f.parent
+    return None
+
+
+def cmd_security(rest: list):
+    """Scan every installed skill and the project's instruction files (or the named skills) for the dangerous
+    shapes of skillsec.py; `--gate` exits 1 on a finding."""
+    import skillsec
+    from codefiles import rel
+    gate = "--gate" in rest
+    names = [r for r in rest if not r.startswith("--")]
+    if names:
+        findings = []
+        for name in names:
+            d = _skill_dir(name) or sys.exit(f"'{name}' is not an installed skill")
+            findings += skillsec.scan_dir(d, rel)
+    else:
+        findings = skillsec.scan_tree(ROOT, rel)
+    _print_security(findings)
+    if gate and findings:
+        sys.exit(1)
+
+
+def _print_security(findings: list):
+    print("SKILL SECURITY: the skills and instruction files an agent reads")
+    for _row, cwe, title, file, ln, snippet, advice, _acc in sorted(findings, key=lambda x: (x[3], x[4])):
+        print(f"  {file}:{ln}  {title} ({cwe})")
+        print(f"      {snippet}")
+        print(f"      -> {advice}")
+    print(f"  findings to review {len(findings)}" + ("" if findings else "; the skills and instruction files are clean"))
+
+
+SKILLS_USAGE = "usage: aix skills [list|general|specific [category] | info NAME | show NAME | enable|disable NAME... | registry | add NAME [--always] | remove NAME | update | always|on-demand NAME | security [NAME...] [--gate]]"
 EXTERN_COMMANDS = ("add", "remove", "update", "always", "on-demand")
 NEEDS_NAME = ("show", "info", "disable", "enable")
 
@@ -184,6 +220,7 @@ def _actions(args, rest: list) -> dict:
         "disable": lambda: [cmd_disable(f) for f in rest],
         "enable": lambda: [cmd_enable(f) for f in rest],
         "registry": lambda: _extern(args).cmd_registry(split_filters(rest)[0]),
+        "security": lambda: cmd_security(rest),
         **{name: (lambda: _extern(args).main(args)) for name in EXTERN_COMMANDS},
     }
 
@@ -192,7 +229,7 @@ def main(args):
     """aix skills [SUB ...]: a bare group or category name lists it."""
     sub, rest = (args[0], list(args[1:])) if args else ("list", [])
     categories = {d.name for d in SKILLS.iterdir() if d.is_dir()}
-    if sub in GROUPS or sub in categories:
+    if (sub in GROUPS or sub in categories) and sub != "security":   # `security` is the scanner; list that category with `aix skills list security`
         sub, rest = "list", [sub] + rest
     actions = _actions(args, rest)
     if sub not in actions or not _valid(sub, rest):

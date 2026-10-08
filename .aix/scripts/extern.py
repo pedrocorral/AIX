@@ -129,8 +129,27 @@ def _link(name: str, entry: dict, dest: Path):
     print(f"  {name}: {where} (linked into all runtimes)")
 
 
-def install_one(name: str, entry: dict):
-    _link(name, entry, _download(name, entry))
+def _security_check(name: str, dest: Path, force: bool):
+    """Scan the downloaded skill for the dangerous shapes (skillsec.py); refuse it unless --force."""
+    import skillsec
+    from codefiles import rel
+    findings = skillsec.scan_dir(dest, rel)
+    if not findings:
+        return
+    print(f"  {name}: {len(findings)} skill-security finding(s) (`aix skills security {name}` for the detail):")
+    for _row, cwe, title, file, ln, snippet, _advice, _acc in sorted(findings, key=lambda x: (x[3], x[4]))[:10]:
+        print(f"    {file}:{ln}  {title} ({cwe})")
+    if force:
+        print(f"  {name}: kept anyway (--force)")
+        return
+    shutil.rmtree(dest, ignore_errors=True)
+    sys.exit(f"  {name}: not installed; review the findings, or re-run with --force to keep it")
+
+
+def install_one(name: str, entry: dict, force: bool = False):
+    dest = _download(name, entry)
+    _security_check(name, dest, force)
+    _link(name, entry, dest)
 
 
 # ---- always-on wiring -------------------------------------------------------------------------------------
@@ -192,13 +211,13 @@ def _make_always(name: str, entry: dict, styles_on: list):
     print(f"  {name}: always-on (AGENTS.md, .github/copilot-instructions.md, .cursor/rules/aix.mdc, GEMINI.md)")
 
 
-def cmd_add(names, always: bool, on_demand: bool, extra):
+def cmd_add(names, always: bool, on_demand: bool, extra, force: bool = False):
     """General skills become always-on unless --on-demand; specific ones stay on-demand unless --always."""
     reg = registry()
     styles_on = [n for n in always_on_names(AGENTS.read_text(encoding="utf-8")) if reg.get(n, {}).get("kind") == "style"]
     for name in names:
         entry = reg.get(name) or sys.exit(f"'{name}' is not in the registry; see `aix skills registry`")
-        install_one(name, entry)
+        install_one(name, entry, force)
         _install_extras(name, entry, extra)
         if always or (entry.get("group") == "general" and not on_demand):
             _make_always(name, entry, styles_on)
@@ -242,15 +261,15 @@ USAGE = "usage: aix skills registry | add NAME... [--always|--on-demand] [--extr
 
 def main(args):
     sub, rest = (args[0], list(args[1:])) if args else ("registry", [])
-    always, on_demand, extra = "--always" in rest, "--on-demand" in rest, []
+    always, on_demand, force, extra = "--always" in rest, "--on-demand" in rest, "--force" in rest, []
     if "--extra" in rest:
         i = rest.index("--extra")
         extra = rest[i + 1].split(",")
         del rest[i:i + 2]
-    rest = [r for r in rest if r not in ("--always", "--on-demand")]
+    rest = [r for r in rest if r not in ("--always", "--on-demand", "--force")]
     actions = {
         "registry": lambda: cmd_registry(),
-        "add": lambda: cmd_add(rest, always, on_demand, extra),
+        "add": lambda: cmd_add(rest, always, on_demand, extra, force),
         "remove": lambda: cmd_remove(rest),
         "update": lambda: cmd_update(rest),
         "always": lambda: cmd_always(rest[0], True),

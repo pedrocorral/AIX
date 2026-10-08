@@ -42,6 +42,7 @@ STEPS = {  # id -> (kind, what, label)
     "clones":          ("check", "aix code clones --gate",   "no duplicated function"),
     "defensive":       ("check", "aix code defensive --gate", "no None under an annotation that promises a value, no open() without with"),
     "security":        ("check", "aix code security --gate", "no unreviewed security finding"),
+    "skills":          ("check", "aix skills security --gate", "no skill or instruction file carries an injection, a fetch-and-run, or an exfiltration shape"),
     "push":            ("check", "aix code security --push --gate", "no string a push-protection scanner would refuse, in any tracked file"),
     "vulnerabilities": ("check", "aix code vulnerabilities --gate", "no taint path, known CVE or secret in history"),
     "licenses":        ("check", "aix code licenses --gate",   "no dependency with a copyleft, proprietary or unknown licence undecided"),

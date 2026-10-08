@@ -120,6 +120,7 @@ The skills                            (aix skills ...)
   aix skills add NAME [--on-demand]   download a registry skill into .aix/skills/extern/, link it everywhere;
                                       general skills become always-on unless --on-demand
   aix skills remove|update NAME       drop it / re-download it;  aix skills always|on-demand NAME
+  aix skills security [NAME...]       scan skills and instruction files for injection, fetch-and-run, exfiltration
   aix skills refactor                 the seven fix skills, one per aix code finding (aix help refactor)
 
 Old forms still work: aix graph|complexity|validate|coverage|security = aix code graph | aix docs ...

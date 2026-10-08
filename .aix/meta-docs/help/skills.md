@@ -1,6 +1,7 @@
 aix skills [list|general|specific [category]] | info NAME | show NAME | enable|disable NAME...
-           | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] | remove NAME... | update [NAME...]
+           | registry [general|specific] | add NAME... [--on-demand|--always] [--extra a,b] [--force] | remove NAME... | update [NAME...]
            | always NAME | on-demand NAME | use NAME ID | use NAME default
+           | security [NAME...] [--gate]
 
 Catalogue: SKILL, STATE, DESCRIPTION (cut at the terminal width). States:
   recommended / available   known in .aix/skills/extern/registry.json, not downloaded (listed first)
@@ -18,6 +19,13 @@ Groups (filters): general = behaviour that applies to every session (style, meth
             .cursor/rules/aix.mdc and GEMINI.md (no runtime has an always-apply switch; the instruction files are
             the only mechanism every tool honours); on-demand removes it
   registry  the known third-party skills with their evidence line (only entries with evidence belong there)
+  security  scan the skills and the project's instruction files (SKILL.md, scripts, AGENTS.md, CLAUDE.md,
+            .cursor/rules) for six dangerous shapes: a hidden character (zero-width or a direction control), a
+            comment that carries an instruction to the agent, a long base64 blob in prose, fetch-and-run in a
+            script, a script that reads a secret place and sends to an outside host, and an override phrase
+            ("ignore previous instructions", "do not tell the user"). A name scans only that skill. --gate exits 1
+            on a finding. `aix skills add` runs the same scan before it keeps a download and refuses a skill with a
+            finding unless --force. To list the `security` category of skills, use `aix skills list security`.
 
 Overrides (layers, AIX-DEVELOPMENT.md §11-12): a skill folder at the same class path in .aix/custom/skills/
 (this project, committed) or ~/.config/aix/skills/ (you; applied only in a terminal session, never in CI, off with

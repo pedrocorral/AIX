@@ -1,4 +1,4 @@
 description: The standard cycle for a feature: spec, tests, implement, scans, review
-order: [spec, tests, threat, implement, unit-tests, style, defensive, modularity, security, push, docs, coverage, audit, review, drift]
+order: [spec, tests, threat, implement, unit-tests, style, defensive, modularity, security, skills, push, docs, coverage, audit, review, drift]
 required: [implement, style, security, docs]
-advised: [push, spec, tests, threat, unit-tests, defensive, modularity, coverage, audit, review, drift]
+advised: [push, spec, tests, threat, unit-tests, defensive, modularity, skills, coverage, audit, review, drift]

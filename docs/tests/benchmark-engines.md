@@ -1280,6 +1280,51 @@ that grew twenty-fold in one commit. All of those are rows now, plus `aix doctor
 Netlify, protect the config files by branch rule, turn `task.allowAutomaticTasks` off in VS Code, and install with
 `--ignore-scripts` as the habit.
 
+### 29. Skill security: `aix skills security` vs NVIDIA SkillSpector (2.21.57, run on 2026-10-08)
+
+A skill is instructions an agent reads, so a malicious skill is a prompt injection, a fetch-and-run or an
+exfiltration shipped as a file. The kit read none of this before: `aix skills add` copied a GitHub tarball into the
+project unchecked, and `aix code security` read the six code languages, never SKILL.md, a skill script, AGENTS.md or
+CLAUDE.md. `skillsec.py`, a leaf, scans the skills and the instruction files for six shapes, each measured against a
+safe twin: a hidden character (zero-width or a direction control), a comment that carries an instruction to the
+agent, a long base64 blob in prose, fetch-and-run in a script, a script that reads a secret place and also sends to
+an outside host, and four override phrases. `aix skills security` scans the installed skills and the instruction
+files; `aix skills add` runs the same scan and refuses a download with a finding unless `--force`.
+
+**The referee.** NVIDIA SkillSpector v2.12.0 (Apache-2.0), 71 patterns in 17 categories, run `--no-llm`. Most of
+its patterns are word lists over English prose; a smaller part is script shapes close to ours. Ours keeps the shapes
+and the four phrases that have no honest use, and drops the word lists: on the real skills those produced every one
+of SkillSpector's findings and all were noise.
+
+**The planted sample** (`tests/test_skillsec.py`, `tests/benchmark/skillsec.py`), one malicious skill carrying every
+shape and its safe twin:
+
+| | ours | SkillSpector |
+|---|---|---|
+| malicious skill | 7: hidden character, instruction comment, base64 blob, two fetch-and-run lines, the exfiltration script, the override phrase | CRITICAL, 10 |
+| safe twin (reads `.env` but sends nothing; posts to a local path but reads no secret) | 0 | MEDIUM, 3 (PE3 for the word `.env`, E1 for the local `curl`, LP3) |
+
+Both catch the malicious skill. The safe twin separates them: ours stays quiet, SkillSpector raises three on a clean
+script because `.env` and a local `curl` match its word lists.
+
+**The negatives**, every finding read by hand:
+
+| | ours | SkillSpector |
+|---|---|---|
+| the kit's 72 own skills + AGENTS.md, CLAUDE.md | 0 | MEDIUM, 5 |
+| the 29 downloaded registry skills (`aix skills add`) | 0 | CRITICAL, 11 ("do not install") |
+
+SkillSpector's 16 findings on 101 ordinary developer skills were all noise: a secrets-audit skill that mentions
+`.env`, a debugging skill that shows `security find-identity` in an example, a skill that says "without asking" or
+"first expand, then migrate", and the kit's own `aix: skip-security-scan` marker matched as "skip-security". Its
+verdict on the 29 registry skills is "do not install" with nothing behind it. Ours reports none of these and keeps
+the six shapes that a legitimate skill has no reason to carry.
+
+**What we did not take.** SkillSpector's word-list categories (anti-refusal, excessive agency, credential words), its
+YARA rules, its OSV dependency lookup and MCP-server rules, its LLM pass and its risk score. The Python AST and taint
+passes it runs on skill scripts are already the kit's `aix code security` for `.py` files; a skill's own scripts can
+be fed to that rather than duplicated. This is the shape half of SkillSpector, measured against it, not a port.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes
