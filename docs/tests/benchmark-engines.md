@@ -1243,6 +1243,43 @@ parameter of a private or protected method never named: 2 on abapGit (`iv_versio
 `iv_package` of `get_language_version`), read by hand, both real. A method whose only statement forwards every
 parameter to one call: 7 on abap2xlsx (`zcl_excel_theme`'s setters onto its elements), 5 on abapGit.
 
+### 28. Supply-chain implants: the PolinRider family (2.21.56, run on 2026-10-08)
+
+GitHub community discussion 188732 and opensourcemalware.com describe a campaign running since March 2026: an
+obfuscated loader appended to JavaScript config files after a run of whitespace, pushed with rewritten commits that
+keep author and timestamp, often through stolen Vercel or Netlify tokens, reading every secret in `process.env` at
+build time; newer variants hide the payload in fake font files, run a VS Code task on folder open, and fetch their
+server from an Ethereum transaction. 4 367 poisoned repositories by July 2026. Before building, this machine and
+the kit were checked against every published indicator: clean.
+
+**The referee.** The maintainer's scanner (OpenSourceMalware/PolinRider, `polinrider-scanner.sh`) knows two exact
+strings of the loader, two script names and a `.gitignore` line. Ours reads shapes, so a rotated marker still
+shows. On the planted sample of `tests/test_implants.py`, one file per shape with its safe twin
+(`tests/benchmark/implants.py`):
+
+| | findings |
+|---|---|
+| ours | 14: padded config, code after the export, second export, `createRequire`, a marker, folder-open task, a task piping curl, two editor settings, two text files posing as fonts, the propagation script, the `.gitignore` line, an install hook running `node -e` |
+| maintainer's scanner | 3: the propagation script, the `.gitignore` line, "1 infected repo" |
+| safe twins, both | 0: a 5 KB legitimate vite config, a binary font, an SVG font, a hook running a project script, `npm ci --ignore-scripts` |
+
+**The negatives.** The 18 extended projects, every implant finding read by hand: 0 after one fix. The first run
+reported three "text where a font should be": SVG fonts in spring-petclinic and NodeGoat, text by their own format,
+which the maintainer's own `find ... ! -name '*.svg'` also excludes; a file under `fonts/` is a finding only when its
+format is binary (`.woff2`, `.woff`, `.ttf`, `.otf`, `.eot`, `.llf`) or has no text format. Size alone decides
+nothing: excalidraw's 5 197-byte `vite.config.ts` stays quiet. The closing note counted `npm install` steps with
+lifecycle scripts on: juice-shop 23, abapGit 6, express 5, the jhipster pair 2 each; advice, not a finding, because a
+build that needs them is common and the person decides.
+
+**What the kit had on this family before: nothing.** The scanner read `.mjs` files for injection and secrets, not
+for a payload after the export; nothing looked at `tasks.json`, at fonts, at install hooks, or at a config file
+that grew twenty-fold in one commit. All of those are rows now, plus `aix doctor`'s check of npm's own `lib/cli.js`
+(407 bytes on this machine; the implant rewrites it to about 1 MB) and of a folder-open task in the project.
+
+**Beyond any scanner**, for the person: rotate the deploy tokens of every project that builds on Vercel or
+Netlify, protect the config files by branch rule, turn `task.allowAutomaticTasks` off in VS Code, and install with
+`--ignore-scripts` as the habit.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

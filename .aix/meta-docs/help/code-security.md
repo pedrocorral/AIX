@@ -121,3 +121,14 @@ TRANSACTION lv`; a bare program after SUBMIT and a quoted function or transactio
 The `*` rules (secrets, tokens, TLS off, debug) run on ABAP files as on every text. `*` in column 1 and `"` to the end of
 the line are comments. Measured against abaplint's dangerous_statement and call_transaction_authority_check (section
 25 of docs/tests/benchmark-engines.md). The taint walk does not read ABAP yet.
+
+Supply-chain implants (2.21.56, the PolinRider campaign of 2026, GitHub discussion 188732): code hidden after a run of
+whitespace in a JavaScript config file (next, postcss, tailwind, eslint, vite, vue, astro, ...), code after the file's
+export, a second export, `createRequire` in a config; the published markers (`global['_V']=`, `global['!']=`,
+`rmcej%otb%`, ...) on every text file; a VS Code task with `runOn: folderOpen` or one that pipes curl into a shell,
+settings that allow automatic tasks or hide the terminal; a file under `fonts/`, or `.llf`, that is text instead of
+a font; `temp_auto_push.bat`, `config.bat` and a `.gitignore` line hiding them; a package.json install hook that runs
+`node -e`, curl, wget, base64 or PowerShell. A closing line counts the `npm install` steps of workflows and Dockerfiles
+that run lifecycle scripts. `aix code vulnerabilities --history` adds a config file that grew from under 500 bytes to
+over 2 KB in one commit and a forced update in the reflog; `aix doctor` checks npm's own lib/cli.js on the machine and a
+folder-open task in the project. Section 28 of docs/tests/benchmark-engines.md.

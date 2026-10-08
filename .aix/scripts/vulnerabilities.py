@@ -206,7 +206,9 @@ def _sections(modes, paths, commits):
         unreachable = found is None
         sections.append(("known CVEs (OSV)", found, _cve_note(stats)))
     if "--history" in modes:
+        import implants
         h = history(commits)
+        h = (h + implants.history_findings(paths)) if h is not None else None   # a config file grown twenty-fold in one commit, a forced update
         scope = f"last {commits} commits" if commits else "every commit"
         sections.append(("secrets in git history", h, f"{scope}, all branches, {len(secretrules.RULES)} gitleaks patterns + the register's" if h is not None else "no git repository"))
     return sections, unreachable

@@ -12,6 +12,10 @@ MARKER_LINES = 30
 
 # (vul, cwe, title, languages or {"*"}, regex, advice)   regexes run per line, comments stripped first
 RULES = [
+    # --- supply-chain implants (PolinRider, section 28): the published markers; the shapes are in implants.py -------
+    ("VUL-DEP-001", "CWE-506", "known marker of the PolinRider implant", {"*"},
+     r"global\[['\"](?:_V|!)['\"]\]\s*=|global\.i\s*=\s*['\"]A8|rmcej%otb%|_\$_1e42|Cot%3t=shtP",
+     "the file carries the campaign's loader: delete everything after the legitimate export, rotate every secret a build could read, revoke the deploy tokens"),
     # --- injection --------------------------------------------------------------------------------------------
     ("VUL-INJ-002", "CWE-94", "ABAP code generated at run time", {"abap"},
      r"^\s*(?:GENERATE\s+SUBROUTINE\s+POOL|INSERT\s+REPORT|INSERT\s+TEXTPOOL|DELETE\s+REPORT|DELETE\s+TEXTPOOL)\b",

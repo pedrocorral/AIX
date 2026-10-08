@@ -5,3 +5,6 @@ Is the INSTALL right? Exit 1 if anything is broken; every finding comes with its
 reaching AGENTS.md, every enabled skill linked in all runtime folders, dangling links, unknown names in
 disabled_skills, always-on sections consistent across AGENTS.md / Copilot / Cursor / Gemini, extern skills with
 provenance, and STATE.md naming a task that exists in going-on/. `aix docs validate` is the counterpart for the docs.
+
+Supply-chain implants (2.21.56): npm's own lib/cli.js over 50 KB on this machine (the PolinRider implant rewrites it to about
+1 MB), and a .vscode/tasks.json of the project with a task that runs when the folder opens.

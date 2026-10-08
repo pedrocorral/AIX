@@ -21,7 +21,7 @@ from findingtags import _not_gated, _tag
 from securityrules import ACCEPT, DOCKER_RULES, LANG, MARKER_LINES, RULES, SKIP_FILE, TEXT_EXT
 from secretscan import SECRET_ADVICE, secret_findings
 import secretscan
-import authz, cloudconfig, infrarules
+import authz, cloudconfig, implants, infrarules
 import pushscan
 from depscan import scan_dependencies, scan_dockerfile
 from guard import checked
@@ -159,7 +159,7 @@ def _dedupe(findings):
 
 
 def scan(paths):
-    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)] + infrarules.root_findings(paths) + authz.findings(paths)
+    findings = [fx for root in paths for f in _files_of(root) for fx in _scan_target(f)] + infrarules.root_findings(paths) + authz.findings(paths) + implants.root_findings()
     for root in {ROOT} | {(ROOT / r) for r in paths if (ROOT / r).is_dir()}:
         findings += scan_dependencies(root)
     return _dedupe(findings)
@@ -212,7 +212,7 @@ def _classify(findings, strict: bool):
 
 
 def _closing_lines(covered, by_vul, skipped) -> list:
-    lines = [f"  skipped by marker: {fx[3]}  ({fx[5]})" for fx in skipped] + cloudconfig.unread_lines()
+    lines = [f"  skipped by marker: {fx[3]}  ({fx[5]})" for fx in skipped] + cloudconfig.unread_lines() + [l for l in [implants.install_note()] if l]
     lines.append("  no pattern matched for: " + ", ".join(v for v in covered if v not in by_vul) + "  (rules ran; absence of a match is not evidence of absence)")
     lines.append("  next: review each REVIEW line; fix or mark `# aix: accepted VUL-… <why>`; `aix code security --audit` writes the audit report;")
     lines.append("        then `aix docs security` / the security-audit-* skills move register rows on that evidence.")

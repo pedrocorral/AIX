@@ -27,6 +27,17 @@ def check_path():
         problem("`aix` is not on PATH", "run `aix self-install` from the kit clone (link + shell profile), then open a new terminal")
 
 
+def check_implants():
+    """The PolinRider family (section 28): npm's own cli.js bloated on this machine, a VS Code task of the project that runs on folder open."""
+    import implants
+    size = implants.npm_cli_size()
+    if size > 50_000:
+        problem(f"npm's lib/cli.js is {size:,} bytes (normally under 1 KB)", "reinstall Node and npm from the official source; the PolinRider implant rewrites it")
+    tasks = ROOT / ".vscode" / "tasks.json"
+    if tasks.is_file() and re.search(r'"runOn"\s*:\s*"folderOpen"', tasks.read_text(encoding="utf-8", errors="replace")):
+        problem(".vscode/tasks.json runs a task when the folder opens", "delete the task: code that runs before anyone reads it is how the PolinRider implant spreads")
+
+
 def _leftovers_of(agents, a: dict) -> list:
     """Pointer files and the skills folder of an unselected agent; a skills folder another selected agent reads
     (gemini and codex share .agents/skills) is that agent's, not a leftover."""
@@ -223,7 +234,7 @@ def inst_headers(blocks):
 
 
 def main():
-    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_lessons, check_seats, check_agents_blocks):
+    for check in (check_python, check_path, check_pointers, check_links, check_always_on, check_extern, check_state, check_kit_edits, check_layers, check_lessons, check_seats, check_agents_blocks, check_implants):
         check()
     for what, fix in problems:
         print(f"PROBLEM {what}\n        fix: {fix}")
