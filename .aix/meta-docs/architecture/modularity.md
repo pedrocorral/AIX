@@ -42,6 +42,8 @@ configuration, I/O or a domain. Every change to a hub propagates to all its depe
 | `billing` importing `orders` and `orders` importing `billing` | — | — | **cycle — forbidden** |
 
 ## Checks (deterministic first, then judgement)
+- **Declared parts**: when a project names its parts and who may use whom, `aix code isolations` checks every edge
+  against that allow-list (`isolations.md`); `--propose` drafts the parts from this graph with its defects left out.
 - **No cycles** at any granularity: package, module, class. A cycle means two nodes are one node in disguise;
   merge them or extract the shared part into a leaf.
 - **Direction**: edges go controller → service → repository port → model, and domain → shared leaves. Never

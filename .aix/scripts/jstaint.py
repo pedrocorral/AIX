@@ -9,6 +9,7 @@ from pathlib import Path
 from codefiles import ROOT, rel, source_files
 from securityrules import ACCEPT, ADVICE, SKIP_FILE, MARKER_LINES
 from javatypes import RECEIVER_CALL, local_types
+from bracecomments import strip_comments   # noqa: F401  (javataint imports it from here)
 
 JS_EXT = (".js", ".jsx", ".ts", ".tsx", ".mjs")
 SOURCES = re.compile(r"\breq(?:uest)?\.(?:query|params|body|headers|cookies|url|originalUrl|nextUrl)\b|\bctx\.(?:request\.)?(?:query|params|body|headers)\b"
@@ -54,11 +55,6 @@ def _statements(lines: list, first: int = 1) -> list:
 
 
 STRINGS = re.compile(r"`(?:[^`\\]|\\.)*`|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", re.S)
-
-
-def strip_comments(text: str) -> str:
-    """Comments out, strings kept whole: the `//` of `"http://x"` is not a comment."""
-    return re.sub(STRINGS.pattern + "|" + COMMENTS.pattern, lambda m: " " if m.group(0).startswith(("//", "/*")) else m.group(0), text, flags=re.S)
 
 
 def _code_only(expr: str) -> str:

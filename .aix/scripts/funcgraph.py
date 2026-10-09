@@ -9,7 +9,9 @@ from pathlib import Path
 from heads import FUNC_HEAD, KEYWORDS, brace_block, head_body
 from codefiles import EXT, rel
 from pyfuncgraph import RESOLUTION
-from depedges import RS_USE, _alias_bases, _java_imports, _java_index, _java_visible, _resolve_js, _rust_base, _rust_resolve
+from depedges import _java_imports, _java_index, _java_visible
+from jsedges import resolve_js, specifier_bases
+import rustedges
 from hygiene import DECLARE, STRINGS_COMMENTS, STRINGS_COMMENTS_JS
 from passthrough import _param_names
 
@@ -32,6 +34,7 @@ ANON_PARAMS = re.compile(r"\bfunction\s*\*?\s*\(([^()]*)\)|\(([^()]*)\)\s*(?::[^
 DEFAULT_EXPORT = re.compile(r"module\.exports\s*=\s*require\(\s*['\"]([^'\"]+)['\"]\s*\)|module\.exports\s*=\s*(?:exports\s*=\s*)?(\w+)|export\s+default\s+(?:function\s+)?(\w+)")   # the re-export form first
 JS_IMPORT_NAMES = re.compile(r"^[ \t]*import\s+(?:type\s+)?(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\}|\*\s+as\s+(\w+))?\s*from\s*['\"]([^'\"]+)['\"]"
                              r"|^[ \t]*(?:const|let|var)\s+(?:(\w+)|\{([^}]*)\})\s*=\s*require\(\s*['\"]([^'\"]+)['\"]\s*\)", re.M)
+RS_USE = re.compile(r"^\s*(?:pub\s+)?(?:use|mod)\s+([A-Za-z_:][\w:]*)", re.M)
 RS_USE_NAMES = re.compile(r"^\s*(?:pub\s+)?use\s+([\w:]+?)(?:::\{([^}]*)\})?\s*;", re.M)
 
 
@@ -113,8 +116,7 @@ class _File:
 
 def _js_target(spec: str, file: _File, files: dict):
     """The project file an import specifier names, relative or through tsconfig aliases; None when it is a package."""
-    bases = [file.f.parent / spec] if spec.startswith(".") else _alias_bases(spec, file.f)
-    target = next((h for h in map(_resolve_js, bases) if h), None)
+    target = next((h for h in map(resolve_js, specifier_bases(spec, file.f)) if h), None)
     return rel(target) if target is not None and rel(target) in files else None
 
 
@@ -148,16 +150,18 @@ def _rust_module(path: list, file: _File, crate_root: Path, files: dict):
     """The project file a `crate::` / `super::` / `self::` path names, else None."""
     if not path or path[0] not in ("crate", "super", "self"):
         return None
-    base = _rust_base(re.match(r"use\s+(.+)", "use " + "::".join(path)), file.f, crate_root)
-    hit = _rust_resolve(*base) if base else None
+    hit = rustedges.resolve(path, file.f, crate_root)
     return rel(hit) if hit is not None and rel(hit) in files else None
 
 
 def _rust_modules(file: _File, crate_root: Path, files: dict):
     """`mod x;` and whole-module uses bind the module's name: `x::f()`."""
     for m in RS_USE.finditer(file.text):
-        where = _rust_base(m, file.f, crate_root)
-        hit = _rust_resolve(*where) if where else None
+        name = m.group(1)
+        if m.group(0).lstrip().startswith(("mod", "pub mod")):
+            hit = rustedges.module_file(crate_root, rustedges.module_path(file.f, crate_root) + [name])
+        else:
+            hit = rustedges.resolve(name.lstrip(":").split("::"), file.f, crate_root)
         if hit and rel(hit) in files:
             file.imports[m.group(1).split("::")[-1]] = (rel(hit), None)
 
@@ -211,7 +215,7 @@ def _default_export(file_rel: str, defs: dict, depth: int = 3):
     if not m:
         return None
     if m.group(1):
-        target = _resolve_js((ROOT / file_rel).parent / m.group(1))
+        target = resolve_js((ROOT / file_rel).parent / m.group(1))
         return _default_export(rel(target), defs, depth - 1) if target else None
     return defs.get((file_rel, m.group(2) or m.group(3)))
 

@@ -1325,6 +1325,90 @@ YARA rules, its OSV dependency lookup and MCP-server rules, its LLM pass and its
 passes it runs on skill scripts are already the kit's `aix code security` for `.py` files; a skill's own scripts can
 be fed to that rather than duplicated. This is the shape half of SkillSpector, measured against it, not a port.
 
+### 30. The module graph's edges vs grimp, dependency-cruiser, cargo-modules and jdeps (2.22.0, run on 2026-10-09)
+
+`aix code graph`, `aix code dead` and now `aix code isolations` all read one module graph (`depedges.py`). It had
+never been measured. Each language now has a referee, run on the cached extended projects, file to file, tests left
+out, only files both sides see (`tests/benchmark/graphedges.py --diff` prints every disagreement):
+
+| language | referee | how it was run |
+|---|---|---|
+| Python | grimp 3.17 (the graph under import-linter 2.15) | `build_graph` on the package, modules mapped to files |
+| JS/TS | dependency-cruiser 16.10.4 with TypeScript 5.9 | `--no-config --ts-pre-compilation-deps`, the project's tsconfig |
+| Rust | cargo-modules 0.23.1 | `dependencies --no-sysroot --no-owns` with items, each item mapped to its module's file; an edge into another crate of the workspace compared at the crate |
+| Java | jdeps (JDK 25) | `-verbose:class -filter:none` on the classes javac builds from `src/main/java` |
+
+| project | referee | before: recall / precision | after: recall / precision |
+|---|---|---|---|
+| flask, requests, pygoat | grimp | 100 / 100 % (all three) | 100 / 100 % |
+| express, NodeGoat, juice-shop | dependency-cruiser | 100 / 100 % (all three) | 100 / 100 % |
+| excalidraw (1 519 edges) | dependency-cruiser | 99.8 / 100 % | 100 / 100 % |
+| ripgrep (workspace of 9 crates) | cargo-modules | 29.7 / 67.3 % | 100 / 99.2 % |
+| bat | cargo-modules | 56.8 / 77.1 % | 81.1 / 96.2 % |
+| commons-lang (424 edges) | jdeps | 98.4 / 97.9 % | 98.6 / 100 % |
+
+**What was fixed.** JavaScript: comments are taken out before imports are read (a commented-out import was an
+edge; `import(/* webpackChunkName */ "./x")` was none, the three excalidraw misses); a monorepo workspace package
+resolves through its package.json (`exports`, `module`, `main`, `types`, then `src/index` when they point at a
+build that is not there); `./x.js` finds `x.ts`. Rust, where the old reader saw a third of the edges: every path of
+a `use` tree (`use crate::{a, b::{c, self}}` was no edge at all), paths written in the code (`crate::billing::charge()`),
+`super` from the file's real module (it climbed one folder, so `src/a/b.rs` resolved `super` to the crate root) and
+inside inline modules, crates of the same workspace by name, `pub use` re-exports followed to the defining file,
+glob imports resolved by the names the file writes (two globs deep), the shallowest Cargo.toml winning over a test
+fixture of the same name, and the body of a `#[cfg(test)]` module left out (test code, like a test file). `mod x;`
+declarations are edges only for reachability (dead code), not for the boundary check (`ownership=False`). Java:
+an explicit import shadows the package's class of the same name (both were edges), an import only Javadoc names is
+no dependency, a class written by its full name is one. Python: a literal `importlib.import_module("a.b")`.
+
+**What is left, read by hand.** bat: 18 edges cargo-modules infers from types (`config.style_components` reaches
+`style.rs` with no name of it in the file) or behind the two-glob limit; 3 of ours are real but invisible to the
+referee: `bat_warning!`, a macro exported at the crate root (2 edges into lib.rs), and `crate::pager` behind
+`#[cfg(all(feature = "minimal-application", feature = "paging"))]`. ripgrep: one constant defined in lib.rs
+(`use crate::MAX_LOOK_AHEAD`) the referee does not list. commons-lang: 6 edges jdeps sees in
+method signatures of the bytecode, no name in the source. These are the limits of a source reader, said in
+`architecture/isolations.md` ("What it does not know").
+
+### 31. `aix code isolations` on real projects and against import-linter (2.22.0, run on 2026-10-09)
+
+**Self-consistency.** On each project: `--propose --depth 2 --write`, `--accept`, the ADR accepted as a person
+would, then the check. The proposal is the code minus its defects, so every flagged edge must belong to a pair the
+proposal left out (`tests/benchmark/isolations.py` maps each verdict back to its pair):
+
+| project | isolations | defect pairs left out | edges flagged | not explained by a defect | undeclared | breaking | declaration errors | propose / check |
+|---|---|---|---|---|---|---|---|---|
+| flask | 10 | 1 | 1 | 0 | 0 | 0 | 0 | 0.2 / 0.2 s |
+| requests | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0.2 / 0.2 s |
+| pygoat | 14 | 1 | 1 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+| express | 31 | 0 | 0 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+| juice-shop | 12 | 4 | 22 | 0 | 0 | 0 | 0 | 0.6 / 0.7 s |
+| excalidraw | 19 | 16 | 102 | 0 | 0 | 0 | 0 | 0.4 / 0.6 s |
+| ripgrep | 12 | 0 | 0 | 0 | 0 | 0 | 0 | 0.6 / 0.6 s |
+| bat | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0.4 / 0.4 s |
+| commons-lang | 18 | 4 | 9 | 0 | 0 | 0 | 0 | 0.8 / 0.8 s |
+| spring-petclinic | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+
+No finding the proposal did not predict, on four languages' worth of layouts. The defects are real shapes, all of
+them cycles here (no upward edge by folder name): excalidraw's 16 pairs are one cycle among eight parts of `src`
+(`actions`, `components`, `data`, `element`, `hooks`, `packages`, `renderer`, `scene`; 14 cuts), `src` ⇄
+`excalidraw-app` (`src/index.tsx` imports the app) and `excalidraw-app/data` ⇄ `collab`; flask's one pair is the
+cycle between `sansio` and `json` (`sansio/app.py` imports `json/provider.py`).
+
+**Against import-linter.** One planted Python project, the rule "only persistence reaches its PostgreSQL
+implementation", written as import-linter's forbidden contract (source `app.orders`, forbidden
+`app.persistence.postgres`) and as our declaration (`app.orders` may use `app.persistence`, which exposes its
+ports and factory):
+
+| case | import-linter 2.15 | aix code isolations |
+|---|---|---|
+| the rule as written, clean code | passes | passes |
+| orders imports postgres: the case both wrote | fails | fails (HIDDEN) |
+| a package added later, shipping, imports postgres | passes: shipping is in no source list | fails (HIDDEN: persistence does not expose the file) |
+| orders imports postgres and the rule file is edited to allow it | passes | fails (GOVERNANCE: no accepted ADR carries the new fingerprint) |
+
+Both catch what both wrote. The allow-list catches the package nobody listed, and the fingerprint catches the
+agent that edits its own rules. import-linter remains a good Python-only tool for a team that keeps its source
+lists current by hand; its layers and independence contracts are what nesting and may_use express here.
+
 ## Where the numbers come from
 
 - `tests/benchmark/engines.py` copies each cached project, installs the kit into the copy, runs every tool, and writes

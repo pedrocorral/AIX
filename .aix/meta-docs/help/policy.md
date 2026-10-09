@@ -10,9 +10,9 @@ and the tool follow one list.
 Which policy applies, later wins: anarchy (the kit's default: no cycle, nothing checked) < a layer's defaults.yaml
 (`policy: standard` in org/ or custom/) < `policy:` in .aix/config.yaml (aix policy use) < a task's own `policy:`
 line (a hotfix in a standard project). `none`, `nothing` and `freedom` are synonyms of anarchy.
-The kit ships: minimal (style, docs), standard (spec, tests, threat, implement, tests, style, modularity, security,
-docs, coverage, audit, review, drift), hotfix (test, fix, style, security, docs, review), release (adds
-vulnerabilities, dead code, clones, the register gate). A layer adds or replaces policies/<name>.yaml; a policy may
+The kit ships: minimal (style, docs), standard (spec, tests, threat, implement, tests, style, modularity, isolations,
+security, docs, coverage, audit, review, drift), hotfix (test, fix, style, security, docs, review), release (adds
+vulnerabilities, dead code, clones, the register gate; isolations required). A layer adds or replaces policies/<name>.yaml; a policy may
 define its own checks (`checks: {lint: npm run lint}`) and use them in `order`.
-Steps: spec, tests, threat, implement, unit-tests, audit, review, drift (skills); style, defensive, modularity, dead,
-clones, security, vulnerabilities, docs, coverage, register (checks). `aix policy show NAME` prints a policy's steps.
+Steps: spec, tests, threat, implement, unit-tests, audit, review, drift (skills); style, defensive, modularity, isolations,
+dead, clones, security, vulnerabilities, docs, coverage, register (checks). isolations passes when none are declared. `aix policy show NAME` prints a policy's steps.

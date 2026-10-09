@@ -25,9 +25,9 @@ aix policy off                  back to anarchy
 | Policy | For | Required | Advised |
 |---|---|---|---|
 | `minimal` | a small team starting out | style gate, docs valid | implement |
-| `standard` | a feature | implement, style, security scan, docs valid | spec, tests, threat model, unit tests, modularity, coverage, audit, review, drift |
+| `standard` | a feature | implement, style, security scan, docs valid | spec, tests, threat model, unit tests, modularity, isolations, coverage, audit, review, drift |
 | `hotfix` | a bug under pressure | implement, style, security scan, docs valid | the reproducing test, review |
-| `release` | closing a version | style, modularity, security, vulnerabilities, docs, the register gate | dead code, clones, coverage, drift, review |
+| `release` | closing a version | style, modularity, isolations (passes when none are declared), security, vulnerabilities, docs, the register gate | dead code, clones, coverage, drift, review |
 
 ## Two kinds of step
 - A **check** is a command the tool runs: `aix code style --gate`, `aix docs validate`, `aix code security --gate`.

@@ -23,7 +23,7 @@ Original brief (verbatim intent, condensed):
 | Requirement from the brief | Where it is satisfied |
 |---|---|
 | Skills + docs in nested hierarchy; agent finds the path with minimum tokens | `.aix/skills/<cat>/<name>/SKILL.md`; `INDEX.md` in every docs folder; `AGENTS.md` navigation table; `.aix/meta-docs/conventions/token-economy.md` |
-| Skills split per task (Google-style) | 72 skills in 7 categories, orchestrators chain sub-skills |
+| Skills split per task (Google-style) | 73 skills in 10 categories, orchestrators chain sub-skills |
 | MVC best practices; Python web / data-science / AI apps | `.aix/meta-docs/architecture/mvc.md`; `.aix/meta-docs/stacks/python/{webapp-general,data-science-app,ai-app,tooling}.md` |
 | `.aix/meta-docs/` complete enough to design a new app | `.aix/meta-docs/INDEX.md` prescribes a reading order; `architecture-design-app` skill executes it |
 | Frontend/backend differentiation | `architecture/frontend-backend-separation.md` + ownership matrix |
@@ -82,6 +82,12 @@ AIX/
 │   ├── abapdeps.py          # leaf: ABAP objects as graph nodes (parts folded), the names a file uses as edges, entry points, clone tokens
 │   ├── abapcalls.py         # leaf: ABAP call edges through declared types (--functions) and dead methods by visibility
 │   ├── abapsec.py           # leaf: the ABAP security rules that need the unit (dynamic SQL unless a literal, EXEC SQL, CALL TRANSACTION and AUTHORITY-CHECK)
+│   ├── bracecomments.py     # leaf: comments out of JS/TS, Java and Rust with strings kept whole (a commented-out import is no edge)
+│   ├── jsedges.py, rustedges.py   # leaves: JS/TS imports (tsconfig paths, monorepo workspaces, `.js` -> `.ts`) and Rust paths (use trees, `super`, re-exports, globs, workspace crates) to files
+│   ├── isodecl.py, isorules.py   # leaves: the isolation declaration (parse, check, nesting, membership, fingerprint) and the verdict on one edge (FORBIDDEN, HIDDEN)
+│   ├── isosurface.py, isogov.py   # leaves: a file's contract (public names, signatures, what breaks a caller) and the governance (ADR fingerprint, recorded contracts, CODEOWNERS)
+│   ├── isopropose.py, isocontext.py, isodata.py, isotrace.py   # leaves: the recommended isolations, an agent's context, the data boundaries, requirements by isolation
+│   ├── isolations.py, affected.py   # `aix code isolations` (check, gate, propose, accept, context, codeowners, requirements) and `aix code affected` (the tests a change reaches)
 │   ├── implants.py          # leaf: supply-chain implants (PolinRider): padded config files, code after the export, folder-open tasks, text fonts, install hooks, history growth
 │   ├── skillsec.py          # leaf: the dangerous shapes of a skill or instruction file (hidden character, instruction comment, base64 blob, fetch-and-run, read-secret-and-send, override phrase) for `aix skills security` and `aix skills add`
 │   ├── abaptaint.py         # leaf: the ABAP taint walk (sources, propagation, sanitisers, sinks incl. HTML output) over abapcalls' resolution, two calls deep
@@ -196,7 +202,7 @@ Built 2026-09-04/05 in a chat session, then compared against two alternative des
 3. **Stack scaffolds**: `.aix/scripts/scaffold.py --stack python-fastapi` producing app factory, composition, settings, core/errors, memory adapter, contract test skeleton, importlinter contract, Makefile targets. Same for `js-react`, later `java-spring`.
 4. **Validator upgrades**: proper YAML front-matter parsing; `related`/`depends_on` existence; file ≤300 lines / folder ≤12 files warnings; INDEX rows pointing at missing files; FR `implemented`/`verified` vs markers/TS status; `STATE.md` staleness vs git.
 5. **Scripts for the other 7 audit skills** (authn/authz endpoint check for `{id}` routes without service-level `can(`; input-validation schema strictness; web headers via HTTP client; logging sensitive-field grep; AI tool registry permission dump; infra: hadolint/checkov/trivy runners; data-privacy PII field grep).
-6. **Lint enforcement of layering** shipped as config: `backend/importlinter.toml` template, `dependency-cruiser` config, ArchUnit example.
+6. ~~**Lint enforcement of layering** shipped as config~~: done natively as `aix code isolations` (2.22.0, ADR-0009): one allow-list for five languages, governed by an ADR fingerprint, measured against import-linter (benchmark section 31).
 7. **Pre-commit config** template calling validate + secrets scan.
 8. **Multi-agent STATE.md** semantics (one line per agent) and a `roadmap.py claim` command.
 9. **Delete-example command** (`.aix/scripts/roadmap.py` or new script) removing the EXAMPLE domain cleanly (docs, INDEX rows, dictionary rows).
@@ -327,4 +333,4 @@ Details and consequences: `.aix/meta-docs/conventions/cli.md`, ".gitignore and b
 
 ## 13. Numbers to remember
 
-Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 72 skills, 24 seeded VUL rows, 4 example requirements/TS.
+Resident floor ≈ 2.5–3k tokens. Typical locate-and-read ≈ 2.5k. Session restart ≈ 7–10k. Skill bodies 300–900 tokens each, one or two loaded at a time. Meta-docs full architecture read ≈ 900 lines (design sessions only). 162 files in the kit, ~180 KB, 73 skills, 24 seeded VUL rows, 4 example requirements/TS.

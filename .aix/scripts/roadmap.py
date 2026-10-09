@@ -123,6 +123,21 @@ def _warn_scope_overlaps(tid: str, my_scope: list):
             print(f"  warning: scope overlaps {other.name[:9]} ({field(o, 'owner') or 'unowned'}): " + ", ".join(f"{a} ~ {b}" for a, b in hits))
 
 
+def _isolation_hint(my_scope: list):
+    """The isolations a task's scope touches, and the command that tells the agent their rules before it edits."""
+    import isodecl
+    decl = isodecl.load(ROOT)
+    deepest = _scope_isolations(decl, my_scope) if decl is not None else []
+    if deepest:
+        print(f"  isolations in scope: {', '.join(deepest)}; before editing: " + "; ".join(f"aix code isolations --context {n}" for n in deepest))
+
+
+def _scope_isolations(decl, my_scope: list) -> list:
+    """The deepest isolations whose paths overlap a task's scope globs."""
+    names = {n for n, iso in decl.isos.items() for g in iso.paths for s in my_scope if overlaps(g.rstrip("*").rstrip("/") or g, s)}
+    return sorted(n for n in names if not any(o != n and decl.is_within(o, n) for o in names))
+
+
 def _sign(text: str, seat: str) -> str:
     """status going-on, owner, claimed, and who held the seat (readable long after the seat is released)."""
     _, _, tool = seats.session()
@@ -144,6 +159,7 @@ def cmd_start(tid, force=False):
     seat = seats.claim(ROOT, force)
     _refuse_if_held(tid, text, seat, force)
     _warn_scope_overlaps(tid, scope_of(text))
+    _isolation_hint(scope_of(text))
     dst = RM / "going-on" / p.name
     dst.write_text(_sign(text, seat), encoding="utf-8")
     if p != dst:

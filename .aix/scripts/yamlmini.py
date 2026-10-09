@@ -1,5 +1,7 @@
 """Leaf: a tiny YAML subset with no dependency: scalars, lists, one-level maps, `key: |` blocks, and the front matter
-of a Markdown file. Enough for config.yaml, profiles, policies and SKILL.md heads; not a YAML parser."""
+of a Markdown file. Enough for config.yaml, profiles, policies and SKILL.md heads; not a YAML parser. `parse_tree`
+reads nested maps by indentation, `- item` and `[a, b]` lists and `{k: v}` flow maps (the isolation declaration)."""
+import re
 from pathlib import Path
 
 
@@ -89,3 +91,125 @@ def front_matter(md: Path) -> dict:
         return {}
     end = text.find("\n---", 3)
     return parse_yaml(text[3:end]) if end > 0 else {}
+
+
+# ---- nested maps by indentation (parse_tree) ---------------------------------------------------------------------
+
+def _content_lines(text: str) -> list:
+    """(indent, content, line number) of every line that carries something, comments and blanks dropped."""
+    out = []
+    for n, raw in enumerate(text.splitlines(), 1):
+        body = _strip_line_comment(raw.rstrip())
+        if body.strip():
+            out.append((len(body) - len(body.lstrip(" ")), body.strip(), n))
+    return out
+
+
+def _strip_line_comment(line: str) -> str:
+    """The line without a `# comment` that is outside quotes (`#` inside a value needs a space before it)."""
+    quote = None
+    for i, ch in enumerate(line):
+        if ch in "\"'" and quote in (None, ch):
+            quote = None if quote else ch
+        elif ch == "#" and quote is None and (i == 0 or line[i - 1] in " \t"):
+            return line[:i]
+    return line
+
+
+FLOW_DEPTH = {"[": 1, "{": 1, "]": -1, "}": -1}
+
+
+def _quote_after(ch: str, quote):
+    """The quote still open after reading ch: a quote opens one, the same quote closes it."""
+    if ch in "\"'" and quote in (None, ch):
+        return None if quote else ch
+    return quote
+
+
+def _split_flow(s: str) -> list:
+    """Top-level comma-separated items of a flow collection's inside, brackets and quotes respected."""
+    items, depth, quote, cur = [], 0, None, ""
+    for ch in s:
+        quote = _quote_after(ch, quote)
+        if quote is None and ch == "," and depth == 0:
+            items.append(cur.strip()); cur = ""
+            continue
+        depth += FLOW_DEPTH.get(ch, 0) if quote is None else 0
+        cur += ch
+    return [x for x in items + [cur.strip()] if x]
+
+
+def _flow_map(inside: str, line: int) -> dict:
+    out = {}
+    for item in _split_flow(inside):
+        key, sep, rest = item.partition(":")
+        if not sep:
+            raise ValueError(f"line {line}: `{item}` in a {{...}} map has no `key: value`")
+        out[_scalar(key)] = _flow_value(rest, line)
+    return out
+
+
+def _flow_value(text: str, line: int):
+    """`[a, b]`, `{k: v, k2: [x]}` or a scalar."""
+    text = text.strip()
+    closing = {"[": "]", "{": "}"}.get(text[:1])
+    if closing and not text.endswith(closing):
+        raise ValueError(f"line {line}: `{text[0]}` is not closed with `{closing}` on the same line")
+    if closing == "]":
+        return [_flow_value(x, line) for x in _split_flow(text[1:-1])]
+    if closing == "}":
+        return _flow_map(text[1:-1], line)
+    return _scalar(text) if text else None
+
+
+def _key_value(content: str, line: int) -> tuple:
+    """`key: value` -> (key, value text); the colon must be followed by a space or the end of the line."""
+    m = re.match(r"""^("[^"]*"|'[^']*'|[^:]+?)\s*:(?:\s+(.*)|$)""", content)
+    if not m:
+        raise ValueError(f"line {line}: expected `key: value`, found `{content}`")
+    return _scalar(m.group(1)), (m.group(2) or "")
+
+
+def _block(lines: list, i: int, indent: int) -> tuple:
+    """(value, next index) of the block whose lines start at `indent`: a list (`- x`) or a map (`k: v`)."""
+    if lines[i][1].startswith("- ") or lines[i][1] == "-":
+        return _list_block(lines, i, indent)
+    out = {}
+    while i < len(lines) and lines[i][0] == indent:
+        _ind, content, n = lines[i]
+        key, rest = _key_value(content, n)
+        i += 1
+        if rest.strip():
+            out[key] = _flow_value(rest, n)
+        elif i < len(lines) and lines[i][0] > indent:
+            out[key], i = _block(lines, i, lines[i][0])
+        else:
+            out[key] = None
+    if i < len(lines) and lines[i][0] > indent:
+        raise ValueError(f"line {lines[i][2]}: unexpected indentation")
+    return out, i
+
+
+def _list_block(lines: list, i: int, indent: int) -> tuple:
+    out = []
+    while i < len(lines) and lines[i][0] == indent and (lines[i][1].startswith("- ") or lines[i][1] == "-"):
+        out.append(_flow_value(lines[i][1][1:], lines[i][2]))
+        i += 1
+    return out, i
+
+
+def parse_tree(text: str) -> dict:
+    """Nested maps by indentation (spaces), `- item` and `[a, b]` lists, `{k: v}` flow maps, quoted scalars,
+    comments. Raises ValueError naming the line on anything else."""
+    lines = _content_lines(text)
+    if not lines:
+        return {}
+    tabbed = next((n for n, raw in enumerate(text.splitlines(), 1) if "\t" in raw[:len(raw) - len(raw.lstrip())]), None)
+    if tabbed:
+        raise ValueError(f"line {tabbed}: indent with spaces, not tabs")
+    value, i = _block(lines, 0, lines[0][0])
+    if i < len(lines):
+        raise ValueError(f"line {lines[i][2]}: unexpected indentation")
+    if not isinstance(value, dict):
+        raise ValueError("the file must be a map (`key: value` at the top), not a list")
+    return value

@@ -40,6 +40,8 @@ skipped when git or a tag is missing).
 | `test_instructions.py` | enable/disable, rendered Copilot and Cursor files, AGENTS.md blocks, profiles, `aix rules` |
 | `test_skills.py` | list, info, `use`/`default`, disable/enable, registry listing |
 | `test_code.py` | `aix code find` (list, yes, the checklist through a pseudo-terminal), every code tool, hidden folders |
+| `test_depedges.py` | the module graph's edges per language: JS comments, dynamic imports, workspaces, `.js` -> `.ts`; Rust use trees, inline modules, `#[cfg(test)]`, workspace crates, re-exports, globs, ownership; Java shadowing, Javadoc imports, qualified names; Python dynamic imports; the nested YAML reader |
+| `test_isolations.py` | `aix code isolations`: the family rules, declaration errors, what nothing uses, the proposal (defects left out), contracts, data boundaries, governance and CODEOWNERS, the command end to end, `aix code affected` |
 | `test_migration.py` | a 1.x layout generated from a fresh install migrates on upgrade |
 | `test_agents.py` | `aix agents`: list, names, aliases, only the selected folders and pointers, deselection removes AIX files and keeps a person's, `--agents` at install, upgrade keeps the line, the checklist through a pseudo-terminal |
 | `test_gitignore.py` | missing lines printed without a terminal, added on `upgrade --yes` and on a y answer, once; a person's `CLAUDE.md` and `.github/skills` kept as `-bak` |

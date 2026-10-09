@@ -45,6 +45,16 @@ The code                              (aix code ...; Python, JS/TS, Rust, Java, 
   aix code clones [PATH...] [--similarity PCT] [--gate]
                                       duplicated functions: exact groups (same structure, other names/literals)
                                       and near-clones above the threshold (default 70 %)
+  aix code isolations [PATH...] [--gate] [--report]
+                                      the declared isolations (docs/requirements/isolations.yaml): who may use
+                                      whom, what each exposes; FORBIDDEN, HIDDEN, UNDECLARED, BREAKING contract,
+                                      DATA boundary, GOVERNANCE (an accepted ADR carries the rules' fingerprint)
+      --propose [--depth N] [--write] the isolations AIX recommends from the code, defects left out and listed
+      --accept                        record the contracts, write the ADR a person accepts
+      --context PATH|NAME             what an agent may use and read before it edits there
+      --codeowners [--write] | --requirements   CODEOWNERS from the owners; requirements by isolation
+  aix code affected [--base REF] [--plain]
+                                      the tests a change reaches through the import graph
   aix code defensive [PATH...] [--all] [--gate] [--report]
                                       how guarded the Python is: fully typed functions, pydantic models and
                                       strict mode, outside data (json/yaml/toml loads, request attributes,

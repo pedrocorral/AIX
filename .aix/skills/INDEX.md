@@ -5,7 +5,7 @@ Skill name = folder path joined with `-` (e.g. `security/audit-injection` → `s
 |---|---|---|
 | `core/` | `sdd-workflow` (orchestrator), `session-resume`, `session-handoff`, `conflict-resolution`, `roadmap-task`, `find-doc`, `lessons-learnt` (the agents' lessons: record, merge, prune, promote), `which-skill` (manual router) | Running the loop, sessions, navigation, lessons |
 | `spec/` | `write-requirement`, `write-adr`, `review`, `write-skill`, `write-for-agents`, `plain-language` | Producing/reviewing ground truth |
-| `architecture/` | `design-app`, `design-persistence`, `structure-project`, `trace`, `deep-modules`, `domain-model`, `improve` (manual) | Whole-app and data-layer design |
+| `architecture/` | `design-app`, `design-persistence`, `structure-project`, `trace`, `deep-modules`, `domain-model`, `isolations` (who may use whom: `aix code isolations`), `improve` (manual) | Whole-app and data-layer design |
 | `implement/` | `feature` (orchestrator), `orm-model`, `repository`, `endpoint`, `ui`, `code-python`, `code-typescript` | Writing code in the right layer |
 | `testing/` | `plan-tests` (orchestrator), `write-unit-tests`, `write-integration-tests`, `write-functional-tests`, `coverage-audit`, `validate-ui` | Test specs and automation |
 | `security/` | `audit` (orchestrator), `threat-model`, `audit-injection`, `audit-authn-authz`, `audit-input-validation`, `audit-secrets-config`, `audit-dependencies`, `audit-licenses`, `audit-web-xss-csrf`, `audit-data-privacy`, `audit-logging-monitoring`, `audit-ai-llm`, `audit-infra` | Register lifecycle |

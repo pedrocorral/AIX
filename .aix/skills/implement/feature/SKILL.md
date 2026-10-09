@@ -6,7 +6,7 @@ description: Implement an approved requirement across layers (model → reposito
 Inputs: task file (`context_files`), FR/API/DM docs listed there, `.aix/meta-docs/architecture/layering.md`, stack doc. Budget: those only + the target domain folder.
 
 ## Procedure
-1. Map each AC to the layer that owns it (`layering.md` "Where does X go?"). Write this mapping in the task plan.
+1. Map each AC to the layer that owns it (`layering.md` "Where does X go?"). Write this mapping in the task plan. When the project declares isolations (`docs/requirements/isolations.yaml`), run `aix code isolations --context <file>` for each file you will touch and import only what it allows (`architecture-isolations`).
 2. Domain model changes → `implement-orm-model` (domain classes + mapping + migration).
 3. New/changed queries → `implement-repository` (port method + memory adapter + production adapter + contract test).
 4. Use case → service in `services/` (transaction boundary, authorisation check, domain events). Marker `@implements FR-…`.
@@ -17,4 +17,4 @@ Inputs: task file (`context_files`), FR/API/DM docs listed there, `.aix/meta-doc
 ## Rules
 Smallest change that satisfies the ACs; no speculative generality; no new dependency without noting it in the task (and `security-audit-dependencies`); no behaviour beyond the requirement (if needed → `spec-write-requirement` first).
 
-Before hand-off: `aix code style <changed files>` must show no function over a limit (`conventions/readability.md`); `aix code graph --gate` no cycle or upward dependency.
+Before hand-off: `aix code style <changed files>` must show no function over a limit (`conventions/readability.md`); `aix code graph --gate` no cycle or upward dependency; `aix code isolations --gate` no import the declared isolations forbid; run the tests `aix code affected --plain` lists.

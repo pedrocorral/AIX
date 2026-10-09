@@ -1,12 +1,15 @@
 """Leaf over codefiles: the edges of the dependency graph. Module-level imports per language (Python, JS/TS, Rust,
-Java) resolved to project files, and Python call edges between functions. Unresolved imports are ignored, never
-guessed."""
-import ast, json, re
+Java, ABAP) resolved to project files, and Python call edges between functions. Unresolved imports are ignored, never
+guessed. JavaScript/TypeScript and Rust are read by their own leaves (jsedges, rustedges); benchmark section 30
+measures every language against a referee (grimp, dependency-cruiser, cargo-modules, jdeps)."""
+import ast, re
 from collections import defaultdict
 from pathlib import Path
 
+from bracecomments import strip_strings
 from codefiles import ROOT, CODE_ROOTS, EXT, rel, source_files
-from guard import checked
+from jsedges import js_module_edges
+from rustedges import rust_module_edges
 
 
 # ---- module-level edges per language ----------------------------------------------------------------------
@@ -65,152 +68,38 @@ def _from_import_targets(node, pkg: list, idx) -> list:
     return [h for h in hits if h] or [resolve_py(mod, idx)]
 
 
+def _node_targets(node, pkg: list, idx) -> list:
+    """The files one AST node imports: `import a.b`, `from .x import y`, a literal `importlib.import_module("a.b")`."""
+    if isinstance(node, ast.Import):
+        return [resolve_py(a.name, idx) for a in node.names]
+    if isinstance(node, ast.ImportFrom):
+        return _from_import_targets(node, pkg, idx)
+    dynamic = _dynamic_import(node) if isinstance(node, ast.Call) else ""
+    return [resolve_py(dynamic, idx)] if dynamic else []
+
+
 def py_module_edges(f: Path, idx):
+    """The project files a Python file imports (static imports and literal dynamic ones)."""
     try:
         tree = ast.parse(f.read_text(encoding="utf-8", errors="replace"))
     except SyntaxError:
         return []
     pkg = list(f.resolve().relative_to(ROOT).parent.parts)
-    out = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            out += [resolve_py(a.name, idx) for a in node.names]
-        elif isinstance(node, ast.ImportFrom):
-            out += _from_import_targets(node, pkg, idx)
+    out = [t for node in ast.walk(tree) for t in _node_targets(node, pkg, idx)]
     return [t for t in out if t and t.resolve() != f.resolve()]
 
 
-JS_IMPORT = re.compile(r"""(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)|import\(\s*['"]([^'"]+)['"]\s*\)|^[ \t]*import\s*['"]([^'"]+)['"]""", re.M)   # the last: `import 'app/config/dayjs';`, a side-effect import
+DYNAMIC_IMPORTS = ("importlib.import_module", "import_module", "__import__")
 
 
-JS_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".mjs")
-_TS_CONFIGS = {}   # folder -> {"baseUrl": Path, "paths": {pattern: [targets]}} or None, once per run
-
-
-@checked
-def _tsconfig(data: dict) -> dict:
-    return data
-
-
-def _jsonc(text: str):
-    """tsconfig.json is JSON with comments and trailing commas."""
-    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-    return _tsconfig(json.loads(re.sub(r",\s*([}\]])", r"\1", text)))
-
-
-def _own_options(data: dict, cfg: Path) -> dict:
-    """baseUrl (resolved) and paths declared in this file; paths without a baseUrl are relative to the file."""
-    opts = data.get("compilerOptions") or {}
-    out = {}
-    if opts.get("baseUrl"):
-        out["baseUrl"] = (cfg.parent / opts["baseUrl"]).resolve()
-    if opts.get("paths"):
-        out["paths"] = opts["paths"]
-        out.setdefault("baseUrl", cfg.parent.resolve())
-    return out
-
-
-def _linked_configs(data: dict, cfg: Path) -> list:
-    """The files `extends` and (solution-style tsconfigs) `references` point to."""
-    links = ([data["extends"]] if isinstance(data.get("extends"), str) else []) + [r.get("path", "") for r in data.get("references", [])]
-    return [(cfg.parent / (link if link.endswith(".json") else link + "/tsconfig.json")).resolve() for link in links if link]
-
-
-def _ts_options(cfg: Path, seen: set = None) -> dict:
-    """baseUrl and paths of a tsconfig, following `extends` and `references`; the nearest declaration wins."""
-    seen = seen or set()
-    if cfg in seen or not cfg.is_file():
-        return {}
-    seen.add(cfg)
-    try:
-        data = _jsonc(cfg.read_text(encoding="utf-8", errors="replace"))
-    except ValueError:
-        return {}
-    out = _own_options(data, cfg)
-    for linked in _linked_configs(data, cfg):
-        for k, v in _ts_options(linked, seen).items():
-            out.setdefault(k, v)
-    return out
-
-
-def _ts_config_for(f: Path) -> dict:
-    """The options of the nearest tsconfig.json / jsconfig.json at or above the file, inside the project."""
-    for folder in [f.parent, *f.parent.parents]:
-        if folder in _TS_CONFIGS:
-            return _TS_CONFIGS[folder]
-        cfg = next((folder / n for n in ("tsconfig.json", "jsconfig.json") if (folder / n).is_file()), None)
-        if cfg or folder == ROOT.resolve() or not folder.is_relative_to(ROOT.resolve()):
-            _TS_CONFIGS[folder] = _ts_options(cfg) if cfg else {}
-            return _TS_CONFIGS[folder]
-    return {}
-
-
-def _alias_bases(spec: str, f: Path) -> list:
-    """Where a bare specifier may live: tsconfig `paths` patterns (`@/*` -> `src/*`), then `baseUrl` itself."""
-    cfg = _ts_config_for(f)
-    if not cfg:
-        return []
-    bases = []
-    for pattern, targets in (cfg.get("paths") or {}).items():
-        prefix = pattern.split("*")[0]
-        if spec.startswith(prefix) and (("*" in pattern) or spec == pattern):
-            rest = spec[len(prefix):]
-            bases += [cfg["baseUrl"] / t.replace("*", rest) for t in targets]
-    return bases + [cfg["baseUrl"] / spec]
-
-
-def _resolve_js(base: Path):
-    cands = [base] + [base.with_name(base.name + e) for e in JS_SUFFIXES] + [base / f"index{e}" for e in JS_SUFFIXES]   # `./activate.service` + `.ts`: with_suffix would replace `.service`
-    return next((c for c in cands if c.is_file()), None)
-
-
-def js_module_edges(f: Path):
-    out = []
-    for m in JS_IMPORT.finditer(f.read_text(encoding="utf-8", errors="replace")):
-        spec = next(g for g in m.groups() if g)
-        bases = [f.parent / spec] if spec.startswith(".") else _alias_bases(spec, f)
-        hit = next((h for h in map(_resolve_js, bases) if h), None)
-        if hit:
-            out.append(hit)
-    return out
-
-
-RS_USE = re.compile(r"^\s*(?:pub\s+)?(?:use|mod)\s+([A-Za-z_:][\w:]*)", re.M)
-
-
-def _rust_base(m, f: Path, crate_root: Path):
-    """(folder to resolve from, remaining path segments) for a `use`/`mod` line, or None when it is external."""
-    path = m.group(1).split("::")
-    if path[0] == "crate":
-        return crate_root, path[1:]
-    if path[0] == "super":
-        return f.parent.parent, path[1:]
-    if path[0] == "self":
-        return f.parent, path[1:]
-    if m.group(0).lstrip().startswith(("mod", "pub mod")):
-        return (f.parent if f.name in ("mod.rs", "lib.rs", "main.rs") else f.with_suffix("")), path
-    return None
-
-
-def _rust_resolve(base: Path, path: list):
-    for n in range(len(path), 0, -1):
-        cand = base.joinpath(*path[:n])
-        hit = next((c for c in (cand.with_suffix(".rs"), cand / "mod.rs") if c.is_file()), None)
-        if hit:
-            return hit
-    return None
-
-
-def rust_module_edges(f: Path):
-    text = f.read_text(encoding="utf-8", errors="replace")
-    crate_root = next((p for p in f.parents if (p / "Cargo.toml").exists()), f.parent) / "src"
-    out = []
-    for m in RS_USE.finditer(text):
-        where = _rust_base(m, f, crate_root)
-        hit = _rust_resolve(*where) if where else None
-        if hit:
-            out.append(hit)
-    return out
+def _dynamic_import(call: ast.Call) -> str:
+    """The module a literal `importlib.import_module("a.b")` or `__import__("a")` names, else ''."""
+    fn = call.func
+    name = fn.id if isinstance(fn, ast.Name) else (f"{fn.value.id}.{fn.attr}" if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) else "")
+    first = call.args[0] if call.args else None
+    if name in DYNAMIC_IMPORTS and isinstance(first, ast.Constant) and isinstance(first.value, str) and not first.value.startswith("."):
+        return first.value
+    return ""
 
 
 JAVA_IMPORT = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)\s*;", re.M)
@@ -218,7 +107,7 @@ JAVA_IMPORT = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)\s*;", re.M)
 
 JAVA_PACKAGE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.M)
 JAVA_WILDCARD = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)\.\*\s*;", re.M)
-JAVA_NOISE = re.compile(r"//[^\n]*|/\*.*?\*/|\"(?:\\.|[^\"\\])*\"", re.S)   # comments and string literals carry no references
+JAVA_QUALIFIED = re.compile(r"(?<![\w.])((?:[a-z_]\w*\.)+[A-Z]\w*)")   # `com.acme.billing.Invoice` written in the code
 
 
 def _java_package(text: str) -> str:
@@ -226,11 +115,15 @@ def _java_package(text: str) -> str:
     return m.group(1) if m else ""
 
 
-def _java_imports(text: str, paths: dict) -> list:
-    """Explicit class imports resolved to project files (the longest path suffix that exists)."""
+def _java_imports(text: str, paths: dict, used: set = None) -> list:
+    """Explicit class imports resolved to project files (the longest path suffix that exists). With `used` (the
+    names the code writes), an import whose class or member is never written (a Javadoc-only import) is no edge."""
     out = []
     for m in JAVA_IMPORT.finditer(text):
         parts = m.group(1).split(".")
+        named = set(parts[-2:]) if "static" in m.group(0).split() else {parts[-1]}   # a static import names a member of a class
+        if used is not None and not used & named:
+            continue
         hit = next((paths[k] for n in range(len(parts), 0, -1) if (k := "/".join(parts[:n])) in paths), None)
         if hit:
             out.append(hit)
@@ -246,12 +139,21 @@ def _java_visible(text: str, idx: dict) -> dict:
     return visible
 
 
+def _java_qualified(code: str, paths: dict) -> list:
+    """Classes named by their full name in the code, without an import: `new com.acme.billing.Invoice()`."""
+    names = {m.group(1) for m in JAVA_QUALIFIED.finditer(code)}
+    return [paths[k] for k in sorted("/".join(n.split(".")) for n in names) if k in paths and "/" in k]
+
+
 def java_module_edges(f: Path, idx: dict):
     text = f.read_text(encoding="utf-8", errors="replace")
-    out = _java_imports(text, idx["paths"])
-    visible = _java_visible(text, idx)
-    named = set(re.findall(r"\b([A-Z]\w*)\b", JAVA_NOISE.sub(" ", text))) - {f.stem}
-    return out + [visible[n] for n in sorted(named) if n in visible]
+    code = strip_strings(text, "java")   # comments and string literals carry no references
+    body = "\n".join(l for l in code.splitlines() if not l.lstrip().startswith(("import ", "package ")))
+    out = _java_imports(text, idx["paths"], set(re.findall(r"\b\w+\b", body)))
+    imported = {m.group(1).split(".")[-1] for m in JAVA_IMPORT.finditer(text)}   # a single-type import shadows the package's class
+    visible = {n: v for n, v in _java_visible(text, idx).items() if n not in imported}
+    named = set(re.findall(r"\b([A-Z]\w*)\b", body)) - {f.stem}
+    return out + [visible[n] for n in sorted(named) if n in visible] + _java_qualified(body, idx["paths"])
 
 
 def _java_index(files) -> dict:
@@ -265,7 +167,7 @@ def _java_index(files) -> dict:
     return idx
 
 
-def _edges_of(f: Path, idx: dict) -> list:
+def _edges_of(f: Path, idx: dict, ownership: bool = True) -> list:
     lang = EXT[f.suffix]
     if lang == "python":
         return py_module_edges(f, idx["py"])
@@ -274,17 +176,18 @@ def _edges_of(f: Path, idx: dict) -> list:
     if lang == "abap":
         import abapdeps
         return abapdeps.module_edges(f, idx["abap"])
-    return rust_module_edges(f) if lang == "rust" else java_module_edges(f, idx["java"])
+    return rust_module_edges(f, ownership) if lang == "rust" else java_module_edges(f, idx["java"])
 
 
-def module_graph(roots):
-    """(nodes, edges) over the files of the roots; an ABAP object's part files fold into the file that stands for it."""
+def module_graph(roots, ownership: bool = True):
+    """(nodes, edges) over the files of the roots; an ABAP object's part files fold into the file that stands for it.
+    `ownership=False` leaves out Rust's `mod x;` declarations (a module declared is not a module used)."""
     import abapdeps
     files = list(source_files(roots))
     idx = {"py": python_index(files), "java": _java_index(files), "abap": abapdeps.index(files)}
     node_of = {f: rel(abapdeps.node_of(f, idx["abap"])) for f in files}
     nodes = set(node_of.values())
-    edges = {(node_of[f], node_of.get(t, rel(t))) for f in files for t in _edges_of(f, idx) if node_of.get(t, rel(t)) != node_of[f] and node_of.get(t, rel(t)) in nodes}
+    edges = {(node_of[f], node_of.get(t, rel(t))) for f in files for t in _edges_of(f, idx, ownership) if node_of.get(t, rel(t)) != node_of[f] and node_of.get(t, rel(t)) in nodes}
     return nodes, edges  # an import of an asset (lock.svg, package.json) or of a file outside the roots is not an edge
 
 

@@ -1,4 +1,4 @@
-aix code graph | complexity | dead | clones | style | defensive | security | vulnerabilities | stats   [TARGET...] [--gate] [--report]
+aix code graph | complexity | dead | clones | isolations | affected | style | defensive | security | vulnerabilities | stats   [TARGET...] [--gate] [--report]
 
 Three tools on one engine (.aix/scripts/graph.py). All read the same dependency graph of the project's source
 (Python, JS/TS, Rust, Java; modules, or functions with --functions); PATH... limits the folders. ABAP: modules are abapGit objects, edges the names a file uses, --functions resolves calls through declared types, security has its own rows (aix help code security), the taint walk follows a screen field, sy-ucomm, a remote function module's parameter or a request field to those sinks (aix help code vulnerabilities).
@@ -6,6 +6,9 @@ Three tools on one engine (.aix/scripts/graph.py). All read the same dependency 
                       cycles, upward dependencies, hubs, propagation cost, NCCD, folder Q.  alias: complexity
   aix code dead       dead code: modules no entry point reaches; with --functions, Python functions never referenced
   aix code clones     duplicated functions: exact groups (same structure) and near-clones (--similarity PCT)
+  aix code isolations the declared parts of the code, who may use whom, what each exposes, the contracts, the data
+                      boundaries, governed by an ADR; --propose drafts them from the code, --context guides an agent
+  aix code affected   the tests a change reaches through the graph (--plain for a test runner)
   aix code style      readability per function: lines, cognitive/cyclomatic complexity, nesting, parameters,
                       names, docstring, magic numbers; one function = a card with line-numbered advice
   aix code defensive  how guarded the Python is: typed functions, pydantic models and strict mode, outside data
@@ -19,4 +22,4 @@ Three tools on one engine (.aix/scripts/graph.py). All read the same dependency 
   aix code find       which folders hold code: a checklist that sets paths.code_roots in .aix/config.yaml, the
                       default scope of every command above (also run at the end of aix install)
 --gate turns each into a CI check; --report writes docs/tests/dependency-graph.md; aix code graph --selftest
-proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code style | code defensive | code security | code vulnerabilities | code licenses | code sbom | code stats.
+proves the arithmetic on known-answer cases. Details: aix help code graph | code dead | code clones | code isolations | code affected | code style | code defensive | code security | code vulnerabilities | code licenses | code sbom | code stats.

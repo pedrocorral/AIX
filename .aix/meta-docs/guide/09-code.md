@@ -27,6 +27,19 @@ the code already has the ideal shape. Also: stable nodes, propagation cost, NCCD
 node's level and role. `--gate` fails on any CUT; `--max-distance N` caps the edits. `--report` writes
 `docs/tests/dependency-graph.md`. Each edit names the refactor skill that does it: `refactor-cycle`, `refactor-hub`.
 
+## Isolations: `aix code isolations`
+Names the parts of the code (a domain, a layer, a persistence and its implementations) in
+`docs/requirements/isolations.yaml` and says who may use whom and which files each part exposes. Anything not
+declared is forbidden; a dot nests a part in its parent (`app.persistence.postgres`). `--propose --write` drafts the
+declaration from the code: what each part uses today, minus the edges that close a cycle or point up the layers
+(listed to fix), and the files outside code uses today. `--accept` records each exposed file's public names (the
+contract) and writes an ADR a person accepts: the gate fails until an accepted ADR carries the fingerprint of the
+rules, so an agent cannot widen them to pass. The check reports FORBIDDEN and HIDDEN imports, UNDECLARED files,
+BREAKING contract changes and DATA boundaries (declared fields kept inside their parts and out of logs and HTTP
+calls). Before editing, an agent runs `--context PATH` for the files it may read and the parts it must not use.
+`--codeowners --write` turns the owners into CODEOWNERS; `--requirements` maps `@implements` markers onto the parts.
+`aix code affected` lists the tests a change reaches through the same graph. Rules: `architecture/isolations.md`.
+
 ## Dead code and clones
 `aix code dead` lists modules no entry point reaches and, with `--functions`, Python functions never referenced.
 `aix code clones` lists duplicated functions: exact groups and near clones (`--similarity PCT`). Skills:
@@ -62,5 +75,5 @@ dependencies (OSV, needs network), secrets in git history. `--audit` writes the 
 
 ## Reports and gates
 `--report` on graph, style, security, stats and vulnerabilities writes under `docs/tests/`; those files are
-generated and ignored by git. The gates, `aix code graph --gate`, `aix code style --gate`,
+generated and ignored by git. The gates, `aix code graph --gate`, `aix code isolations --gate`, `aix code style --gate`,
 `aix code defensive --gate`, `aix code security --gate`, `aix docs security --gate`, exit 1 for CI.
