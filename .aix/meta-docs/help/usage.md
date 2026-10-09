@@ -46,13 +46,18 @@ The code                              (aix code ...; Python, JS/TS, Rust, Java, 
                                       duplicated functions: exact groups (same structure, other names/literals)
                                       and near-clones above the threshold (default 70 %)
   aix code isolations [PATH...] [--gate] [--report]
-                                      the declared isolations (docs/requirements/isolations.yaml): who may use
-                                      whom, what each exposes; FORBIDDEN, HIDDEN, UNDECLARED, BREAKING contract,
+                                      the declared isolations (docs/requirements/isolations.yaml): how deep
+                                      outsiders reach (frontiers); PENDING, HIDDEN, UNDECLARED, BREAKING,
                                       DATA boundary, GOVERNANCE (an accepted ADR carries the rules' fingerprint)
-      --propose [--depth N] [--write] the isolations AIX recommends from the code, defects left out and listed
+      --propose [--depth N] [--write] the isolations AIX recommends from the code, frontiers proposed, defects listed
+      --review                        accept or reject each proposed frontier (terminal checklist)
       --accept                        record the contracts, write the ADR a person accepts
       --context PATH|NAME             what an agent may use and read before it edits there
       --codeowners [--write] | --requirements   CODEOWNERS from the owners; requirements by isolation
+  aix code tests [PATH...] [--untested] [--gate] [--report]
+                                      every module of the tree with the tests that import it; NO TESTS alerts
+      --priority [--top N]            the functions to test first: call paths x complexity
+      --affected [--base REF] [--plain]   the tests a change reaches (also: aix code affected)
   aix code affected [--base REF] [--plain]
                                       the tests a change reaches through the import graph
   aix code defensive [PATH...] [--all] [--gate] [--report]

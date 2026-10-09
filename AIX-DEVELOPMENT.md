@@ -86,7 +86,9 @@ AIX/
 │   ├── jsedges.py, rustedges.py   # leaves: JS/TS imports (tsconfig paths, monorepo workspaces, `.js` -> `.ts`) and Rust paths (use trees, `super`, re-exports, globs, workspace crates) to files
 │   ├── isodecl.py, isorules.py   # leaves: the isolation declaration (parse, check, nesting, membership, fingerprint) and the verdict on one edge (FORBIDDEN, HIDDEN)
 │   ├── isosurface.py, isogov.py   # leaves: a file's contract (public names, signatures, what breaks a caller) and the governance (ADR fingerprint, recorded contracts, CODEOWNERS)
+│   ├── isoedit.py, isoreview.py   # leaves: one isolation's block rewritten in the declaration; the review of proposed frontiers (evidence, decisions)
 │   ├── isopropose.py, isocontext.py, isodata.py, isotrace.py   # leaves: the recommended isolations, an agent's context, the data boundaries, requirements by isolation
+│   ├── codetests.py         # `aix code tests`: tests by module (NO TESTS), test priority by reach x complexity, --affected
 │   ├── isolations.py, affected.py   # `aix code isolations` (check, gate, propose, accept, context, codeowners, requirements) and `aix code affected` (the tests a change reaches)
 │   ├── implants.py          # leaf: supply-chain implants (PolinRider): padded config files, code after the export, folder-open tasks, text fonts, install hooks, history growth
 │   ├── skillsec.py          # leaf: the dangerous shapes of a skill or instruction file (hidden character, instruction comment, base64 blob, fetch-and-run, read-secret-and-send, override phrase) for `aix skills security` and `aix skills add`

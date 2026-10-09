@@ -29,16 +29,27 @@ node's level and role. `--gate` fails on any CUT; `--max-distance N` caps the ed
 
 ## Isolations: `aix code isolations`
 Names the parts of the code (a domain, a layer, a persistence and its implementations) in
-`docs/requirements/isolations.yaml` and says who may use whom and which files each part exposes. Anything not
-declared is forbidden; a dot nests a part in its parent (`app.persistence.postgres`). `--propose --write` drafts the
-declaration from the code: what each part uses today, minus the edges that close a cycle or point up the layers
-(listed to fix), and the files outside code uses today. `--accept` records each exposed file's public names (the
+`docs/requirements/isolations.yaml`, how deep code outside each part may reach into it (its frontiers: `"."` limits
+it to its top level, an accepted folder opens the way down to it); everything they do not limit is allowed. A dot
+nests a part in its parent (`app.persistence.postgres`), and a part may set its own frontiers inside its parent's.
+`--propose --write` drafts the declaration from the code: frontiers at the deepest folders outside code reaches
+today, all proposed. `--review`
+accepts or rejects each frontier in a terminal checklist. `--accept` records the public names outsiders may reach (the
 contract) and writes an ADR a person accepts: the gate fails until an accepted ADR carries the fingerprint of the
-rules, so an agent cannot widen them to pass. The check reports FORBIDDEN and HIDDEN imports, UNDECLARED files,
+rules, so an agent cannot widen them to pass. The check reports PENDING frontiers, HIDDEN imports, UNDECLARED files,
 BREAKING contract changes and DATA boundaries (declared fields kept inside their parts and out of logs and HTTP
 calls). Before editing, an agent runs `--context PATH` for the files it may read and the parts it must not use.
 `--codeowners --write` turns the owners into CODEOWNERS; `--requirements` maps `@implements` markers onto the parts.
 `aix code affected` lists the tests a change reaches through the same graph. Rules: `architecture/isolations.md`.
+
+## Tests by module: `aix code tests`
+Every folder that holds code is a module, and every module needs its own tests: a test file that imports it
+directly (Rust's `#[cfg(test)]` and ABAP's `FOR TESTING` count as inline tests). `aix code tests` prints the module
+tree with each module's test files and marks the others NO TESTS; `--untested` lists only those, `--gate` fails on
+them (the advised `module-tests` step of the standard and release policies). `--priority` ranks the functions to
+test first from the call graph: the call paths that end in a function (every branch through every caller) times
+its cognitive complexity, untested first; a test calling a function by name in a file it imports tests it. `--affected` is
+`aix code affected`. A test that drives the code over HTTP or a subprocess imports nothing and is credited to none.
 
 ## Dead code and clones
 `aix code dead` lists modules no entry point reaches and, with `--functions`, Python functions never referenced.

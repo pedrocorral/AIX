@@ -1,22 +1,19 @@
 """Leaf: the isolations AIX recommends for a project, drafted from its module graph (`aix code isolations
 --propose`). One isolation per code root; one part per folder below it (the first folder that holds code, so a
 lone `app/` or `src/<package>/` wrapper is skipped), one more level of parts with `--depth 2`. A root's own files
-(main.py, the composition root) belong to the root isolation itself, which may use every part.
+(main.py, the composition root) belong to the root isolation itself.
 
-  may_use   what each part uses today, minus the edges that are defects: an edge that closes a cycle between two
-            parts (the fewest cuts, ideal.cycle_cuts) or points up the layers (graphmetrics.layer_of) is left out
-            and listed to fix, so the proposal is the code's own shape with its defects removed, not blessed
-  exposes   the files code outside the part uses today: the smallest contract the code already keeps
-Test files are exempt (they exercise internals). The draft is a starting point a person prunes: every permission
-removed is a rule the code must then keep."""
+  frontiers for each isolation "." (accepting it limits the isolation to its top level), then the deepest folders
+            code outside it reaches today, each `proposed` with its evidence (the imports reaching that deep): a
+            person accepts or rejects each one (`--review`)
+Test files are exempt (they exercise internals). Everything the frontiers do not limit is allowed. The suggestions
+also serve an existing declaration: new ones are merged in as proposed, decided ones are never touched."""
 import datetime, re
 from collections import defaultdict
 from pathlib import PurePosixPath as P
 
-from graphmetrics import is_test, layer_of
-from ideal import cycle_cuts
+from graphmetrics import is_test
 
-UNSAFE = re.compile(r"""^[\s*&!|>'"%@`{\[,#?:-]|: | #|\s$""")
 
 
 # ---- the units: which folder each file belongs to -----------------------------------------------------------------
@@ -69,58 +66,33 @@ def _unit_of(f: str, base: str, top: str, depth: int, paths: dict) -> str:
     return name
 
 
-# ---- permissions without the defects ------------------------------------------------------------------------------
-
-def _common(a: str, b: str):
-    pa, pb = a.split("."), b.split(".")
-    n = next((i for i, (x, y) in enumerate(zip(pa, pb)) if x != y), min(len(pa), len(pb)))
-    return ".".join(pa[:n]) or None
-
-
-def _tops(a: str, b: str) -> tuple:
-    """The two siblings below the nearest common isolation on the way to a and to b."""
-    c = _common(a, b)
-    depth = c.count(".") + 1 if c else 0
-    return ".".join(a.split(".")[:depth + 1]), ".".join(b.split(".")[:depth + 1])
-
-
-def unit_edges(owner: dict, edges: set) -> tuple:
-    """((sibling, sibling) -> the file edges behind it, isolation -> the sibling pairs its files use). Pairs are taken
-    below the nearest common isolation; every isolation from the user up to its sibling records the pair, because
-    a part that declares may_use lists everything it uses. A parent's own files using its parts, and a part using
-    its parent, need no permission."""
-    pairs, users = defaultdict(list), defaultdict(set)
-    for a, b in edges:
-        A, B = owner.get(a), owner.get(b)
-        if not A or not B or A == B or B.startswith(A + ".") or A.startswith(B + "."):
-            continue
-        pair = _tops(A, B)
-        pairs[pair].append((a, b))
-        for n in _chain(A)[:_chain(A).index(pair[0]) + 1]:
-            users[n].add(pair)
-    return pairs, users
-
-
-def defects(paths: dict, uedges: dict) -> dict:
-    """(part, part) -> why it is left out of the proposal: closes a cycle, or points up the layers."""
-    out = {}
-    for arc, members in cycle_cuts(set(n for e in uedges for n in e), set(uedges)).items():
-        out[arc] = f"closes a cycle among {', '.join(sorted(members))}"
-    for a, b in uedges:
-        la, lb = layer_of(paths[a][0].rstrip("/*")), layer_of(paths[b][0].rstrip("/*"))
-        if la is not None and lb is not None and la < lb:
-            out.setdefault((a, b), f"points up the layers ({a}: layer {la}, {b}: layer {lb})")
-    return out
-
-
-def exposes(owner: dict, edges: set, paths: dict) -> dict:
-    """isolation -> the files code outside it uses today."""
-    out = {n: set() for n in paths}
+def _outside_reach(owner: dict, edges: set) -> dict:
+    """isolation -> {folder of a file outside code reaches, relative to the file's path: import count}, per
+    isolation of the file's chain (a file of a part is inside its parent too)."""
+    out = defaultdict(lambda: defaultdict(int))
     for a, b in edges:
         A, B = owner.get(a), owner.get(b)
         for n in _chain(B or ""):
             if A and not (A == n or A.startswith(n + ".")):
-                out[n].add(b)
+                out[n][str(P(b).parent)] += 1
+    return out
+
+
+def _deepest(folders: dict, base: str) -> dict:
+    """{frontier relative to base: imports}: the reached folders that are not on the way to a deeper reached one."""
+    rel = {("." if f == base else f[len(base) + 1:] if base != "." else f): n for f, n in folders.items()}
+    return {f: n for f, n in rel.items() if not any(o != f and (f == "." or o.startswith(f + "/")) for o in rel)}
+
+
+def frontier_suggestions(owner: dict, edges: set, bases: dict) -> dict:
+    """isolation -> {frontier: imports reaching that deep}. Always the top level "." (accepting it limits the isolation;
+    its count is every import from outside), then the deepest folders reached below it."""
+    reach = _outside_reach(owner, edges)
+    out = {}
+    for n, base in bases.items():
+        if base is not None:
+            deeper = {f: c for f, c in _deepest(reach.get(n, {}), base).items() if f != "."}
+            out[n] = {".": sum(reach.get(n, {}).values()), **deeper}
     return out
 
 
@@ -131,20 +103,10 @@ def _chain(name: str) -> list:
 
 # ---- the draft --------------------------------------------------------------------------------------------------
 
-def _permitted(users: dict, cut: dict) -> dict:
-    """isolation -> the siblings it may use: what its files use, the defect pairs left out."""
-    return {n: {pair[1] for pair in used if pair not in cut} for n, used in users.items()}
-
-
-def _specs(paths: dict, shown: dict, may_use: dict) -> dict:
-    """The declaration of each isolation, parents first. A part always declares may_use (an empty list too)."""
-    isos = {}
-    for n in sorted(paths, key=lambda x: (x.count("."), x)):
-        spec = {"paths": paths[n], "exposes": sorted(shown[n])}
-        if n.count(".") or may_use.get(n):
-            spec["may_use"] = sorted(may_use.get(n, ()))
-        isos[n] = spec
-    return isos
+def _specs(paths: dict, frontiers: dict) -> dict:
+    """The declaration of each isolation, parents first, every frontier proposed ("." first)."""
+    return {n: {"paths": paths[n], "frontiers": {f: "proposed" for f in sorted(frontiers.get(n, {".": 0}), key=lambda f: (f != ".", f))}}
+            for n in sorted(paths, key=lambda x: (x.count("."), x))}
 
 
 def _without_tests(roots: list, files: list, edges: set) -> tuple:
@@ -153,37 +115,37 @@ def _without_tests(roots: list, files: list, edges: set) -> tuple:
             {e for e in edges if not is_test(e[0]) and not is_test(e[1])})
 
 
+def bases_of(paths: dict) -> dict:
+    """isolation -> the folder its frontiers are relative to (`src/orders/**` -> `src/orders`)."""
+    from isodecl import base_folder
+    return {n: base_folder(globs) for n, globs in paths.items()}
+
+
 def propose(roots: list, files: list, edges: set, depth: int = 1) -> tuple:
-    """(declaration as a dict, the defects left out as [(from, to, why, example edge)])."""
+    """(declaration as a dict, the frontier evidence {isolation: {frontier: imports}})."""
     roots, code, edges = _without_tests(roots, files, edges)
     owner, paths = units(roots, code, depth)
-    uedges, users = unit_edges(owner, edges)
-    cut = defects(paths, uedges)
-    kept = edges - {e for pair in cut for e in uedges[pair]}   # a file reached only by a defect is not part of a contract
-    isos = _specs(paths, exposes(owner, kept, paths), _permitted(users, cut))
-    left_out = [(a, b, why, sorted(uedges[(a, b)])[0]) for (a, b), why in sorted(cut.items())]
-    return {"tests": "exempt", "isolations": isos}, left_out
+    evidence = frontier_suggestions(owner, edges, bases_of(paths))
+    return {"tests": "exempt", "isolations": _specs(paths, evidence)}, evidence
 
 
-def _q(v: str) -> str:
-    return '"' + v.replace('"', '\\"') + '"' if UNSAFE.search(v) else v
+def evidence_lines(evidence: dict) -> list:
+    """Comment lines: why each frontier is proposed."""
+    return [f"#   {n} {f}: " + (("limit it to its top level; " if f == "." else "open down to here; ") + (f"{c} import(s) from outside" if c else "nothing outside reaches in"))
+            for n, fs in sorted(evidence.items()) for f, c in sorted(fs.items(), key=lambda kv: (kv[0] != ".", kv[0]))]
 
 
-def _flow(values: list) -> str:
-    return "[" + ", ".join(_q(str(v)) for v in values) + "]"
-
-
-def to_yaml(decl: dict, left_out: list) -> str:
-    """The draft as the declaration file, with the defects it left out as comments."""
+def to_yaml(decl: dict, evidence: dict = None) -> str:
+    """The draft as the declaration file, with the evidence behind each frontier."""
+    from isoedit import render_block
     today = datetime.date.today().isoformat()
     lines = [f"# Isolations proposed by `aix code isolations --propose` on {today}, from the code as it is.",
-             "# Prune it: every may_use entry or exposed file you remove is a rule the code must then keep.",
-             "# `aix code isolations --accept` records the contracts and writes the ADR a person accepts.", "",
+             "# Every frontier is `proposed`: `aix code isolations --review` accepts or rejects each one. Everything the",
+             "# frontiers do not limit is allowed. `--accept` records the contracts and writes the ADR a person accepts.", "",
              f"tests: {decl.get('tests', 'exempt')}", "isolations:"]
     for name, spec in decl["isolations"].items():
-        lines.append(f"  {name}:")
-        lines += [f"    {key}: {_flow(spec[key])}" for key in ("paths", "exposes", "may_use") if key in spec]
-    if left_out:
-        lines += ["", "# Left out (defects to fix, not permissions):"]
-        lines += [f"#   {a} -> {b}: {why} (e.g. {ea} -> {eb})" for a, b, why, (ea, eb) in left_out]
+        lines += render_block(name, spec)
+    if evidence:
+        lines += ["", "# Frontiers proposed: \".\" limits the isolation to its top level, a folder opens the way down to it",
+                  "# (the deepest folders code outside reaches today):", *evidence_lines(evidence)]
     return "\n".join(lines) + "\n"

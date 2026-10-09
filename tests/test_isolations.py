@@ -1,9 +1,10 @@
-"""`aix code isolations` and `aix code affected`: the named parts of the code, who may use whom, what each exposes,
-the contracts, the data boundaries and the ADR that governs them. The rules on small declarations (a family: the
-parent's files use its parts, a part uses its parent, siblings are free until one declares may_use; a top
-isolation uses only what it names; every isolation entered must expose the file); the declaration's own errors
-(a widening part, a part outside its parent, a file in two isolations); the proposal (the code's shape minus its
-defects: a cycle and an upward edge left out, and nothing else found); contracts (a removed name or a new required
+"""`aix code isolations` and `aix code affected`: the named parts of the code, who may use whom, how deep outsiders
+reach (frontiers), the contracts, the data boundaries and the ADR that governs them. The rules on small declarations
+(frontiers: an accepted top level limits, an accepted folder opens the way down to it, a rejected one stays closed,
+no accepted frontier limits nothing, everything they do not limit is allowed; a parent's files use its parts' top
+level, a part uses its parent's files); the declaration's own errors
+(a removed key, a part outside its parent, a file in two isolations); the proposal (frontiers from today's reach,
+nothing else found once accepted); the review menu; contracts (a removed name or a new required
 parameter breaks, a new optional one does not); data (a field outside its isolation, a field reaching a logger
 through a local); governance (no ADR, a proposed one, an accepted one, a changed declaration); then the command
 end to end in a project, and the tests a change reaches."""
@@ -31,62 +32,63 @@ def kinds(d, edges) -> dict:
 
 
 FAMILY = {
-    "app": {"paths": ["src/**"], "exposes": []},
-    "app.orders": {"paths": ["src/orders/**"], "exposes": ["src/orders/api.py"], "may_use": ["app.persistence"]},
-    "app.billing": {"paths": ["src/billing/**"], "exposes": ["src/billing/api.py"]},
-    "app.persistence": {"paths": ["src/persistence/**"], "exposes": ["src/persistence/ports.py", "src/persistence/factory.py"]},
-    "app.persistence.postgres": {"paths": ["src/persistence/postgres/**"], "exposes": ["src/persistence/postgres/repo.py"], "may_use": []},
+    "app": {"paths": ["src/**"], "frontiers": {".": "accepted"}},
+    "app.orders": {"paths": ["src/orders/**"], "frontiers": {".": "accepted"}},
+    "app.billing": {"paths": ["src/billing/**"]},
+    "app.persistence": {"paths": ["src/persistence/**"], "frontiers": {".": "accepted", "ports/sql": "accepted", "postgres": "rejected"}},
+    "app.persistence.postgres": {"paths": ["src/persistence/postgres/**"], "frontiers": {".": "accepted"}},
     "lib": {"paths": ["lib/**"]},
 }
 
 
 class Rules(unittest.TestCase):
-    def test_the_family_and_the_allow_list(self):
+    def test_frontiers_decide_everything_else_is_allowed(self):
         d = decl(FAMILY)
         got = kinds(d, [
-            ("src/main.py", "src/orders/api.py"),                          # the root's own file uses a part: exposed
-            ("src/main.py", "src/orders/internal.py"),                     # ... not exposed: hidden
-            ("src/persistence/factory.py", "src/persistence/postgres/repo.py"),   # parent's file -> its part
-            ("src/persistence/postgres/repo.py", "src/persistence/ports.py"),     # part -> its parent's file
-            ("src/persistence/postgres/repo.py", "src/persistence/helpers.py"),   # ... even one it does not expose
-            ("src/orders/api.py", "src/persistence/ports.py"),             # named in may_use, exposed
-            ("src/orders/api.py", "src/persistence/postgres/repo.py"),     # entering persistence: not exposed by it
-            ("src/orders/api.py", "src/billing/api.py"),                   # orders declares may_use without billing
-            ("src/billing/api.py", "src/orders/api.py"),                   # billing declares nothing: siblings free
-            ("src/billing/api.py", "src/orders/internal.py"),              # ... but the file must be exposed
-            ("src/persistence/postgres/repo.py", "src/orders/api.py"),     # postgres declares [] : nothing outside
-            ("src/main.py", "lib/x.py"),                                   # a top isolation names nothing
+            ("src/main.py", "src/orders/api.py"),                          # the root's own file uses a part's top level
+            ("src/main.py", "src/orders/internal/calc.py"),                # ... below orders' frontier: hidden
+            ("src/persistence/factory.py", "src/persistence/postgres/repo.py"),   # parent's file -> its part's top level
+            ("src/persistence/factory.py", "src/persistence/postgres/sql/q.py"),  # ... below the part's own frontier
+            ("src/persistence/postgres/repo.py", "src/persistence/ports.py"),     # part -> its parent's files
+            ("src/persistence/postgres/repo.py", "src/persistence/helpers/x.py"),  # ... any of them
+            ("src/orders/api.py", "src/persistence/ports.py"),             # top level
+            ("src/orders/api.py", "src/persistence/postgres/repo.py"),     # postgres was rejected: stays closed
+            ("src/orders/api.py", "src/persistence/ports/sql/q.py"),       # the accepted frontier
+            ("src/orders/api.py", "src/persistence/ports/sql/internal/z.py"),   # deeper than the frontier
+            ("src/orders/api.py", "src/persistence/ports/x.py"),           # on the way down to the frontier
+            ("src/orders/api.py", "src/billing/deep/inner/x.py"),          # billing has no frontier: open
+            ("src/billing/api.py", "src/orders/internal/calc.py"),         # siblings: only as deep as the frontiers allow
+            ("src/persistence/postgres/repo.py", "src/orders/api.py"),     # no direction rule: allowed
+            ("src/main.py", "lib/deep/x.py"),                              # lib has no frontier: open
         ])
-        self.assertEqual(list(got.values()), [None, "HIDDEN", None, None, None, None, "HIDDEN", "FORBIDDEN", None, "HIDDEN", "FORBIDDEN", "FORBIDDEN"], got)
+        self.assertEqual(list(got.values()), [None, "HIDDEN", None, "HIDDEN", None, None, None, "HIDDEN", None, "HIDDEN", None, None, "HIDDEN", None, None], got)
 
-    def test_naming_a_part_enters_it_directly(self):
-        spec = dict(FAMILY, wiring={"paths": ["wiring/**"], "may_use": ["app.persistence.postgres"]})
-        d = decl(spec)
-        self.assertIsNone(isorules.judge(d, "wiring/main.py", "src/persistence/postgres/repo.py"), "named: entered at the part, which exposes the file")
-        self.assertEqual(isorules.judge(d, "wiring/main.py", "src/persistence/ports.py").kind, "FORBIDDEN", "the parent itself is not named")
+    def test_no_accepted_frontier_limits_nothing(self):
+        open_ = decl({"a": {"paths": ["a/**"]}, "b": {"paths": ["b/**"], "frontiers": {".": "rejected", "deep": "proposed"}}})
+        self.assertIsNone(isorules.judge(open_, "a/x.py", "b/deep/inner/y.py"), "rejecting the top level keeps b open; a proposal is not in force")
+        self.assertEqual(isorules.pending_frontiers(open_), [("b", "deep")])
 
     def test_declaration_errors(self):
         d = decl({
             "app": {"paths": ["src/**"], "may_use": ["lib"], "colour": "red"},
-            "app.orders": {"paths": ["src/orders/**", "other/**"], "may_use": ["ghost", "billing"]},
-            "lib": {"paths": ["lib/**"], "exposes": ["src/orders/api.py"]},
+            "app.orders": {"paths": ["src/orders/**", "other/**"], "frontiers": {".": "accepted"}},
+            "lib": {"paths": ["lib/**"], "frontiers": {"deep": "maybe"}, "exposes": ["lib/a.py"]},
             "billing": {"paths": ["src/orders/x.py"]},
             "x.y": {"paths": ["x/**"]},
         }, data={"card": {"fields": ["pan"], "stays_in": ["nowhere"]}})
         isodecl.check_files(d, ["src/orders/api.py", "other/o.py", "src/orders/x.py", "lib/l.py"])
         text = "\n".join(d.errors)
-        for expected in ("unknown key `colour`", "`ghost`: no such isolation", "widens the parent: `app` may not use `billing`",
+        for expected in ("unknown key `colour`", "`may_use` is gone: everything the frontiers do not limit is allowed",
                          "parent `x` is not declared", "stays_in `nowhere`", "other/o.py, which its parent `app` does not",
-                         "`lib` exposes src/orders/api.py, which is not one of its files", "held by unrelated isolations"):
+                         "frontier `deep` has status `maybe`", "frontiers need one folder path", "`exposes` became `frontiers`",
+                         "held by unrelated isolations"):
             self.assertIn(expected, text)
 
     def test_what_nothing_uses_is_offered_for_removal(self):
         d = decl(FAMILY)
         edges = {("src/main.py", "src/orders/api.py")}
-        files = ["src/main.py", "src/orders/api.py", "src/billing/api.py", "src/persistence/ports.py"]
-        self.assertIn(("app.orders", "app.persistence"), isorules.unused_permissions(d, edges))
-        self.assertIn(("app.billing", "src/billing/api.py"), isorules.unused_exposes(d, edges, files))
-        self.assertNotIn(("app.orders", "src/orders/api.py"), isorules.unused_exposes(d, edges, files))
+        self.assertIn(("app.persistence", "ports/sql"), isorules.unused_frontiers(d, edges), "nothing outside reaches that deep")
+        self.assertNotIn(("app.persistence", "ports/sql"), isorules.unused_frontiers(d, edges | {("src/orders/api.py", "src/persistence/ports/sql/q.py")}))
 
     def test_globs(self):
         rx = isodecl.glob_regex
@@ -98,37 +100,32 @@ class Rules(unittest.TestCase):
 
 
 class Proposal(unittest.TestCase):
-    FILES = ["src/main.py", "src/orders/api.py", "src/orders/rules.py", "src/billing/api.py", "src/models/order.py",
-             "src/services/pay.py", "src/shared/money.py", "tests/test_x.py"]
+    FILES = ["src/main.py", "src/orders/api.py", "src/orders/rules.py", "src/billing/api.py", "src/shared/money.py",
+             "src/shared/fmt/text.py", "src/shared/fmt/inner/deep.py", "tests/test_x.py"]
     EDGES = {("src/main.py", "src/orders/api.py"), ("src/orders/api.py", "src/billing/api.py"), ("src/billing/api.py", "src/orders/rules.py"),
-             ("src/orders/api.py", "src/shared/money.py"), ("src/models/order.py", "src/services/pay.py"), ("tests/test_x.py", "src/orders/rules.py")}
+             ("src/orders/api.py", "src/shared/money.py"), ("src/orders/api.py", "src/shared/fmt/text.py"), ("tests/test_x.py", "src/shared/fmt/inner/deep.py")}
 
-    def test_the_code_minus_its_defects(self):
-        raw, left_out = isopropose.propose(["src", "tests"], self.FILES, self.EDGES)
+    def test_frontiers_from_todays_reach(self):
+        raw, evidence = isopropose.propose(["src", "tests"], self.FILES, self.EDGES)
         isos = raw["isolations"]
-        self.assertEqual(sorted(isos), ["src", "src.billing", "src.models", "src.orders", "src.services", "src.shared"], "tests are exempt, not an isolation")
-        reasons = {(a, b): why for a, b, why, _e in left_out}
-        self.assertIn("src/orders/api.py", isos["src.orders"]["exposes"], "what outside code uses")
-        self.assert_exposed_only_for_kept_edges(isos, {e for _a, _b, _why, e in left_out})
-        self.assertIn("points up the layers", reasons[("src.models", "src.services")])
-        self.assertEqual(len([k for k, why in reasons.items() if "cycle" in why]), 1, "one cut breaks the orders/billing cycle")
+        self.assertEqual(sorted(isos), ["src", "src.billing", "src.orders", "src.shared"], "tests are exempt, not an isolation")
+        self.assertEqual(isos["src.shared"]["frontiers"], {".": "proposed", "fmt": "proposed"}, "the top level, then the deepest folder outside code reaches (the test's deeper reach does not count)")
+        self.assertTrue(all(spec["frontiers"].get(".") == "proposed" for spec in isos.values()), "every isolation: the limit itself is a decision")
+        self.assertEqual(evidence["src.shared"], {".": 2, "fmt": 1})
+        self.assertNotIn("may_use", str(raw), "everything the frontiers do not limit is allowed")
+        for spec in isos.values():
+            spec["frontiers"] = {f: "accepted" for f in spec["frontiers"]}
         d = isodecl.Decl(raw); isodecl.check_shape(d)
         isodecl.check_files(d, [f for f in self.FILES if not f.startswith("tests/")])
         self.assertEqual(d.errors, [])
-        flagged = {(a, b) for a, b in self.EDGES if not a.startswith("tests/") and isorules.judge(d, a, b)}
-        self.assertEqual(len(flagged), 2, f"only the left-out edges fail: {flagged}")
-
-    def assert_exposed_only_for_kept_edges(self, isos: dict, cut: set):
-        kept_targets = {b for a, b in self.EDGES if (a, b) not in cut}
-        for n, spec in isos.items():
-            self.assertFalse(set(spec["exposes"]) - kept_targets, f"{n} exposes a file only a defect reaches")
+        self.assertFalse({e for e in self.EDGES if not e[0].startswith("tests/") and isorules.judge(d, *e)}, "the accepted proposal keeps every edge of today")
 
     def test_yaml_round_trip(self):
-        raw, left_out = isopropose.propose(["src"], self.FILES[:-1], self.EDGES)
+        raw, evidence = isopropose.propose(["src"], self.FILES[:-1], self.EDGES)
         from yamlmini import parse_tree
-        text = isopropose.to_yaml(raw, left_out)
+        text = isopropose.to_yaml(raw, evidence)
         self.assertEqual(parse_tree(text)["isolations"], raw["isolations"])
-        self.assertIn("# Left out (defects to fix, not permissions):", text)
+        self.assertIn("#   src.shared fmt: open down to here; 1 import(s) from outside", text)
 
 
 class Contracts(unittest.TestCase):
@@ -244,6 +241,21 @@ class Command(unittest.TestCase):
         for adr in (self.project / "docs/requirements/decisions").glob("ADR-*-isolations.md"):
             adr.write_text(adr.read_text(encoding="utf-8").replace("status: proposed", "status: accepted"), encoding="utf-8")
 
+    def review_in_a_terminal(self, keys: bytes) -> str:
+        """`--review` on a real pseudo-terminal, the checklist driven by keys; the screen as plain text."""
+        from helpers import Terminal
+        term = Terminal(self.project, self.home, ["code", "isolations", "--review"], {"LINES": "40", "COLUMNS": "150"})
+        term.read(2.0)
+        for key in keys:
+            term.send(bytes([key]))
+        term.read(1.5)
+        term.wait()
+        return term.plain()
+
+    def decide_every_frontier(self, status: str):
+        decl_file = self.project / isodecl.DECL
+        decl_file.write_text(decl_file.read_text(encoding="utf-8").replace(": proposed", f": {status}"), encoding="utf-8")
+
     def test_nothing_declared_passes(self):
         r = self.iso("--gate")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -254,6 +266,11 @@ class Command(unittest.TestCase):
         self.assertIn("`isolations.yaml`", (self.project / "docs/requirements/INDEX.md").read_text(encoding="utf-8"))
         r = self.iso("--gate")
         self.assertEqual(r.returncode, 1); self.assertIn("no accepted ADR", r.stdout)
+        self.assertIn("`src.persistence` frontier `.` is proposed, not in force", r.stdout)
+        self.assertIn("Pending frontiers", self.iso("--review", check=True).stdout, "without a terminal the review only lists")
+        screen = self.review_in_a_terminal(b"\r")
+        self.assertIn("checked = accepted", screen)
+        self.assertNotIn(": proposed", (self.project / isodecl.DECL).read_text(encoding="utf-8"), "Enter accepted every checked frontier")
         self.assertIn("status: proposed", self.iso("--accept", check=True).stdout)
         self.assertIn("waiting for a person", self.iso("--accept", check=True).stdout, "a second accept writes no second ADR")
         self.accept_as_a_person()
@@ -262,7 +279,7 @@ class Command(unittest.TestCase):
         self.violate()
         r = self.iso("--gate")
         self.assertEqual(r.returncode, 1)
-        for kind, what in (("FORBIDDEN", "src/billing/api.py -> src/orders/api.py"), ("HIDDEN", "src/persistence/postgres/repo.py  ("),
+        for kind, what in (("HIDDEN", "src/persistence/postgres/repo.py  ("),
                            ("BREAKING", "`place` changed (cart, coupon=) -> (cart, region, coupon=)"), ("GOVERNANCE", "")):
             self.assertIn(kind.lower() + " 1", r.stdout.replace("findings: ", ""), r.stdout)
             self.assertIn(what, r.stdout)
@@ -277,12 +294,25 @@ class Command(unittest.TestCase):
         decl_file.write_text(decl_file.read_text(encoding="utf-8") + "# a comment changes nothing\n", encoding="utf-8")
         decl_file.write_text(decl_file.read_text(encoding="utf-8").replace("tests: exempt", "tests: exempt\nowners: {rules: \"@arch\"}"), encoding="utf-8")
 
+    def test_unchecked_is_rejected_and_new_suggestions_merge(self):
+        self.iso("--propose", "--depth", "2", "--write", check=True)
+        self.review_in_a_terminal(b" \r")   # uncheck the first line (src .), accept the rest
+        text = (self.project / isodecl.DECL).read_text(encoding="utf-8")
+        self.assertIn('  src:\n    paths: [src/**]\n    frontiers: {".": rejected}', text)
+        orders = self.project / "src/orders/api.py"
+        orders.write_text(orders.read_text(encoding="utf-8") + "from src.persistence.postgres.repo import PgRepo\n", encoding="utf-8")
+        self.assertIn("added 1 proposed frontier(s)", self.iso("--propose", "--write", check=True).stdout)
+        text = (self.project / isodecl.DECL).read_text(encoding="utf-8")
+        self.assertIn('frontiers: {".": accepted, postgres: proposed}', text, "the decided top level kept, the new reach proposed")
+        self.assertIn('frontiers: {".": rejected}', text, "a rejected frontier is never proposed again")
+
     def test_context_codeowners_and_requirements(self):
         self.iso("--propose", "--depth", "2", "--write", check=True)
+        self.decide_every_frontier("accepted")
         out = self.iso("--context", "src/orders/api.py", check=True).stdout
         self.assertIn("Isolation `src.orders`", out)
         self.assertIn("src.persistence: src/persistence/factory.py, src/persistence/ports.py", out, "the files to read, nothing else of them")
-        self.assertIn("must not use: src.shared", out)
+        self.assertIn("every other isolation is open", out)
         self.assertIn("SCATTERED  FR-ORDERS-001", self.iso("--requirements", check=True).stdout)
         self.assertNotEqual(self.iso("--codeowners").returncode, 0, "no owner declared: nothing to write")
 

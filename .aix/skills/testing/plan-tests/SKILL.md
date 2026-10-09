@@ -7,6 +7,7 @@ Read: the FR/API/NFR docs in scope; `docs/tests/test-plan-rules.md`; `.aix/meta-
 
 ## Procedure
 1. For each AC: decide the lowest level that can prove it (decision table in `levels.md`).
+   Inside the code being changed, `aix code tests --priority PATH` names the functions most worth a direct test (call paths x complexity, untested first).
 2. `grep -rl "<FR-id>" docs/tests` → extend an existing TS if the same AC+level exists; otherwise create `TS-<DOMAIN>-NNN` from `.aix/templates/test-spec.md` in `docs/tests/<functional|non-functional>/<domain>/`.
 3. Fill *Not covered here* with pointers to sibling TS (this is the anti-duplication contract).
 4. Set `tests:` in the FR front-matter; add rows to the folder INDEX.

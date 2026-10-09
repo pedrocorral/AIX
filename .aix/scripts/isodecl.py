@@ -1,19 +1,20 @@
 """Leaf: the isolation declaration (docs/requirements/isolations.yaml): the named parts of the code, which files
-each holds, what each exposes, and which others each may use. Read, checked and fingerprinted here; judged in
-isorules. An allow-list: anything not declared is forbidden.
+each holds, and how deep code outside each may reach into it (its frontiers). Read, checked and fingerprinted here;
+judged in isorules. Everything the frontiers do not limit is allowed.
 
     isolations:
-      orders:              {paths: [src/orders/**], exposes: [src/orders/api.py], may_use: [billing, shared]}
-      orders.pricing:      {paths: [src/orders/pricing/**]}     # nested by the dot: a part of orders
-    data:
-      card: {fields: [card_number, cvv], stays_in: [payments]}
+      persistence:         {paths: [src/persistence/**], frontiers: {".": accepted, ports/sql: proposed}}
+      persistence.postgres: {paths: [src/persistence/postgres/**], frontiers: {".": accepted}}   # a part: the dot
+      orders:              {paths: [src/orders/**], frontiers: {".": accepted}}
     tests: exempt                                               # exempt (default) or checked
 
-A file belongs to the deepest isolation whose paths match it. `may_use` absent inherits the parent's list (a top
-isolation without one may use nothing); a nested list may only narrow its parent's, never widen it, and it lists
-everything the part may use outside itself. Children use their parent's own files; the parent's own files use its
-children; siblings are free until one declares `may_use`. From outside, every isolation entered on the way to a
-file must expose it."""
+Frontiers. A frontier is a folder of the isolation (relative to its one folder path; "." is its top level) with a
+status: accepted, proposed or rejected. Accepting "." limits the isolation: code outside it calls its top level only;
+each accepted folder opens the way down to it (that folder included, nothing deeper, nothing beside); a rejected
+folder stays closed. An isolation with no accepted frontier limits nothing (rejecting "." keeps it open). The isolation's own files reach everything inside it, except where a part declares its
+own frontiers: every isolation entered on the way to a file must let the caller through. A proposed frontier is
+not in force until a person accepts it. A file belongs to the deepest isolation whose paths match it; a part uses
+its parent's files freely."""
 import hashlib, json, re
 from pathlib import Path
 
@@ -24,7 +25,10 @@ from yamlmini import parse_tree
 DECL = "docs/requirements/isolations.yaml"
 CONTRACTS = "docs/requirements/isolations.contracts.json"
 NAME = re.compile(r"^[a-z0-9_-]+(?:\.[a-z0-9_-]+)*$")
-ISO_KEYS = {"paths", "exposes", "may_use", "owner", "description"}
+ISO_KEYS = {"paths", "frontiers", "owner", "description"}
+GONE = {"exposes": "`exposes` became `frontiers`: how deep outsiders may reach",
+        "may_use": "`may_use` is gone: everything the frontiers do not limit is allowed"}
+STATUSES = ("accepted", "proposed", "rejected")
 DATA_KEYS = {"fields", "stays_in", "never_to", "description"}
 TOP_KEYS = {"isolations", "data", "tests", "owners"}
 SINKS = ("logs", "http", "print")
@@ -35,18 +39,40 @@ class Iso:
     def __init__(self, name: str, spec: dict):
         self.name, self.spec = name, spec
         self.paths = _as_list(spec.get("paths"))
-        self.exposes = _as_list(spec["exposes"]) if "exposes" in spec else None     # None: everything visible
-        self.may_use = _as_list(spec["may_use"]) if "may_use" in spec else None     # None: inherit the parent's
+        self.frontiers = _frontier_map(spec.get("frontiers"))                     # folder -> accepted|proposed|rejected
+        self.base = base_folder(self.paths)                                       # the one folder frontiers are relative to
         self.owner, self.description = spec.get("owner"), spec.get("description", "")
         self.parent = name.rsplit(".", 1)[0] if "." in name else None
         self._path_rx = [glob_regex(g) for g in self.paths]
-        self._expose_rx = [glob_regex(g) for g in self.exposes or []]
 
     def holds(self, rel: str) -> bool:
         return any(rx.match(rel) for rx in self._path_rx)
 
-    def exposes_file(self, rel: str) -> bool:
-        return self.exposes is None or any(rx.match(rel) for rx in self._expose_rx)
+    @property
+    def limited(self) -> bool:
+        """An accepted frontier limits how deep outsiders reach; without one nothing is limited."""
+        return "accepted" in self.frontiers.values()
+
+    def accepted(self) -> list:
+        return sorted(f for f, s in self.frontiers.items() if s == "accepted")
+
+    def pending(self) -> list:
+        return sorted(f for f, s in self.frontiers.items() if s == "proposed")
+
+    def folder_in(self, rel: str):
+        """The folder of a file relative to the isolation's folder ("." for its top level), else None."""
+        if self.base is None or not (rel.startswith(self.base + "/") or self.base == "."):
+            return None
+        folder = str(Path(rel).parent)
+        return "." if folder == self.base else (folder if self.base == "." else folder[len(self.base) + 1:])
+
+    def reachable(self, rel: str) -> bool:
+        """Code outside the isolation may call this file: nothing limited, the top level, or a folder on the way down
+        to an accepted frontier (that frontier included, nothing deeper)."""
+        folder = self.folder_in(rel)
+        if not self.limited or folder is None or folder == ".":
+            return True
+        return any(f == folder or f.startswith(folder + "/") for f in self.accepted())
 
 
 class Decl:
@@ -74,13 +100,6 @@ class Decl:
     def children(self, name: str) -> list:
         return sorted(n for n in self.isos if self.isos[n].parent == name)
 
-    def effective_may_use(self, name: str):
-        """The list in force for an isolation: its own, else the nearest ancestor's; [] at the top."""
-        for n in self.chain(name):
-            if self.isos[n].may_use is not None:
-                return self.isos[n].may_use
-        return []
-
     # ---- files ----------------------------------------------------------------------------------------------------
     def owner_of(self, rel: str):
         """The deepest isolation holding a file, or None. Two unrelated isolations holding it is a declaration error."""
@@ -91,6 +110,25 @@ class Decl:
                 self.errors.append(f"{rel} is held by unrelated isolations {', '.join(hits)}: a file belongs to one part (or to a part and its parents)")
             self._owner[rel] = deepest
         return self._owner[rel]
+
+
+def _frontier_map(value) -> dict:
+    """`{".": accepted, ports/sql: proposed}` as {folder: status}; a folder written with a trailing slash is the same."""
+    if not isinstance(value, dict):
+        return {}
+    return {(str(k).strip().strip("/") or "."): str(v).strip().lower() for k, v in value.items()}
+
+
+def base_folder(paths: list):
+    """The one folder an isolation's paths name (`src/persistence/**`, `src/persistence/`), else None."""
+    if len(paths) != 1:
+        return None
+    g = paths[0].strip()
+    g = g[2:] if g.startswith("./") else g
+    g = g[:-3] if g.endswith("/**") else g.rstrip("/")
+    if g in ("**", ""):
+        return "."
+    return None if any(c in g for c in "*?[") or "." in Path(g).name else g
 
 
 def _as_list(v) -> list:
@@ -136,7 +174,7 @@ def load(root: Path = ROOT):
 
 
 def check_shape(d: Decl):
-    """Everything that can be checked without the project's files: keys, names, parents, may_use, data."""
+    """Everything that can be checked without the project's files: keys, names, parents, frontiers, data."""
     if not isinstance(d.raw.get("isolations"), dict) or not d.raw["isolations"]:
         d.errors.append(f"{DECL}: no `isolations:` map")
         return
@@ -155,28 +193,18 @@ def _check_iso(d: Decl, iso: Iso):
         d.errors.append(f"{where}: its parent `{iso.parent}` is not declared")
     if not iso.paths:
         d.errors.append(f"{where}: no `paths:`")
-    d.errors += [f"{where}: unknown key `{k}` (known: {', '.join(sorted(ISO_KEYS))})" for k in iso.spec if k not in ISO_KEYS]
-    for target in iso.may_use or []:
-        _check_permission(d, iso, target)
+    d.errors += [f"{where}: unknown key `{k}` (known: {', '.join(sorted(ISO_KEYS))})" + (f" ({GONE[k]})" if k in GONE else "")
+                 for k in iso.spec if k not in ISO_KEYS]
+    _check_frontier_shape(d, iso, where)
 
 
-def _check_permission(d: Decl, iso: Iso, target: str):
-    """A may_use entry names a declared isolation, not the isolation itself or one of its ancestors, and never widens
-    what the parent may use."""
-    where = f"isolation `{iso.name}` may_use `{target}`"
-    if target not in d.isos:
-        d.errors.append(f"{where}: no such isolation")
-    elif d.is_within(iso.name, target):
-        d.warnings.append(f"{where}: it is itself or its own parent; a part always reaches its parent's exposed files")
-    elif d.is_within(target, iso.name):
-        d.warnings.append(f"{where}: it is a part of `{iso.name}`; a part's own files always reach their children")
-    elif iso.parent and not d.is_within(target, iso.parent) and not _covered(d, iso.parent, target):
-        d.errors.append(f"{where}: widens the parent: `{iso.parent}` may not use `{target}`, so no part of it may")
-
-
-def _covered(d: Decl, parent: str, target: str) -> bool:
-    """The parent's list in force names target or an isolation target is part of."""
-    return any(d.is_within(target, allowed) for allowed in d.effective_may_use(parent))
+def _check_frontier_shape(d: Decl, iso: Iso, where: str):
+    if "frontiers" in iso.spec and not isinstance(iso.spec["frontiers"], dict):
+        d.errors.append(f"{where}: `frontiers` is a map of folder -> status ({{\".\": accepted, ports/sql: proposed}})")
+    if iso.frontiers and iso.base is None:
+        d.errors.append(f"{where}: frontiers need one folder path (`paths: [src/persistence/**]`)")
+    d.errors += [f"{where}: frontier `{f}` has status `{s}` (one of {', '.join(STATUSES)})" for f, s in iso.frontiers.items() if s not in STATUSES]
+    d.errors += [f"{where}: frontier `{f}` leaves the isolation's folder" for f in iso.frontiers if f.startswith("/") or ".." in f.split("/")]
 
 
 def _check_data(d: Decl, name: str, spec: dict):
@@ -190,15 +218,15 @@ def _check_data(d: Decl, name: str, spec: dict):
 
 
 def check_files(d: Decl, files: list):
-    """Everything that needs the files: each part inside its parent, each exposed glob inside its isolation and
-    not hidden by a part, every file in at most one line of isolations (owner_of records that)."""
+    """Everything that needs the files: each part inside its parent, each frontier a folder of its isolation and not
+    closed by a part, every file in at most one line of isolations (owner_of records that)."""
     outside = set()
     for rel in files:
         owner = d.owner_of(rel)
         if owner and owner not in outside and _outside_parents(d, rel, owner):
             outside.add(owner)
     for iso in d.isos.values():
-        _check_exposes(d, iso, files)
+        _check_frontiers(d, iso, files)
 
 
 def _outside_parents(d: Decl, rel: str, owner: str) -> bool:
@@ -211,28 +239,35 @@ def _outside_parents(d: Decl, rel: str, owner: str) -> bool:
 
 
 def _hiding_part(d: Decl, name: str, f: str):
-    """The part of `name`, on the way down to f, that does not expose f (a parent cannot expose what a part hides)."""
+    """The part of `name`, on the way down to f, whose own frontiers keep f closed (a parent cannot open what a part
+    closes)."""
     inner = [c for c in d.chain(d.owner_of(f) or "") if c != name and d.is_within(c, name)]
-    return next((c for c in inner if not d.isos[c].exposes_file(f)), None)
+    return next((c for c in inner if not d.isos[c].reachable(f)), None)
 
 
-def _check_exposes(d: Decl, iso: Iso, files: list):
-    if not iso.exposes:
-        return
-    exposed = [f for f in files if iso.exposes_file(f)]
-    if not exposed:
-        d.warnings.append(f"isolation `{iso.name}`: `exposes` matches no file")
-        return
-    _check_exposed_files(d, iso.name, exposed)
+def covers(frontier: str, folder: str) -> bool:
+    """A folder lies at or below a frontier ("." covers every folder)."""
+    return frontier == "." or folder == frontier or folder.startswith(frontier + "/")
 
 
-def _check_exposed_files(d: Decl, name: str, exposed: list):
-    """Every exposed file is the isolation's own, and no part of it hides one."""
-    outside = [f for f in exposed if not d.is_within(d.owner_of(f) or "", name)]
-    if outside:
-        d.errors.append(f"isolation `{name}` exposes {outside[0]}, which is not one of its files")
-    hidden = [(f, _hiding_part(d, name, f)) for f in exposed]
-    d.errors += [f"isolation `{name}` exposes {f}, which its part `{part}` does not expose" for f, part in hidden if part]
+def _closed_by_part(d: Decl, iso: Iso, frontier: str, inside: list):
+    """(file, part) for a file at an accepted frontier that one of the isolation's parts keeps closed, else None."""
+    at = [f for f in inside if iso.folder_in(f) == frontier]
+    return next(((f, part) for f in at if (part := _hiding_part(d, iso.name, f))), None)
+
+
+def _check_frontiers(d: Decl, iso: Iso, files: list):
+    """Each frontier names a folder holding the isolation's files, and none opens a folder one of its parts closes."""
+    mine = [f for f in files if d.is_within(d.owner_of(f) or "", iso.name)]
+    for frontier, status in sorted(iso.frontiers.items()):
+        inside = [f for f in mine if covers(frontier, iso.folder_in(f) or "")]
+        d.warnings += [] if inside else [f"isolation `{iso.name}`: frontier `{frontier}` holds none of its files"]
+        d.warnings += _closed_warning(d, iso, frontier, inside) if status == "accepted" else []
+
+
+def _closed_warning(d: Decl, iso: Iso, frontier: str, inside: list) -> list:
+    closed = _closed_by_part(d, iso, frontier, inside)
+    return [f"isolation `{iso.name}` opens `{frontier}`, but its part `{closed[1]}` keeps {closed[0]} closed"] if closed else []
 
 
 # ---- the fingerprint ------------------------------------------------------------------------------------------------

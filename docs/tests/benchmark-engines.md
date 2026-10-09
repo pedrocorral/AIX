@@ -1368,46 +1368,46 @@ referee: `bat_warning!`, a macro exported at the crate root (2 edges into lib.rs
 method signatures of the bytecode, no name in the source. These are the limits of a source reader, said in
 `architecture/isolations.md` ("What it does not know").
 
-### 31. `aix code isolations` on real projects and against import-linter (2.22.0, run on 2026-10-09)
+### 31. `aix code isolations` on real projects and against import-linter (2.22.0, rerun with frontiers in 2.23.0, 2026-10-09)
 
-**Self-consistency.** On each project: `--propose --depth 2 --write`, `--accept`, the ADR accepted as a person
-would, then the check. The proposal is the code minus its defects, so every flagged edge must belong to a pair the
-proposal left out (`tests/benchmark/isolations.py` maps each verdict back to its pair):
+**Self-consistency.** On each project: `--propose --depth 2 --write`, every proposed frontier and the ADR accepted as
+a person would, `--accept`, then the check. The proposed frontiers are the deepest folders the code reaches today and
+everything they do not limit is allowed, so the accepted proposal must keep every import of today: no finding.
 
-| project | isolations | defect pairs left out | edges flagged | not explained by a defect | undeclared | breaking | declaration errors | propose / check |
-|---|---|---|---|---|---|---|---|---|
-| flask | 10 | 1 | 1 | 0 | 0 | 0 | 0 | 0.2 / 0.2 s |
-| requests | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0.2 / 0.2 s |
-| pygoat | 14 | 1 | 1 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
-| express | 31 | 0 | 0 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
-| juice-shop | 12 | 4 | 22 | 0 | 0 | 0 | 0 | 0.6 / 0.7 s |
-| excalidraw | 19 | 16 | 102 | 0 | 0 | 0 | 0 | 0.4 / 0.6 s |
-| ripgrep | 12 | 0 | 0 | 0 | 0 | 0 | 0 | 0.6 / 0.6 s |
-| bat | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0.4 / 0.4 s |
-| commons-lang | 18 | 4 | 9 | 0 | 0 | 0 | 0 | 0.8 / 0.8 s |
-| spring-petclinic | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+| project | isolations | frontiers proposed | hidden | undeclared | breaking | declaration errors | propose / check |
+|---|---|---|---|---|---|---|---|
+| flask | 10 | 12 | 0 | 0 | 0 | 0 | 0.2 / 0.2 s |
+| requests | 3 | 3 | 0 | 0 | 0 | 0 | 0.2 / 0.2 s |
+| pygoat | 14 | 17 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+| express | 31 | 31 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+| juice-shop | 12 | 15 | 0 | 0 | 0 | 0 | 0.6 / 0.6 s |
+| excalidraw | 19 | 32 | 0 | 0 | 0 | 0 | 0.4 / 0.8 s |
+| ripgrep | 12 | 18 | 0 | 0 | 0 | 0 | 0.5 / 0.6 s |
+| bat | 7 | 7 | 0 | 0 | 0 | 0 | 0.4 / 0.4 s |
+| commons-lang | 18 | 19 | 0 | 0 | 0 | 0 | 0.8 / 0.9 s |
+| spring-petclinic | 5 | 5 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
 
-No finding the proposal did not predict, on four languages' worth of layouts. The defects are real shapes, all of
-them cycles here (no upward edge by folder name): excalidraw's 16 pairs are one cycle among eight parts of `src`
-(`actions`, `components`, `data`, `element`, `hooks`, `packages`, `renderer`, `scene`; 14 cuts), `src` ⇄
-`excalidraw-app` (`src/index.tsx` imports the app) and `excalidraw-app/data` ⇄ `collab`; flask's one pair is the
-cycle between `sansio` and `json` (`sansio/app.py` imports `json/provider.py`).
+No finding on four languages' worth of layouts. A frontier beyond `"."` (excalidraw has 13) is a place where outside
+code reaches below a part's top level today: the review is where a person accepts it or rejects it, and a rejected
+one turns those imports into findings to fix. The 2.22.0 version also proposed who may use whom and left the loops
+out (excalidraw's cycle among eight parts of `src`, flask's `sansio` ⇄ `json`); with point 2 of ADR-0009 rejected
+there is no such list, and `aix code graph` still reports the loops.
 
 **Against import-linter.** One planted Python project, the rule "only persistence reaches its PostgreSQL
 implementation", written as import-linter's forbidden contract (source `app.orders`, forbidden
-`app.persistence.postgres`) and as our declaration (`app.orders` may use `app.persistence`, which exposes its
-ports and factory):
+`app.persistence.postgres`) and as our declaration (persistence's accepted frontier is its top level: its ports and
+factory):
 
 | case | import-linter 2.15 | aix code isolations |
 |---|---|---|
 | the rule as written, clean code | passes | passes |
 | orders imports postgres: the case both wrote | fails | fails (HIDDEN) |
-| a package added later, shipping, imports postgres | passes: shipping is in no source list | fails (HIDDEN: persistence does not expose the file) |
+| a package added later, shipping, imports postgres | passes: shipping is in no source list | fails (HIDDEN: postgres lies deeper than persistence's frontier) |
 | orders imports postgres and the rule file is edited to allow it | passes | fails (GOVERNANCE: no accepted ADR carries the new fingerprint) |
 
-Both catch what both wrote. The allow-list catches the package nobody listed, and the fingerprint catches the
-agent that edits its own rules. import-linter remains a good Python-only tool for a team that keeps its source
-lists current by hand; its layers and independence contracts are what nesting and may_use express here.
+Both catch what both wrote. The frontier catches the package nobody listed (it limits how deep anyone reaches into
+persistence, whoever they are), and the fingerprint catches the agent that edits its own rules. import-linter remains
+a good Python-only tool for a team that keeps its source lists current by hand.
 
 ## Where the numbers come from
 

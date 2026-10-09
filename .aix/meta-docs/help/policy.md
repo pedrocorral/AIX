@@ -15,4 +15,4 @@ security, docs, coverage, audit, review, drift), hotfix (test, fix, style, secur
 vulnerabilities, dead code, clones, the register gate; isolations required). A layer adds or replaces policies/<name>.yaml; a policy may
 define its own checks (`checks: {lint: npm run lint}`) and use them in `order`.
 Steps: spec, tests, threat, implement, unit-tests, audit, review, drift (skills); style, defensive, modularity, isolations,
-dead, clones, security, vulnerabilities, docs, coverage, register (checks). isolations passes when none are declared. `aix policy show NAME` prints a policy's steps.
+module-tests (every module has its own tests), dead, clones, security, vulnerabilities, docs, coverage, register (checks). isolations passes when none are declared. `aix policy show NAME` prints a policy's steps.

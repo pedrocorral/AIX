@@ -50,8 +50,9 @@ Words are commands, dashes are modifiers. `aix help <command>` prints the detail
 | `aix code graph [PATH...] [--functions] [--roles] [--gate] [--max-distance N] [--report] [--selftest]` | The modularity metric; alias `complexity` |
 | `aix code dead [PATH...] [--functions] [--gate]` | Unreachable modules and functions |
 | `aix code clones [PATH...] [--similarity PCT] [--gate]` | Duplicated functions |
-| `aix code isolations [PATH...] [--gate] [--report]`, `--propose [--depth N] [--write [--force]]`, `--accept`, `--context PATH\|NAME`, `--codeowners [--write]`, `--requirements` | The declared isolations: who may use whom, exposed files, contracts, data boundaries, governed by an ADR |
-| `aix code affected [PATH...] [--base REF] [--plain]` | The tests a change reaches through the import graph |
+| `aix code isolations [PATH...] [--gate] [--report]`, `--propose [--depth N] [--write [--force]]`, `--review`, `--accept`, `--context PATH\|NAME`, `--codeowners [--write]`, `--requirements` | The declared isolations: frontiers (how deep outsiders reach), contracts, data boundaries, governed by an ADR |
+| `aix code tests [PATH...] [--untested] [--gate] [--report]`, `--priority [--top N]`, `--affected [--base REF] [--plain]` | Every module with its own tests or NO TESTS; the functions to test first (call paths x complexity); the tests a change reaches |
+| `aix code affected [PATH...] [--base REF] [--plain]` | The tests a change reaches through the import graph (= `aix code tests --affected`) |
 | `aix code style [TARGET...] [--gate] [--all] [--report] [--selftest]` | Readability per function; `FILE:FUNCTION` for one card |
 | `aix code defensive [PATH...] [--all] [--gate] [--report]` | How guarded the Python is: types, pydantic, doors, asserts, open(), None under an annotation |
 | `aix code licenses [--gate] [--report]` | Every installed dependency's licence, classed; the gate on copyleft, proprietary, unknown |

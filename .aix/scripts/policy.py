@@ -38,6 +38,7 @@ STEPS = {  # id -> (kind, what, label)
     "drift":           ("skill", "review-doc-drift-check",  "docs and code agree"),
     "style":           ("check", "aix code style --gate",    "no function over a readability limit"),
     "modularity":      ("check", "aix code graph --gate",    "no cycle, no upward dependency"),
+    "module-tests":    ("check", "aix code tests --gate",    "every module of the tree has its own tests (a test that imports it)"),
     "isolations":      ("check", "aix code isolations --gate", "every import keeps to the declared isolations, whose rules an accepted ADR carries (passes when none are declared)"),
     "dead":            ("check", "aix code dead --gate",     "no dead module"),
     "clones":          ("check", "aix code clones --gate",   "no duplicated function"),

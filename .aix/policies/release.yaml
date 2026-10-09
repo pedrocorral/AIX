@@ -1,4 +1,4 @@
 description: Closing a version: everything in standard plus the deep security scan, the register gate and doc drift
-order: [style, defensive, modularity, isolations, dead, clones, security, skills, push, vulnerabilities, licenses, sbom, docs, coverage, register, drift, review]
+order: [style, defensive, modularity, isolations, module-tests, dead, clones, security, skills, push, vulnerabilities, licenses, sbom, docs, coverage, register, drift, review]
 required: [push, style, modularity, isolations, security, vulnerabilities, docs, register]
-advised: [defensive, dead, clones, skills, licenses, sbom, coverage, drift, review]
+advised: [defensive, module-tests, dead, clones, skills, licenses, sbom, coverage, drift, review]
