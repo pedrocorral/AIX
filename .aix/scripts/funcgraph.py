@@ -167,7 +167,7 @@ def _rust_modules(file: _File, crate_root: Path, files: dict):
 
 
 def _rust_imports(file: _File, files: dict):
-    crate_root = next((p for p in file.f.parents if (p / "Cargo.toml").exists()), file.f.parent) / "src"
+    crate_root = rustedges.crate_root_dir(file.f)
     _rust_modules(file, crate_root, files)
     for m in RS_USE_NAMES.finditer(file.text):   # `use crate::a::b::helper;` and `use crate::a::b::{c, d as e};`
         path, braces = m.group(1).split("::"), m.group(2)

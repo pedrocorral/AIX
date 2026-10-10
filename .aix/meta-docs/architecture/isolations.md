@@ -73,6 +73,8 @@ The check fails until an **accepted ADR** carries the fingerprint of the declara
 (`isolations: sha256:...` in its front matter). `--accept` records the contracts and writes the ADR with status
 `proposed`, the declaration and what changed; **a person sets `status: accepted`, an agent never does.** So widening a
 rule to make a check pass is visible and attributed: the gate fails with GOVERNANCE until someone decides.
+Deleting the declaration is a rule change too: once an ADR has governed the rules, the gate fails with
+GOVERNANCE until the newest one is accepted with `isolations: retired`.
 
 What makes it unbreakable is outside the repository, because an agent can edit any file in it: the gate in CI,
 branch protection with code owners on the declaration, the contracts and `docs/requirements/decisions/`

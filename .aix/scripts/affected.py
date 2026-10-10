@@ -28,45 +28,51 @@ def changed_files(base: str) -> list:
         if r.returncode:
             sys.exit(f"git {' '.join(args)}: {r.stderr.strip() or 'failed'} (aix code affected needs a git repository)")
         return [l for l in r.stdout.splitlines() if l.strip()]
-    return sorted(set(git("diff", "--name-only", base)) | set(git("ls-files", "--others", "--exclude-standard")))
+    return sorted(set(git("diff", "--name-only", "--relative", base)) | set(git("ls-files", "--others", "--exclude-standard")))   # --relative: a project inside a larger repository
 
 
 def dependents(nodes: set, edges: set, start: set) -> dict:
-    """node -> the changed file it depends on (directly or not), for every node that reaches one of `start`."""
+    """node -> every changed file it depends on (directly or not), for every node that reaches one of `start`."""
     users = defaultdict(set)
     for a, b in edges:
         users[b].add(a)
-    reached, todo = {n: n for n in start if n in nodes}, [n for n in start if n in nodes]
-    while todo:
-        n = todo.pop()
-        for u in users[n]:
-            if u not in reached:
-                reached[u] = reached[n]
-                todo.append(u)
+    reached = defaultdict(set)
+    for origin in sorted(start & set(nodes)):
+        for n in _users_of(origin, users):
+            reached[n].add(origin)
     return reached
 
 
+def _users_of(origin: str, users: dict) -> set:
+    """The origin and every file that imports it, directly or through others."""
+    seen, todo = {origin}, [origin]
+    while todo:
+        for u in users[todo.pop()] - seen:
+            seen.add(u)
+            todo.append(u)
+    return seen
+
+
 def affected(paths: list, base: str) -> tuple:
-    """(tests -> the changed file that reaches them, changed source files no test reaches, changed files outside the graph)."""
+    """(test -> the changed files it reaches, changed source files no test reaches, changed files outside the graph)."""
     nodes, edges = module_graph(paths)
     changed = changed_files(base)
     inside = {f for f in changed if f in nodes}
-    reached = dependents(nodes, edges, inside)
-    tests = {n: why for n, why in reached.items() if is_test(n)}
-    guarded = set(tests.values())
+    tests = {n: origins for n, origins in dependents(nodes, edges, inside).items() if is_test(n)}
+    guarded = set().union(*tests.values()) if tests else set()
     unguarded = sorted(f for f in inside if not is_test(f) and f not in guarded)
     return tests, unguarded, sorted(set(changed) - inside)
 
 
 def _grouped(tests: dict) -> list:
-    """Lines of the tests, under the isolation of the changed file that reaches them (when the project declares any)."""
+    """Lines of the tests, under the isolation of each changed file that reaches them (when the project declares any)."""
     import isodecl
     d = isodecl.load(ROOT)
-    groups = defaultdict(list)
-    for t, why in sorted(tests.items()):
-        key = (d.owner_of(why) if d and d.owner_of(why) else None) or why
-        groups[key].append(t)
-    return [line for key, ts in sorted(groups.items()) for line in [f"  {key}:"] + [f"    {t}" for t in ts]]
+    groups = defaultdict(set)
+    for t, origins in tests.items():
+        for why in origins:
+            groups[(d.owner_of(why) if d else None) or why].add(t)
+    return [line for key, ts in sorted(groups.items()) for line in [f"  {key}:"] + [f"    {t}" for t in sorted(ts)]]
 
 
 def _base(args: list) -> str:

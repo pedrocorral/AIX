@@ -75,12 +75,19 @@ class Iso:
         return any(f == folder or f.startswith(folder + "/") for f in self.accepted())
 
 
+def _map(value) -> dict:
+    """A map as written, or empty when the file holds something else there."""
+    return value if isinstance(value, dict) else {}
+
+
 class Decl:
     """The parsed declaration, its problems, and the membership of files."""
     def __init__(self, raw: dict, source: str = DECL):
         self.raw, self.source, self.errors, self.warnings = raw, source, [], []
-        self.isos = {n: Iso(n, s or {}) for n, s in (raw.get("isolations") or {}).items() if isinstance(s, (dict, type(None)))}
-        self.data = {n: (s or {}) for n, s in (raw.get("data") or {}).items()} if isinstance(raw.get("data"), dict) else {}
+        isos = _map(raw.get("isolations"))
+        self.isos = {n: Iso(n, s or {}) for n, s in isos.items() if isinstance(s, (dict, type(None)))}
+        self.malformed = sorted(n for n, s in isos.items() if not isinstance(s, (dict, type(None))))
+        self.data = {n: (s or {}) for n, s in _map(raw.get("data")).items()}
         self.tests_checked = str(raw.get("tests", "exempt")).lower() == "checked"
         self._owner = {}
 
@@ -125,10 +132,13 @@ def base_folder(paths: list):
         return None
     g = paths[0].strip()
     g = g[2:] if g.startswith("./") else g
+    named_folder = g.endswith("/**") or g.endswith("/")   # `src/app.core/**` names a folder whatever its name
     g = g[:-3] if g.endswith("/**") else g.rstrip("/")
     if g in ("**", ""):
         return "."
-    return None if any(c in g for c in "*?[") or "." in Path(g).name else g
+    if any(c in g for c in "*?[") or (not named_folder and "." in Path(g).name):
+        return None
+    return g
 
 
 def _as_list(v) -> list:
@@ -176,8 +186,9 @@ def load(root: Path = ROOT):
 def check_shape(d: Decl):
     """Everything that can be checked without the project's files: keys, names, parents, frontiers, data."""
     if not isinstance(d.raw.get("isolations"), dict) or not d.raw["isolations"]:
-        d.errors.append(f"{DECL}: no `isolations:` map")
+        d.errors.append(f"{DECL}: no `isolations:` map (`isolations:` then one `name: {{paths: [...]}}` per isolation)")
         return
+    d.errors += [f"isolation `{n}`: expected a map (`{n}: {{paths: [...], frontiers: {{...}}}}`), found a {type(d.raw['isolations'][n]).__name__}" for n in d.malformed]
     d.errors += [f"{DECL}: unknown top-level key `{k}` (known: {', '.join(sorted(TOP_KEYS))})" for k in d.raw if k not in TOP_KEYS]
     for name in sorted(d.isos):
         _check_iso(d, d.isos[name])
@@ -193,9 +204,16 @@ def _check_iso(d: Decl, iso: Iso):
         d.errors.append(f"{where}: its parent `{iso.parent}` is not declared")
     if not iso.paths:
         d.errors.append(f"{where}: no `paths:`")
+    if not _owner_ok(iso.spec.get("owner")):
+        d.errors.append(f"{where}: `owner` is a name (`\"@team\"`) or a list of names")
     d.errors += [f"{where}: unknown key `{k}` (known: {', '.join(sorted(ISO_KEYS))})" + (f" ({GONE[k]})" if k in GONE else "")
                  for k in iso.spec if k not in ISO_KEYS]
     _check_frontier_shape(d, iso, where)
+
+
+def _owner_ok(owner) -> bool:
+    """No owner, a name, or a list of names."""
+    return owner is None or isinstance(owner, str) or (isinstance(owner, list) and all(isinstance(o, str) for o in owner))
 
 
 def _check_frontier_shape(d: Decl, iso: Iso, where: str):

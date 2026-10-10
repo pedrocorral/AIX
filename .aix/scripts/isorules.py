@@ -11,7 +11,7 @@ from collections import namedtuple
 Verdict = namedtuple("Verdict", "kind a b owner_a owner_b message")
 
 
-def _entered(d, a_owner: str, b_owner: str) -> list:
+def entered(d, a_owner: str, b_owner: str) -> list:
     """The isolations of b's line the edge enters, outermost first (none when a's isolation holds b's)."""
     return [n for n in reversed(d.chain(b_owner)) if not d.is_within(a_owner, n)]
 
@@ -26,7 +26,7 @@ def judge(d, a: str, b: str):
     A, B = d.owner_of(a), d.owner_of(b)
     if A is None or B is None or A == B:
         return None
-    hidden_by = _hidden_in(d, _entered(d, A, B), b)
+    hidden_by = _hidden_in(d, entered(d, A, B), b)
     if hidden_by is None:
         return None
     frontiers = ", ".join(f"`{f}`" for f in d.isos[hidden_by].accepted() if f != ".") or "its top level only"

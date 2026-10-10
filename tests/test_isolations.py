@@ -261,6 +261,25 @@ class Command(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("nothing declared", r.stdout)
 
+    def test_deleting_governed_rules_fails_until_a_retirement_is_accepted(self):
+        self.iso("--propose", "--write", check=True)
+        self.decide_every_frontier("accepted")
+        self.iso("--accept", check=True); self.accept_as_a_person()
+        (self.project / isodecl.DECL).unlink()
+        r = self.iso("--gate")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("deleting the rules is a decision", r.stdout)
+        adr = self.project / "docs/requirements/decisions/ADR-0099-retire-isolations.md"
+        adr.write_text("---\nid: ADR-0099\nstatus: accepted\nisolations: retired\n---\n# ADR-0099\n", encoding="utf-8")
+        self.assertEqual(self.iso("--gate").returncode, 0, "an accepted retirement")
+
+    def test_a_frontier_only_tests_reach_is_unused(self):
+        self.iso("--propose", "--depth", "2", "--write", check=True)
+        self.decide_every_frontier("accepted")
+        decl_file = self.project / isodecl.DECL
+        decl_file.write_text(decl_file.read_text(encoding="utf-8").replace('[src/persistence/**]\n    frontiers: {".": accepted}', '[src/persistence/**]\n    frontiers: {".": accepted, postgres: accepted}'), encoding="utf-8")
+        self.assertIn("`src.persistence` opens `postgres` and nothing outside reaches that deep", self.iso().stdout, "only the test reaches postgres")
+
     def test_the_loop(self):
         self.iso("--propose", "--depth", "2", "--write", check=True)
         self.assertIn("`isolations.yaml`", (self.project / "docs/requirements/INDEX.md").read_text(encoding="utf-8"))
@@ -341,6 +360,12 @@ class Affected(unittest.TestCase):
         out = project_cmd(project, home, "code", "affected").stdout
         self.assertIn("no test reaches these changed files", out)
         self.assertIn("src/c.py", out)
+        (project / "src/b.py").write_text("from src.a import X\nY = X\n", encoding="utf-8")
+        out = project_cmd(project, home, "code", "affected").stdout
+        unguarded = out.split("nothing guards them")[-1].split()
+        self.assertIn("src/c.py", unguarded)
+        for f in ("src/a.py", "src/b.py"):
+            self.assertNotIn(f, unguarded, "test_b reaches a and b: both are guarded, not only the nearest")
 
 
 if __name__ == "__main__":

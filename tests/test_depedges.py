@@ -112,6 +112,88 @@ class Rust(_Graph):
         self.assertNotIn((app + "lib.rs", app + "orders.rs"), self.edges(ownership=False), "declaring a module is not using it")
 
 
+class RustCrateRootElsewhere(_Graph):
+    """ripgrep's shape: the binary's root file is not under src/ (`[[bin]] path = "cmd/main.rs"`)."""
+    ROOTS = ["tool"]
+    FILES = {
+        "tool/Cargo.toml": '[package]\nname = "tool"\n\n[[bin]]\nname = "t"\npath = "cmd/main.rs"\n',
+        "tool/cmd/main.rs": "mod flags;\nfn main() { crate::flags::defs::run(); }\n",
+        "tool/cmd/flags/mod.rs": "pub mod defs;\n",
+        "tool/cmd/flags/defs.rs": "pub fn run() {}\n",
+    }
+
+    def test_modules_resolve_from_the_root_file_cargo_names(self):
+        e = self.edges()
+        self.assertIn(("tool/cmd/main.rs", "tool/cmd/flags/mod.rs"), e, "`mod flags;` next to the root file")
+        self.assertIn(("tool/cmd/flags/mod.rs", "tool/cmd/flags/defs.rs"), e, "`pub mod defs;` inside it")
+        self.assertIn(("tool/cmd/main.rs", "tool/cmd/flags/defs.rs"), e, "`crate::` from the root file's folder")
+
+
+class RustOwnCrateByName(_Graph):
+    """A binary, a bin target and an integration test are crates of their own: they name the library by its name."""
+    ROOTS = ["app"]
+    FILES = {
+        "app/Cargo.toml": '[package]\nname = "my-app"\n',
+        "app/src/lib.rs": "pub mod billing;\n",
+        "app/src/billing.rs": "pub fn charge() {}\n",
+        "app/src/main.rs": "use my_app::billing::charge;\nfn main() { charge(); }\n",
+        "app/src/bin/tool.rs": "use my_app::billing::charge;\nfn main() { charge(); }\n",
+        "app/tests/it.rs": "use my_app::billing::charge;\n#[test] fn t() { charge(); }\n",
+    }
+
+    def test_binaries_and_integration_tests_reach_the_library(self):
+        e = self.edges(ownership=False)
+        for user in ("app/src/main.rs", "app/src/bin/tool.rs", "app/tests/it.rs"):
+            self.assertIn((user, "app/src/billing.rs"), e, user)
+
+
+class RustExternCrate(_Graph):
+    """`pub extern crate other as o;` re-exports a whole workspace crate: an edge to its root; an outside crate is none."""
+    ROOTS = ["facade", "core"]
+    FILES = {
+        "facade/Cargo.toml": '[package]\nname = "facade"\n',
+        "facade/src/lib.rs": "pub extern crate core_lib as core;\nextern crate serde;\n",
+        "core/Cargo.toml": '[package]\nname = "core-lib"\n',
+        "core/src/lib.rs": "pub fn run() {}\n",
+    }
+
+    def test_a_reexported_crate_is_an_edge(self):
+        self.assertEqual({b for a, b in self.edges(ownership=False) if a == "facade/src/lib.rs"}, {"core/src/lib.rs"})
+
+
+class JavaScriptConfigsAndStrings(_Graph):
+    ROOTS = ["src", "config"]
+    FILES = {
+        "tsconfig.base.json": '{"compilerOptions": {"baseUrl": "./src"}}\n',
+        "tsconfig.json": '{"extends": "./tsconfig.base.json", "compilerOptions": {"paths": {"@lib/*": ["lib/*"]}}}\n',
+        "src/lib/util.ts": "export const u = 1;\n",
+        "src/lib/other.ts": "export const o = 1;\n",
+        "config/index.ts": "export default 1;\n",
+        "src/a.ts": """
+            import { u } from "@lib/util";
+            const msg = "please import the file from './lib/other'";
+            const t = `require("./lib/other")`;
+            """,
+    }
+
+    def test_inherited_base_url_and_imports_written_inside_strings(self):
+        e = self.edges()
+        self.assertIn(("src/a.ts", "src/lib/util.ts"), e, "paths resolve against the baseUrl inherited through extends")
+        self.assertNotIn(("src/a.ts", "src/lib/other.ts"), e, "an import written inside a string is text")
+
+
+class JavaScriptNoBaseUrl(_Graph):
+    ROOTS = ["src", "config"]
+    FILES = {
+        "tsconfig.json": '{"compilerOptions": {"paths": {"@x/*": ["src/*"]}}}\n',
+        "src/a.ts": 'import config from "config";\nexport const a = config;\n',
+        "config/index.ts": "export default 1;\n",
+    }
+
+    def test_a_bare_import_is_a_package_without_base_url(self):
+        self.assertEqual(self.edges(), set(), "without baseUrl, `config` is the npm package, not the local folder")
+
+
 class Java(_Graph):
     ROOTS = ["src/main/java"]
     FILES = {

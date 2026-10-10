@@ -97,14 +97,39 @@ def _python(text: str) -> dict:
 
 # ---- JS / TS --------------------------------------------------------------------------------------------------------
 
-JS_FUNCTION = re.compile(r"\bexport\s+(?:default\s+)?(?:async\s+)?function\s*\*?\s*(\w+)\s*(?:<[^>(]*>)?\s*\(([^)]*)\)")
+JS_FUNCTION = re.compile(r"\bexport\s+(?:default\s+)?(?:async\s+)?function\s*\*?\s*(\w+)\s*(?:<[^>(]*>)?\s*\(")
 JS_DECL = re.compile(r"\bexport\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(class|const|let|var|interface|type|enum)\s+(\w+)")
-JS_ARROW = re.compile(r"\bexport\s+const\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s+)?\(([^)]*)\)\s*(?::[^=]+)?=>")
+JS_ARROW = re.compile(r"\bexport\s+const\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s+)?\(")
+ARROW_TAIL = re.compile(r"\s*(?::[^=;{]+)?=>")
+JAVA_TAIL = re.compile(r"\s*(?:throws\s+[\w.,\s]+)?[{;]")
 JS_LIST = re.compile(r"\bexport\s+(?:type\s+)?\{([^}]*)\}")
 
 
+def balanced(code: str, open_at: int) -> tuple:
+    """(the text inside the bracket opened at open_at, the index after its closing one): `(cb: () => void)` whole."""
+    depth = 0
+    for i in range(open_at, len(code)):
+        depth += {"(": 1, ")": -1}.get(code[i], 0)
+        if depth == 0:
+            return code[open_at + 1:i], i + 1
+    return code[open_at + 1:], len(code)
+
+
+def heads(pattern, code: str, tail=None) -> list:
+    """(match, parameters) for every head the pattern finds up to its `(`, the parameters read to the balanced `)`;
+    with `tail`, only the heads whose closing `)` the tail follows (`=>` of an arrow, `{` or `;` of a method)."""
+    out = []
+    for m in pattern.finditer(code):
+        params, after = balanced(code, m.end() - 1)
+        if tail is None or tail.match(code, after):
+            out.append((m, params))
+    return out
+
+
 def split_top(s: str) -> list:
-    """Top-level comma-separated parts, brackets of any kind respected."""
+    """Top-level comma-separated parts, brackets of any kind respected; an arrow (`=>`, `->`) is no bracket and no
+    default value."""
+    s = s.replace("=>", "\u2192").replace("->", "\u2192")
     parts, depth, cur = [], 0, ""
     for ch in s:
         depth += {"(": 1, "[": 1, "{": 1, "<": 1, ")": -1, "]": -1, "}": -1, ">": -1}.get(ch, 0)
@@ -128,8 +153,8 @@ def _js_params(raw: str) -> str:
 def _js(text: str) -> dict:
     code = strip_strings(text, "js")
     out = {m.group(2): m.group(1) for m in JS_DECL.finditer(code)}
-    out.update({m.group(1): _js_params(m.group(2)) for m in JS_ARROW.finditer(code)})
-    out.update({m.group(1): _js_params(m.group(2)) for m in JS_FUNCTION.finditer(code)})
+    out.update({m.group(1): _js_params(params) for m, params in heads(JS_ARROW, code, ARROW_TAIL)})
+    out.update({m.group(1): _js_params(params) for m, params in heads(JS_FUNCTION, code)})
     for m in JS_LIST.finditer(code):
         for part in split_top(m.group(1)):
             out.setdefault(re.split(r"\s+as\s+", part.replace("type ", "").strip())[-1], "name")
@@ -141,8 +166,8 @@ def _js(text: str) -> dict:
 # ---- Java -----------------------------------------------------------------------------------------------------------
 
 JAVA_TYPE = re.compile(r"\bpublic\s+(?:(?:abstract|final|static|sealed|non-sealed|strictfp)\s+)*(class|interface|enum|record|@interface)\s+(\w+)")
-JAVA_METHOD = re.compile(r"\bpublic\s+(?:(?:static|final|abstract|synchronized|default|native|strictfp)\s+)*(?:<[^>]*>\s*)?(?:[\w.$\[\]<>?,\s]+?\s+)?(\w+)\s*\(([^)]*)\)\s*(?:throws\s+[\w.,\s]+)?[{;]")
-JAVA_ABSTRACT = re.compile(r"^\s*(?:(?:static|default)\s+)?(?:<[^>]*>\s*)?[\w.$\[\]<>?,]+(?:\s*<[^;(]*>)?\s+(\w+)\s*\(([^)]*)\)\s*(?:throws\s+[\w.,\s]+)?[;{]", re.M)   # an interface's methods, default ones included
+JAVA_METHOD = re.compile(r"\bpublic\s+(?:(?:static|final|abstract|synchronized|default|native|strictfp)\s+)*(?:<[^>]*>\s*)?(?:[\w.$\[\]<>?,\s]+?\s+)?(\w+)\s*\(")
+JAVA_ABSTRACT = re.compile(r"^\s*(?:(?:static|default)\s+)?(?:<[^>]*>\s*)?[\w.$\[\]<>?,]+(?:\s*<[^;(]*>)?\s+(\w+)\s*\(", re.M)   # an interface's methods, default ones included
 
 
 def _java_types(raw: str) -> str:
@@ -157,16 +182,16 @@ def _java_types(raw: str) -> str:
 def _java(text: str) -> dict:
     code = strip_strings(text, "java")
     out = {m.group(2): m.group(1) for m in JAVA_TYPE.finditer(code)}
-    out.update({f"{m.group(1)}{_java_types(m.group(2))}": "method" for m in JAVA_METHOD.finditer(code)})
+    out.update({f"{m.group(1)}{_java_types(params)}": "method" for m, params in heads(JAVA_METHOD, code, JAVA_TAIL)})
     if re.search(r"\binterface\s+\w+", code):
         keywords = {"return", "new", "throw", "if", "while", "for", "switch"}
-        out.update({f"{m.group(1)}{_java_types(m.group(2))}": "method" for m in JAVA_ABSTRACT.finditer(code) if m.group(1) not in keywords})
+        out.update({f"{m.group(1)}{_java_types(params)}": "method" for m, params in heads(JAVA_ABSTRACT, code, JAVA_TAIL) if m.group(1) not in keywords})
     return out
 
 
 # ---- Rust -----------------------------------------------------------------------------------------------------------
 
-RUST_FN = re.compile(r"\bpub(?:\([^)]*\))?\s+(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+\"[^\"]*\"\s+)?fn\s+(\w+)\s*(?:<[^>(]*>)?\s*\(([^)]*)\)")
+RUST_FN = re.compile(r"\bpub(?:\([^)]*\))?\s+(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+\"[^\"]*\"\s+)?fn\s+(\w+)\s*(?:<[^>(]*>)?\s*\(")
 RUST_ITEM = re.compile(r"\bpub(?:\([^)]*\))?\s+(struct|enum|trait|type|const|static|mod|union)\s+(\w+)")
 
 
@@ -178,8 +203,8 @@ def _rust_params(raw: str) -> str:
 def _rust(text: str) -> dict:
     code = strip_strings(text, "rust")
     out = {m.group(2): m.group(1) for m in RUST_ITEM.finditer(code)}
-    for m in RUST_FN.finditer(code):
-        sig = _rust_params(m.group(2))
+    for m, params in heads(RUST_FN, code):
+        sig = _rust_params(params)
         out[m.group(1)] = sig if m.group(1) not in out or out[m.group(1)] == sig else " | ".join(sorted({out[m.group(1)], sig}))
     return out
 

@@ -6,7 +6,8 @@ after the fact."""
 import sys
 
 from codefiles import ROOT, rel
-import isogov
+import isorules
+from graphmetrics import is_test
 
 LIST = 12   # files listed per isolation before "... N more"
 
@@ -28,11 +29,34 @@ def _files(names: list) -> str:
     return ", ".join(shown) + (f" ... and {len(names) - LIST} more" if len(names) > LIST else "")
 
 
+def reach_from(d, name: str, files: list) -> tuple:
+    """({limited isolation entered first: the files code in `name` may reach through it}, [limited isolations it can
+    reach nothing of]), by the check's own rule: every isolation entered must let the file through."""
+    reach = {n: sorted(f for f, ok in pairs if ok) for n, pairs in sorted(_by_first_limit(d, name, files).items())}
+    return {n: fs for n, fs in reach.items() if fs}, sorted(n for n, fs in reach.items() if not fs)
+
+
+def _by_first_limit(d, name: str, files: list) -> dict:
+    """{first limited isolation entered: [(file, reachable through every limited isolation entered)]}, tests left out."""
+    groups = {}
+    for f in files:
+        limited = [] if is_test(f) else _limited_entered(d, name, f)
+        if limited:
+            groups.setdefault(limited[0], []).append((f, all(d.isos[n].reachable(f) for n in limited)))
+    return groups
+
+
+def _limited_entered(d, name: str, f: str) -> list:
+    """The limited isolations code in `name` enters on its way to file f, outermost first."""
+    owner = d.owner_of(f)
+    return [n for n in isorules.entered(d, name, owner) if d.isos[n].limited] if owner else []
+
+
 def _limited_lines(d, name: str, files: list) -> list:
-    """The other isolations whose frontiers limit this code, each with the only files it may reach (and read)."""
-    reachable = isogov.reachable_files(d, files)
-    others = [n for n in sorted(reachable) if not d.is_within(name, n)]
-    out = [f"    {n}: {_files(reachable[n])}" for n in others]
+    """The isolations whose frontiers limit this code, each with the only files it may reach (and read)."""
+    open_to, closed = reach_from(d, name, files)
+    out = [f"    {n}: {_files(fs)}" for n, fs in open_to.items()]
+    out += [f"    nothing to reach in: {', '.join(closed)}"] if closed else []
     return out or ["    none: no other isolation has an accepted frontier"]
 
 

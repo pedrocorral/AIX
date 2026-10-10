@@ -30,6 +30,7 @@ The check (no option) reports, and --gate fails on any of:
                frontiers on an isolation with more than one folder path, a part outside its parent, a file in two
                unrelated isolations
   GOVERNANCE   no accepted ADR carries the fingerprint of the declaration and the recorded contracts
+               (or the declaration was deleted and no accepted ADR says `isolations: retired`)
   PENDING      a frontier still proposed: a decision waiting for a person (--review)
   HIDDEN       an import deeper than a frontier allows
   UNDECLARED   a code file in no isolation (tests are exempt unless `tests: checked`)

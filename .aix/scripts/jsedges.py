@@ -7,7 +7,7 @@ through the packages of a monorepo's workspaces (every package.json with a `name
 import json, os, re
 from pathlib import Path
 
-from bracecomments import strip_comments
+from bracecomments import STRINGS, strip_comments
 from codefiles import ROOT, SKIP
 from guard import checked
 
@@ -32,14 +32,13 @@ def _jsonc(text: str):
 # ---- tsconfig paths -----------------------------------------------------------------------------------------------
 
 def _own_options(data: dict, cfg: Path) -> dict:
-    """baseUrl (resolved) and paths declared in this file; paths without a baseUrl are relative to the file."""
+    """baseUrl (resolved) and paths declared in this file, with the folder of the file that declares the paths."""
     opts = data.get("compilerOptions") or {}
     out = {}
     if opts.get("baseUrl"):
         out["baseUrl"] = (cfg.parent / opts["baseUrl"]).resolve()
     if opts.get("paths"):
-        out["paths"] = opts["paths"]
-        out.setdefault("baseUrl", cfg.parent.resolve())
+        out["paths"], out["pathsDir"] = opts["paths"], cfg.parent.resolve()
     return out
 
 
@@ -66,6 +65,14 @@ def _ts_options(cfg: Path, seen: set = None) -> dict:
     return out
 
 
+def _effective(opts: dict) -> dict:
+    """The options TypeScript uses: paths resolve against baseUrl, own or inherited through `extends`, else against
+    the folder of the tsconfig that declares them; a bare specifier resolves against baseUrl only when one is set."""
+    if not opts:
+        return {}
+    return {**opts, "pathsBase": opts.get("baseUrl") or opts.get("pathsDir")}
+
+
 def _ts_config_for(f: Path) -> dict:
     """The options of the nearest tsconfig.json / jsconfig.json at or above the file, inside the project."""
     for folder in [f.parent, *f.parent.parents]:
@@ -73,7 +80,7 @@ def _ts_config_for(f: Path) -> dict:
             return _TS_CONFIGS[folder]
         cfg = next((folder / n for n in ("tsconfig.json", "jsconfig.json") if (folder / n).is_file()), None)
         if cfg or folder == ROOT.resolve() or not folder.is_relative_to(ROOT.resolve()):
-            _TS_CONFIGS[folder] = _ts_options(cfg) if cfg else {}
+            _TS_CONFIGS[folder] = _effective(_ts_options(cfg)) if cfg else {}
             return _TS_CONFIGS[folder]
     return {}
 
@@ -88,8 +95,8 @@ def _alias_bases(spec: str, f: Path) -> list:
         prefix = pattern.split("*")[0]
         if spec.startswith(prefix) and (("*" in pattern) or spec == pattern):
             rest = spec[len(prefix):]
-            bases += [cfg["baseUrl"] / t.replace("*", rest) for t in targets]
-    return bases + [cfg["baseUrl"] / spec]
+            bases += [cfg["pathsBase"] / t.replace("*", rest) for t in targets]
+    return bases + ([cfg["baseUrl"] / spec] if cfg.get("baseUrl") else [])
 
 
 # ---- workspace packages -------------------------------------------------------------------------------------------
@@ -164,9 +171,17 @@ def specifier_bases(spec: str, f: Path) -> list:
     return _alias_bases(spec, f) + _workspace_bases(spec)
 
 
+def _in_strings(code: str) -> list:
+    """(start, end) of every string literal: an `import ... from` written inside one is text, not an import."""
+    return [m.span() for m in re.finditer(STRINGS["js"], code, re.S)]
+
+
 def js_module_edges(f: Path) -> list:
-    out = []
-    for m in JS_IMPORT.finditer(strip_comments(f.read_text(encoding="utf-8", errors="replace"), "js")):
+    code = strip_comments(f.read_text(encoding="utf-8", errors="replace"), "js")
+    strings, out = _in_strings(code), []
+    for m in JS_IMPORT.finditer(code):
+        if any(a < m.start() < b for a, b in strings):
+            continue
         spec = next(g for g in m.groups() if g)
         hit = next((h for h in map(resolve_js, specifier_bases(spec, f)) if h), None)
         if hit:

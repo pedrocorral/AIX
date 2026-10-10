@@ -41,11 +41,19 @@ def name_of(folder: str) -> str:
     return re.sub(r"[^a-z0-9_-]+", "-", folder.lower()).strip("-") or "root"
 
 
+def top_names(roots: list) -> dict:
+    """root -> its isolation name: the folder's name, or its whole path when two roots share a name (backend/src,
+    frontend/src -> backend-src, frontend-src)."""
+    short = {r: name_of(P(r).name if r != "." else "project") for r in roots}
+    clash = {n for n in short.values() if list(short.values()).count(n) > 1}
+    return {r: (name_of(r.replace("/", "-")) if short[r] in clash else short[r]) for r in roots}
+
+
 def units(roots: list, files: list, depth: int) -> dict:
     """file -> isolation name; and the paths glob of every isolation, in `paths` (returned as the second item)."""
-    owner, paths = {}, {}
+    owner, paths, names = {}, {}, top_names(roots)
     for root in roots:
-        top = name_of(P(root).name if root != "." else "project")
+        top = names[root]
         mine = [f for f in files if root == "." or f.startswith(root + "/") or f == root]
         if not mine:
             continue

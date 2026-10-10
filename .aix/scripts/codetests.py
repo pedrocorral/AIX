@@ -26,6 +26,7 @@ from codefiles import ROOT, default_roots
 from depedges import module_graph
 from graphmetrics import is_test
 from guard import checked
+from isogov import index_row
 
 USAGE = "usage: aix code tests [PATH...] [--untested] [--gate] [--report] | --priority [--top N] | --affected [--base REF] [--plain]"
 INLINE_TESTS = re.compile(r"#\[cfg\(test\)\]|\bFOR\s+TESTING\b", re.I)
@@ -78,19 +79,30 @@ class Coverage:
         return [m for m in self.modules if self.state(m) == "NO TESTS"]
 
 
-def _tree_lines(c: Coverage) -> list:
-    """The modules as an indented tree; a folder that only holds other modules is shown as their container."""
-    shown, out = set(), []
+def _children(c: Coverage) -> dict:
+    """folder -> its sub-folders on the way to a module (every module and every folder above one)."""
+    kids = defaultdict(set)
     for m in c.modules:
         parts = P(m).parts
-        for depth in range(len(parts)):
-            folder = str(P(*parts[:depth + 1]))
-            if folder in shown:
-                continue
-            shown.add(folder)
-            label = c.state(folder) if folder in c.modules else "(holds modules only)"
-            out.append(f"  {'  ' * depth}{parts[depth]}/  {label}")
-    return out
+        for depth in range(1, len(parts)):
+            kids[str(P(*parts[:depth]))].add(str(P(*parts[:depth + 1])))
+    return kids
+
+
+def _render(c: Coverage, kids: dict, folder: str, label: str, depth: int) -> list:
+    """One folder and its sub-folders; a folder holding no code and one sub-folder joins it on one line."""
+    under = sorted(kids.get(folder, ()))
+    if folder not in c.modules and len(under) == 1:
+        return _render(c, kids, under[0], f"{label}/{P(under[0]).name}", depth)
+    state = c.state(folder) if folder in c.modules else "(holds modules only)"
+    return [f"  {'  ' * depth}{label}/  {state}"] + [line for k in under for line in _render(c, kids, k, P(k).name, depth + 1)]
+
+
+def _tree_lines(c: Coverage) -> list:
+    """The modules as an indented tree; a folder that only holds other modules is shown as their container."""
+    kids = _children(c)
+    tops = sorted({P(m).parts[0] for m in c.modules})
+    return [line for top in tops for line in _render(c, kids, top, top, 0)]
 
 
 def render_tree(c: Coverage) -> str:
@@ -134,36 +146,43 @@ def _topological(comps: set, links: set) -> list:
 
 def path_weights(nodes: list, edges: set) -> dict:
     """node -> how many call paths end in it: every caller, and every path through every caller, each branch
-    counted (A calls B and C, both call D: D has 4). A loop counts as one function, so the count stays finite."""
+    counted (A calls B and C, both call D: D has 4). Functions calling each other in a loop are one function: one
+    node with one weight, shared by its members, so the count stays finite."""
     comp = _components(nodes, edges)
-    calls = [(a, b) for a, b in edges if a in comp and b in comp and a != b]
-    weight_of = _component_weights(comp, [(comp[a], comp[b]) for a, b in calls if comp[a] != comp[b]])
-    weight = defaultdict(int)
-    for a, b in calls:
-        weight[b] += 1 + (weight_of[comp[a]] if comp[a] != comp[b] else 0)
-    return {n: weight[n] for n in nodes}
+    crossing = {(comp[a], comp[b]) for a, b in edges if a in comp and b in comp and comp[a] != comp[b]}
+    weight_of = _component_weights(comp, crossing)
+    return {n: weight_of[comp[n]] for n in nodes}
 
 
-def _component_weights(comp: dict, crossing: list) -> dict:
-    """component -> the call paths ending in it, one per call crossing into it plus every path ending in its caller."""
-    into = defaultdict(list)
+def _component_weights(comp: dict, crossing: set) -> dict:
+    """component -> the call paths ending in it: for each distinct calling component, one path plus every path
+    ending in that caller."""
+    into = defaultdict(set)
     for y, x in crossing:
-        into[x].append(y)
+        into[x].add(y)
     weight_of = {}
-    for c in _topological(set(comp.values()), set(crossing)):
+    for c in _topological(set(comp.values()), crossing):
         weight_of[c] = sum(1 + weight_of[y] for y in into[c])
     return weight_of
 
 
 def _metrics(paths: list) -> dict:
-    """`file:Class.func` -> cognitive complexity, for every function the style tool measures."""
+    """`file:name` -> cognitive complexity, for every function the style tool measures (it names a JS/TS, Java or
+    Rust method without its class; the call graph with it: `cognitive_of` joins the two)."""
     import stylemetrics
     from codefiles import source_files, rel
     out = {}
     for f in source_files(paths):
         for fx in stylemetrics.functions_in(f):
-            out[f"{rel(f)}:{fx['name']}"] = fx["cognitive"]
+            out[f"{rel(f)}:{fx['name']}"] = max(fx["cognitive"], out.get(f"{rel(f)}:{fx['name']}", 0))
     return out
+
+
+def cognitive_of(node: str, metrics: dict) -> int:
+    """The cognitive complexity of a call-graph node `file:Class.method`: by its full name, else by `file:method`."""
+    if node in metrics:
+        return metrics[node]
+    return metrics.get(f"{_file_of(node)}:{node.rsplit(':', 1)[1].split('.')[-1]}", 0)
 
 
 def _file_of(node: str) -> str:
@@ -177,7 +196,8 @@ def priorities(paths: list) -> list:
     nodes, edges = graph._function_level(paths)
     code = sorted(n for n in nodes if not is_test(_file_of(n)))
     calls = {(a, b) for a, b in edges if not is_test(_file_of(a))}
-    weight, cog = path_weights(code, calls), _metrics(paths)
+    weight, metrics = path_weights(code, calls), _metrics(paths)
+    cog = {n: cognitive_of(n, metrics) for n in code}
     direct = defaultdict(int)
     for a, b in calls:
         direct[b] += 1
@@ -259,6 +279,7 @@ def _modules_mode(args: list, paths: list):
     if "--report" in args:
         out = ROOT / "docs" / "tests" / "tests-by-module.md"
         out.write_text("# Tests by module (generated — do not edit)\n\n```\n" + render_tree(c) + "\n```\n", encoding="utf-8")
+        index_row(out.parent / "INDEX.md", "| `tests-by-module.md` | Generated by `aix code tests --report`: every module with its own tests or NO TESTS | Planning tests; release |")
         print(f"\n  wrote {out.relative_to(ROOT)}")
     if "--gate" in args:
         if c.untested():

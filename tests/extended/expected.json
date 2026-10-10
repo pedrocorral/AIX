@@ -1,9 +1,9 @@
 {
  "BenchmarkJava": {
   "clones": 470,
-  "dead": 12,
+  "dead": 7,
   "defensive": 0,
-  "graph": 23,
+  "graph": 3025,
   "security": 942,
   "style": 7555,
   "vulnerabilities": 1657
@@ -12,7 +12,7 @@
   "clones": 10,
   "dead": 6,
   "defensive": 0,
-  "graph": 32,
+  "graph": 31,
   "security": 22,
   "style": 265,
   "vulnerabilities": 5
@@ -21,7 +21,7 @@
   "clones": 69,
   "dead": 30,
   "defensive": 0,
-  "graph": 820,
+  "graph": 819,
   "security": 114,
   "style": 2429,
   "vulnerabilities": 27
@@ -46,9 +46,9 @@
  },
  "bat": {
   "clones": 43,
-  "dead": 2,
+  "dead": 1,
   "defensive": 0,
-  "graph": 85,
+  "graph": 127,
   "security": 24,
   "style": 1116,
   "vulnerabilities": 0
@@ -66,16 +66,16 @@
   "clones": 475,
   "dead": 0,
   "defensive": 0,
-  "graph": 1263,
+  "graph": 1235,
   "security": 7,
   "style": 9292,
   "vulnerabilities": 0
  },
  "excalidraw": {
   "clones": 120,
-  "dead": 10,
+  "dead": 9,
   "defensive": 0,
-  "graph": 2601,
+  "graph": 2606,
   "security": 58,
   "style": 3383,
   "vulnerabilities": 3
@@ -102,7 +102,7 @@
   "clones": 159,
   "dead": 2,
   "defensive": 0,
-  "graph": 1412,
+  "graph": 1414,
   "security": 23,
   "style": 2378,
   "vulnerabilities": 0
@@ -111,7 +111,7 @@
   "clones": 157,
   "dead": 2,
   "defensive": 0,
-  "graph": 1427,
+  "graph": 1432,
   "security": 24,
   "style": 2355,
   "vulnerabilities": 0
@@ -120,7 +120,7 @@
   "clones": 229,
   "dead": 6,
   "defensive": 0,
-  "graph": 1447,
+  "graph": 1489,
   "security": 65,
   "style": 4451,
   "vulnerabilities": 22
@@ -145,9 +145,9 @@
  },
  "ripgrep": {
   "clones": 79,
-  "dead": 7,
+  "dead": 0,
   "defensive": 0,
-  "graph": 71,
+  "graph": 281,
   "security": 14,
   "style": 2709,
   "vulnerabilities": 0

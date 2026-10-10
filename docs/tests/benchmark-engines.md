@@ -1343,7 +1343,7 @@ out, only files both sides see (`tests/benchmark/graphedges.py --diff` prints ev
 | flask, requests, pygoat | grimp | 100 / 100 % (all three) | 100 / 100 % |
 | express, NodeGoat, juice-shop | dependency-cruiser | 100 / 100 % (all three) | 100 / 100 % |
 | excalidraw (1 519 edges) | dependency-cruiser | 99.8 / 100 % | 100 / 100 % |
-| ripgrep (workspace of 9 crates) | cargo-modules | 29.7 / 67.3 % | 100 / 99.2 % |
+| ripgrep (workspace of 9 crates) | cargo-modules | 29.7 / 67.3 % | 100 / 99.2 %; 100 / 98.4 % in 2.23.1 (below) |
 | bat | cargo-modules | 56.8 / 77.1 % | 81.1 / 96.2 % |
 | commons-lang (424 edges) | jdeps | 98.4 / 97.9 % | 98.6 / 100 % |
 
@@ -1364,7 +1364,11 @@ no dependency, a class written by its full name is one. Python: a literal `impor
 `style.rs` with no name of it in the file) or behind the two-glob limit; 3 of ours are real but invisible to the
 referee: `bat_warning!`, a macro exported at the crate root (2 edges into lib.rs), and `crate::pager` behind
 `#[cfg(all(feature = "minimal-application", feature = "paging"))]`. ripgrep: one constant defined in lib.rs
-(`use crate::MAX_LOOK_AHEAD`) the referee does not list. commons-lang: 6 edges jdeps sees in
+(`use crate::MAX_LOOK_AHEAD`) the referee does not list. Rerun in 2.23.1: ripgrep's example `simplegrep.rs` now
+names the `grep` crate by its name (a crate root other than `src/lib.rs` resolves), so `crates/grep/src/lib.rs` enters
+the files both sides see, and with it its five `pub extern crate grep_cli as cli;` lines, which the reader never took
+for edges (recall 95.9 % until `extern crate` became one); the sixth, `grep_pcre2` behind `#[cfg(feature = "pcre2")]`,
+is ours only, like bat's pager: 125 ours, 123 the referee's, 123 both. commons-lang: 6 edges jdeps sees in
 method signatures of the bytecode, no name in the source. These are the limits of a source reader, said in
 `architecture/isolations.md` ("What it does not know").
 
@@ -1382,10 +1386,15 @@ everything they do not limit is allowed, so the accepted proposal must keep ever
 | express | 31 | 31 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
 | juice-shop | 12 | 15 | 0 | 0 | 0 | 0 | 0.6 / 0.6 s |
 | excalidraw | 19 | 32 | 0 | 0 | 0 | 0 | 0.4 / 0.8 s |
-| ripgrep | 12 | 18 | 0 | 0 | 0 | 0 | 0.5 / 0.6 s |
+| ripgrep | 12 | 18; 21 in 2.23.1 (below the table) | 0 | 0 | 0 | 0 | 0.5 / 0.6 s |
 | bat | 7 | 7 | 0 | 0 | 0 | 0 | 0.4 / 0.4 s |
 | commons-lang | 18 | 19 | 0 | 0 | 0 | 0 | 0.8 / 0.9 s |
 | spring-petclinic | 5 | 5 | 0 | 0 | 0 | 0 | 0.1 / 0.1 s |
+
+Rerun in 2.23.1, the same ten projects, no finding. ripgrep proposes 21 frontiers, 3 more, because more of its
+imports now resolve: its binary's root is `crates/core/main.rs`, named by `path =` in Cargo.toml, so
+`crate::flags::complete` and `crate::flags::doc` are edges now, and the `grep` facade's `pub extern crate` lines
+reach the `src` of the crates it re-exports. Accepted as proposed, they still keep every import of today.
 
 No finding on four languages' worth of layouts. A frontier beyond `"."` (excalidraw has 13) is a place where outside
 code reaches below a part's top level today: the review is where a person accepts it or rejects it, and a rejected

@@ -12,11 +12,15 @@ from codefiles import ROOT, SKIP
 
 USE = re.compile(r"\b(?:pub(?:\([^)]*\))?\s+)?use\s+([^;]+);")
 PUB_USE = re.compile(r"\bpub(?:\([^)]*\))?\s+use\s+([^;]+);")
+EXTERN = re.compile(r"\bextern\s+crate\s+(\w+)")   # `pub extern crate grep_cli as cli;`: the whole crate, re-exported
 MOD = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\s*;", re.M)
 INLINE_MOD = re.compile(r"\bmod\s+(\w+)\s*\{")
 TEST_MOD = re.compile(r"#\[cfg\(test\)\]\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{")
 PATH = re.compile(r"(?<![\w:])((?:crate|super|self|[a-z_]\w*)(?:::\w+)+)")
-_CRATES = {}   # ROOT -> {crate name with underscores: crate folder}
+_CRATES = {}   # ROOT -> {crate name with underscores: the folder of its library's root file}
+_ROOTS = {}    # ROOT -> {folder of a crate root file: that file}
+_ALL_ROOT_FILES = {}   # ROOT -> every crate root file (a folder may hold several: src/lib.rs and src/main.rs, tests/*.rs) (src/lib.rs, src/main.rs, src/bin/*.rs, `path =` in Cargo.toml)
+TOML_PATH = re.compile(r'^\s*path\s*=\s*"([^"]+\.rs)"', re.M)
 _REEXPORTS = {}   # file -> {name it re-exports: the path segments it names}
 _SCOPES = {}      # file -> {every name its use declarations and `mod` lines bind: the path segments}
 IDENT = re.compile(r"\b[A-Za-z_]\w*\b")
@@ -26,20 +30,55 @@ GLOB_DEPTH = 2
 REEXPORT_DEPTH = 3
 
 
+def _scan():
+    """Every Cargo.toml of the project, top-down (the shallowest wins over a fixture of the same name): the crates
+    by name and the crate root files, wherever `path =` puts them (ripgrep's binary is crates/core/main.rs)."""
+    crates, roots, every = {}, {}, set()
+    for folder, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in SKIP and not d.startswith(".")]   # never into target/ or node_modules/
+        if "Cargo.toml" in files:
+            every |= _read_toml(Path(folder).resolve(), crates, roots)
+    _CRATES[ROOT], _ROOTS[ROOT], _ALL_ROOT_FILES[ROOT] = crates, roots, every
+
+
+def _root_candidates(folder: Path, text: str) -> list:
+    """Every file Cargo may compile as a crate root: lib, main, bins, tests, examples, benches, `path = ...`."""
+    files = [folder / "src" / "lib.rs", folder / "src" / "main.rs", *sorted((folder / "src" / "bin").glob("*.rs"))]
+    files += [f for sub in ("tests", "examples", "benches") for f in sorted((folder / sub).glob("*.rs"))]   # each its own crate
+    return files + [(folder / p).resolve() for p in TOML_PATH.findall(text)]
+
+
+def _read_toml(folder: Path, crates: dict, roots: dict):
+    text = (folder / "Cargo.toml").read_text(encoding="utf-8", errors="replace")
+    files = _root_candidates(folder, text)
+    present = [f.resolve() for f in files if f.is_file()]
+    for f in present:
+        roots.setdefault(f.parent, f)   # lib.rs first: a folder holding both is the library's
+    name = re.search(r'^\[package\](?:(?!^\[).)*?^name\s*=\s*"([^"]+)"', text, re.M | re.S)
+    lib = next((f for f in files if f.is_file() and f.name == "lib.rs"), None)
+    if name:
+        crates.setdefault(name.group(1).replace("-", "_"), (lib.parent if lib else folder / "src"))
+    return set(present)
+
+
 def workspace_crates() -> dict:
-    """crate name (dashes as underscores) -> its folder, for every Cargo.toml [package] of the project."""
+    """crate name (dashes as underscores) -> the folder of its library root, for every Cargo.toml [package]."""
     if ROOT not in _CRATES:
-        found = {}
-        for folder, dirs, files in os.walk(ROOT):
-            dirs[:] = [d for d in dirs if d not in SKIP and not d.startswith(".")]   # never into target/ or node_modules/
-            if "Cargo.toml" not in files:
-                continue
-            toml = Path(folder) / "Cargo.toml"
-            m = re.search(r'^\[package\](?:(?!^\[).)*?^name\s*=\s*"([^"]+)"', toml.read_text(encoding="utf-8", errors="replace"), re.M | re.S)
-            if m:
-                found.setdefault(m.group(1).replace("-", "_"), toml.parent.resolve())   # walked top-down: the shallowest wins over a fixture
-        _CRATES[ROOT] = found
+        _scan()
     return _CRATES[ROOT]
+
+
+def crate_root_dir(f: Path) -> Path:
+    """The folder of the root file of the crate a file belongs to: the deepest such folder above it (src/ as a rule;
+    a `path =` of Cargo.toml elsewhere)."""
+    if ROOT not in _ROOTS:
+        _scan()
+    f = f.resolve()
+    above = [d for d in _ROOTS[ROOT] if d == f.parent or d in f.parents]
+    if above:
+        return max(above, key=lambda d: len(d.parts))
+    crate = next((p for p in f.parents if (p / "Cargo.toml").exists()), f.parent)
+    return crate / "src"
 
 
 def expand_use_named(tree: str) -> list:
@@ -90,19 +129,13 @@ def _split_top(s: str) -> list:
 
 # ---- modules and files --------------------------------------------------------------------------------------------
 
-def _crate_src(f: Path) -> Path:
-    """The src folder of the crate a file belongs to (the nearest Cargo.toml above it)."""
-    crate = next((p for p in f.parents if (p / "Cargo.toml").exists()), f.parent)
-    return crate / "src"
-
-
 def module_path(f: Path, src: Path) -> list:
     """The module path of a file inside its crate: src/lib.rs -> [], src/a/mod.rs -> ['a'], src/a/b.rs -> ['a', 'b']."""
     try:
         parts = list(f.resolve().relative_to(src.resolve()).parts)
     except ValueError:
         return []
-    if parts and parts[-1] in ("mod.rs",) or (len(parts) == 1 and parts[0] in ("lib.rs", "main.rs")):
+    if parts and parts[-1] in ("mod.rs",) or (len(parts) == 1 and parts[0] in ("lib.rs", "main.rs")) or _crate_root(src) == f.resolve():
         return parts[:-1]
     if parts and parts[0] == "bin":
         return []
@@ -145,7 +178,10 @@ def _locate(src: Path, full: list, depth: int):
 
 
 def _crate_root(src: Path):
-    return next((c for c in (src / "lib.rs", src / "main.rs") if c.is_file()), None)
+    """The root file of the crate whose root folder is src."""
+    if ROOT not in _ROOTS:
+        _scan()
+    return _ROOTS[ROOT].get(src.resolve()) or next((c for c in (src / "lib.rs", src / "main.rs") if c.is_file()), None)
 
 
 def resolve(segments: list, f: Path, src: Path, inline: list = (), depth: int = 0):
@@ -158,7 +194,16 @@ def resolve(segments: list, f: Path, src: Path, inline: list = (), depth: int = 
     if _module_prefix(src, here + [head])[1] == len(here) + 1:   # exactly a child module, not a shorter prefix
         return _locate(src, here + segments, depth)
     other = workspace_crates().get(head)
-    return _locate(other / "src", rest, depth) if other and other != src.parent.resolve() else None
+    if other is None or (other == src.resolve() and not _is_root_file(f)):
+        return None   # a module of the library names its own crate `crate::`, never by name
+    return _locate(other, rest, depth)
+
+
+def _is_root_file(f: Path) -> bool:
+    """A crate root of its own (a binary, an integration test, an example): it names its library by the crate name."""
+    if ROOT not in _ROOTS:
+        _scan()
+    return f.resolve() in _ALL_ROOT_FILES[ROOT]
 
 
 def _anchored(head: str, rest: list, here: list):
@@ -186,6 +231,7 @@ def _inline_at(regions: list, pos: int) -> list:
 def _paths(code: str) -> list:
     """(position, path, name bound) of every use-tree leaf, and (position, path, None) of every path in the code."""
     found = [(u.start(), p, n) for u in USE.finditer(code) for p, n in expand_use_named(u.group(1))]
+    found += [(m.start(), m.group(1), None) for m in EXTERN.finditer(code)]
     blanked = USE.sub(lambda u: " " * len(u.group(0)), code)   # same length: positions still match the regions
     return found + [(m.start(), m.group(1), None) for m in PATH.finditer(blanked)]
 
@@ -216,7 +262,7 @@ def _glob_files(f: Path) -> list:
     """The files a file glob-imports (`use crate::error::*;`)."""
     if f not in _GLOBS:
         _GLOBS[f] = []   # a glob cycle stops here
-        code, src = _code(f), _crate_src(f)
+        code, src = _code(f), crate_root_dir(f)
         regions = _inline_regions(code)
         leaves = [(u.start(), p) for u in USE.finditer(code) for p, n in expand_use_named(u.group(1)) if n == "*"]
         hits = (resolve(p.lstrip(":").split("::"), f, src, _inline_at(regions, pos), 1) for pos, p in leaves)
@@ -229,7 +275,7 @@ def _glob_targets(module: Path, names: tuple, depth: int = 0) -> list:
     then (two globs deep) the files it glob-imports that define the rest. `names` is (every identifier, the ones
     written as a path head `x::`): a module name counts only as a path head, never as a variable of that name."""
     idents, heads = names
-    scope, src = _scope(module), _crate_src(module)
+    scope, src = _scope(module), crate_root_dir(module)
     bound = {n for n in idents & scope.keys() if scope[n] != ["self", n] or n in heads}
     out = [resolve(scope[n], module, src, (), 1) for n in sorted(bound)]
     rest = idents - scope.keys() - _defs(module)
@@ -253,7 +299,7 @@ def rust_module_edges(f: Path, ownership: bool = True) -> list:
     reach its files (dead code), a boundary check does not (declaring a module is not using it). The body of a
     `#[cfg(test)]` module is left out."""
     code = _without_tests(strip_strings(f.read_text(encoding="utf-8", errors="replace"), "rust"))
-    src, out, regions = _crate_src(f), [], _inline_regions(code)
+    src, out, regions = crate_root_dir(f), [], _inline_regions(code)
     if ownership:
         out += [module_file(src, module_path(f, src) + _inline_at(regions, m.start()) + [m.group(1)]) for m in MOD.finditer(code)]
     plain = USE.sub(" ", code)

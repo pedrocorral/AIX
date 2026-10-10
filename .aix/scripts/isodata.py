@@ -18,6 +18,7 @@ from pathlib import Path
 
 from bracecomments import strip_comments
 from codefiles import EXT
+from isodecl import _as_list
 from taint import call_name
 
 SINK_CALLS = {
@@ -37,9 +38,8 @@ def rules(d) -> list:
     """(name, fields, stays_in, sinks) per declared kind of data."""
     out = []
     for name, spec in sorted(d.data.items()):
-        fields = [str(f) for f in (spec.get("fields") or [])]
-        stays = [str(s) for s in (spec.get("stays_in") or [])]
-        sinks = [str(s) for s in (spec.get("never_to") or ["logs", "http", "print"])]
+        fields, stays = _as_list(spec.get("fields")), _as_list(spec.get("stays_in"))
+        sinks = [s for s in (_as_list(spec.get("never_to")) or ["logs", "http", "print"]) if s in SINK_CALLS]
         if fields:
             out.append((name, fields, stays, sinks))
     return out
@@ -154,9 +154,21 @@ def _sink_hit(node, fields: set, tainted: dict, sinks: list):
     return (node.lineno, hit, kind, call_name(node)) if hit else None
 
 
+def _scope_nodes(scope) -> list:
+    """The nodes of one scope: a function's body, or the module's own code, never the body of a function inside it
+    (each function is a scope of its own: a local of one never taints another's)."""
+    out, todo = [], list(ast.iter_child_nodes(scope))
+    while todo:
+        node = todo.pop()
+        out.append(node)
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            todo += list(ast.iter_child_nodes(node))
+    return sorted(out, key=lambda n: (getattr(n, "lineno", 0), getattr(n, "col_offset", 0)))
+
+
 def _scope_sinks(scope, fields: set, sinks: list) -> list:
     tainted, out = {}, []
-    for node in ast.walk(scope):
+    for node in _scope_nodes(scope):
         _taint_assignment(node, fields, tainted)
         hit = _sink_hit(node, fields, tainted, sinks)
         if hit:

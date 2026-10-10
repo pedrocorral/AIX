@@ -145,7 +145,9 @@ def _flow_map(inside: str, line: int) -> dict:
         key, sep, rest = item.partition(":")
         if not sep:
             raise ValueError(f"line {line}: `{item}` in a {{...}} map has no `key: value`")
-        out[_scalar(key)] = _flow_value(rest, line)
+        if _tree_scalar(key) in out:
+            raise ValueError(f"line {line}: `{_tree_scalar(key)}` appears twice in the same map")
+        out[_tree_scalar(key)] = _flow_value(rest, line)
     return out
 
 
@@ -159,7 +161,16 @@ def _flow_value(text: str, line: int):
         return [_flow_value(x, line) for x in _split_flow(text[1:-1])]
     if closing == "}":
         return _flow_map(text[1:-1], line)
-    return _scalar(text) if text else None
+    return _tree_scalar(text) if text else None
+
+
+def _tree_scalar(v: str):
+    """A scalar of parse_tree: comments were cut from the line already (a `#` needs a space before it), so a `#`
+    inside a value (`team#1`) stays; quotes are removed, true/false are booleans."""
+    v = v.strip()
+    if len(v) > 1 and v[0] in "\"'" and v[-1] == v[0]:
+        return v[1:-1]
+    return v == "true" if v in ("true", "false") else v
 
 
 def _key_value(content: str, line: int) -> tuple:
@@ -167,7 +178,7 @@ def _key_value(content: str, line: int) -> tuple:
     m = re.match(r"""^("[^"]*"|'[^']*'|[^:]+?)\s*:(?:\s+(.*)|$)""", content)
     if not m:
         raise ValueError(f"line {line}: expected `key: value`, found `{content}`")
-    return _scalar(m.group(1)), (m.group(2) or "")
+    return _tree_scalar(m.group(1)), (m.group(2) or "")
 
 
 def _block(lines: list, i: int, indent: int) -> tuple:
@@ -178,16 +189,21 @@ def _block(lines: list, i: int, indent: int) -> tuple:
     while i < len(lines) and lines[i][0] == indent:
         _ind, content, n = lines[i]
         key, rest = _key_value(content, n)
-        i += 1
-        if rest.strip():
-            out[key] = _flow_value(rest, n)
-        elif i < len(lines) and lines[i][0] > indent:
-            out[key], i = _block(lines, i, lines[i][0])
-        else:
-            out[key] = None
+        if key in out:
+            raise ValueError(f"line {n}: `{key}` appears twice in the same map")
+        out[key], i = _map_value(lines, i + 1, indent, rest, n)
     if i < len(lines) and lines[i][0] > indent:
         raise ValueError(f"line {lines[i][2]}: unexpected indentation")
     return out, i
+
+
+def _map_value(lines: list, i: int, indent: int, rest: str, n: int) -> tuple:
+    """(value, next index) of one key: written on its line, a deeper block below it, or nothing."""
+    if rest.strip():
+        return _flow_value(rest, n), i
+    if i < len(lines) and lines[i][0] > indent:
+        return _block(lines, i, lines[i][0])
+    return None, i
 
 
 def _list_block(lines: list, i: int, indent: int) -> tuple:
