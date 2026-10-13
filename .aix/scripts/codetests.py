@@ -101,7 +101,7 @@ def _render(c: Coverage, kids: dict, folder: str, label: str, depth: int) -> lis
 def _tree_lines(c: Coverage) -> list:
     """The modules as an indented tree; a folder that only holds other modules is shown as their container."""
     kids = _children(c)
-    tops = sorted({P(m).parts[0] for m in c.modules})
+    tops = sorted({P(m).parts[0] if P(m).parts else "." for m in c.modules})   # ".": code in the project's own folder
     return [line for top in tops for line in _render(c, kids, top, top, 0)]
 
 

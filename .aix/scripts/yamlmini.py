@@ -206,17 +206,33 @@ def _map_value(lines: list, i: int, indent: int, rest: str, n: int) -> tuple:
     return None, i
 
 
+MAP_ITEM = re.compile(r"""^(?!["'\[{])[^:#\s][^:]*?:(?:\s|$)""")
+
+
 def _list_block(lines: list, i: int, indent: int) -> tuple:
+    """`- x` items: a scalar or flow value, a map (`- key: v` and the keys below it), or a block below a bare `-`."""
     out = []
     while i < len(lines) and lines[i][0] == indent and (lines[i][1].startswith("- ") or lines[i][1] == "-"):
-        out.append(_flow_value(lines[i][1][1:], lines[i][2]))
-        i += 1
+        value, i = _list_item(lines, i, indent)
+        out.append(value)
     return out, i
 
 
+def _list_item(lines: list, i: int, indent: int) -> tuple:
+    """(value, next index) of one `- ` item. A map item is read as a block whose first line starts after the dash."""
+    content, n = lines[i][1], lines[i][2]
+    rest = content[1:].lstrip()
+    if MAP_ITEM.match(rest):
+        lines[i] = (indent + len(content) - len(rest), rest, n)   # the item's keys line up after `- `
+        return _block(lines, i, lines[i][0])
+    if not rest and i + 1 < len(lines) and lines[i + 1][0] > indent:
+        return _block(lines, i + 1, lines[i + 1][0])
+    return _flow_value(rest, n), i + 1
+
+
 def parse_tree(text: str) -> dict:
-    """Nested maps by indentation (spaces), `- item` and `[a, b]` lists, `{k: v}` flow maps, quoted scalars,
-    comments. Raises ValueError naming the line on anything else."""
+    """Nested maps by indentation (spaces), `- item` and `[a, b]` lists (an item may be a map), `{k: v}` flow maps,
+    quoted scalars, comments. Raises ValueError naming the line on anything else."""
     lines = _content_lines(text)
     if not lines:
         return {}

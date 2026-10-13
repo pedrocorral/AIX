@@ -69,6 +69,13 @@ class Command(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("2 module(s) without their own tests", r.stderr)
 
+    def test_code_in_the_project_folder_itself_is_a_module(self):
+        """ripgrep's build.rs, juice-shop's server.ts: a file at the root of the project crashed the tree (2.23.0)."""
+        (self.project / "build.py").write_text("def build():\n    return 1\n", encoding="utf-8")
+        r = project_cmd(self.project, self.home, "code", "tests", ".", check=False)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("./  NO TESTS", r.stdout)
+
     def test_the_report_lists_itself_in_an_index_written_before_it_existed(self):
         index = self.project / "docs/tests/INDEX.md"
         index.write_text("\n".join(l for l in index.read_text(encoding="utf-8").splitlines() if "tests-by-module.md" not in l) + "\n", encoding="utf-8")

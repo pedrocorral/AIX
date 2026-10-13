@@ -20,6 +20,8 @@ TOOLS = {  # tool -> (arguments, the number to record: regex with one group)
     "style": (["code", "style"], r"functions analysed (\d+)"),
     "graph": (["code", "graph"], r"nodes \d+, edges (\d+)"),
     "dead": (["code", "dead"], r"DEAD MODULES (\d+)"),
+    "tests": (["code", "tests"], r"Tests by module — (\d+) module"),
+    "isolations": (["code", "isolations", "--propose", "--depth", "2"], r"# (\d+) isolation\(s\)"),
     "clones": (["code", "clones"], r"exact clone groups (\d+)"),
     "defensive": (["code", "defensive"], r"listed (\d+)"),
     "security": (["code", "security"], r"findings to review (\d+)"),

@@ -41,6 +41,13 @@ class Robustness(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_tree("a:\n  frontiers: x\n  frontiers: y\n")
 
+    def test_yaml_lists_of_maps_as_compose_and_kubernetes_write_them(self):
+        from yamlmini import parse_tree
+        text = ("watch:\n  - path: ./backend\n    action: sync\n    ignore:\n      - .venv\n  - path: ./x\n    action: rebuild\n"
+                "ports:\n  - \"80:80\"\n  - /a:/b:ro\n  - KEY=${A:-b}\nnested:\n  -\n    name: a\n")
+        self.assertEqual(parse_tree(text), {"watch": [{"path": "./backend", "action": "sync", "ignore": [".venv"]}, {"path": "./x", "action": "rebuild"}],
+                                            "ports": ["80:80", "/a:/b:ro", "KEY=${A:-b}"], "nested": [{"name": "a"}]})
+
     def test_malformed_declarations_are_errors_not_crashes(self):
         for raw, expected in (({"isolations": ["a", "b"]}, "no `isolations:` map"),
                               ({"isolations": {"orders": "src/orders/**"}}, "expected a map"),

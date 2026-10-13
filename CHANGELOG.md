@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.23.2 — 2026-10-13
+
+- `aix code tests` crashed on any project with code files in its own folder (ripgrep's `build.rs`, juice-shop's `server.ts`): the module tree had no name for the project folder. It is the module `./` now. The extended suite never ran the command, so 2.23.0 and 2.23.1 shipped the crash; it now runs `aix code tests` and `aix code isolations --propose --depth 2` on all 18 projects and records their counts.
+- The kit's YAML reader reads a list item that is a map (`- path: ./backend` and the keys below it), as compose and Kubernetes files write them; before, the item was the text `path: ./backend`. Found while prototyping diagrams of an application (TASK-0006) on the compose files of the extended projects.
+
 ## 2.23.1 — 2026-10-10
 
 - 2.22 and 2.23 verified end to end: an upgrade from 2.21.58, the five languages planted in one project (HIDDEN in Python, TS, Rust and Java, BREAKING, DATA, CODEOWNERS, requirements, the report, the standard and release policies), and an independent review. Fixed:
