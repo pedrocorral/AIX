@@ -31,8 +31,15 @@ class Weight(unittest.TestCase):
         self.assertEqual(entered_twice["L1"], entered_twice["L2"], "the members of a loop share one weight")
 
     def test_a_method_takes_its_complexity_whatever_the_language_names_it(self):
-        self.assertEqual(codetests.cognitive_of("svc.ts:Cart.total", {"svc.ts:total": 3}), 3)
-        self.assertEqual(codetests.cognitive_of("a.py:C.m", {"a.py:C.m": 5, "a.py:m": 1}), 5)
+        self.assertEqual(codetests.cognitive_of("svc.ts:Cart.total", {"svc.ts:total": [(4, 3)]}), 3)
+        self.assertEqual(codetests.cognitive_of("a.py:C.m", {"a.py:C.m": [(2, 5)], "a.py:m": [(9, 1)]}), 5)
+
+    def test_two_methods_of_one_name_in_a_file_keep_their_own_complexity(self):
+        """ripgrep's parse.rs: Parser.new (cognitive 12, line 176) and FlagMap.new (3, line 374) both scored 12, which put
+        FlagMap.new first in ripgrep's priority list (1 320 instead of 330)."""
+        metrics = {"parse.rs:new": [(176, 12), (374, 3)]}
+        self.assertEqual(codetests.cognitive_of("parse.rs:Parser.new", metrics, 176), 12)
+        self.assertEqual(codetests.cognitive_of("parse.rs:FlagMap.new", metrics, 374), 3, "the nearest function at or above its body")
 
 
 class Command(unittest.TestCase):
@@ -81,6 +88,15 @@ class Command(unittest.TestCase):
         index.write_text("\n".join(l for l in index.read_text(encoding="utf-8").splitlines() if "tests-by-module.md" not in l) + "\n", encoding="utf-8")
         self.run_tool("--report"); self.run_tool("--report")
         self.assertEqual(index.read_text(encoding="utf-8").count("`tests-by-module.md`"), 1, "an upgraded project's index gains the row once")
+
+    def test_priority_scores_each_of_two_same_named_methods_by_its_own_body(self):
+        (self.project / "src/shapes").mkdir()
+        (self.project / "src/shapes/run.ts").write_text(
+            "export class Busy {\n  run(x: number) {\n    if (x > 0) {\n      if (x > 1) { return 2; }\n    }\n    return 0;\n  }\n}\n"
+            "export class Idle {\n  run() {\n    return 1;\n  }\n}\n", encoding="utf-8")
+        out = self.run_tool("--priority").stdout
+        self.assertIn("src/shapes/run.ts:Busy.run", out)
+        self.assertNotIn("Idle.run", out, "a body with no branch scores 0, whatever its namesake costs")
 
     def test_priority_puts_the_complex_widely_reached_untested_function_first(self):
         out = self.run_tool("--priority").stdout

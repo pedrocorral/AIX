@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.23.3 — 2026-10-13
+
+- `aix code tests --priority` gave two methods of one name in one file the same complexity, the larger: in ripgrep's `parse.rs`, `Parser.new` (cognitive 12) and `FlagMap.new` (3) both scored 12, so `FlagMap.new` led the list at 1 320 instead of 330. In ripgrep 1 161 of 2 548 functions share their name with another in their file (`new`, `default`, `build`). The call graph now records the line where each JS/TS, Rust and Java body opens, and a method takes the complexity of the function that starts there; all 1 177 such methods on four extended projects matched on the same line. Audited at the same time against brute force: the call-path counts agree on every function of five projects (about 4 000), loops included.
+
 ## 2.23.2 — 2026-10-13
 
 - `aix code tests` crashed on any project with code files in its own folder (ripgrep's `build.rs`, juice-shop's `server.ts`): the module tree had no name for the project folder. It is the module `./` now. The extended suite never ran the command, so 2.23.0 and 2.23.1 shipped the crash; it now runs `aix code tests` and `aix code isolations --propose --depth 2` on all 18 projects and records their counts.

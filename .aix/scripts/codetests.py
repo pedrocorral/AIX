@@ -24,6 +24,7 @@ from pathlib import PurePosixPath as P
 
 from codefiles import ROOT, default_roots
 from depedges import module_graph
+from funcgraph import LINES
 from graphmetrics import is_test
 from guard import checked
 from isogov import index_row
@@ -171,18 +172,22 @@ def _metrics(paths: list) -> dict:
     Rust method without its class; the call graph with it: `cognitive_of` joins the two)."""
     import stylemetrics
     from codefiles import source_files, rel
-    out = {}
+    out = defaultdict(list)
     for f in source_files(paths):
         for fx in stylemetrics.functions_in(f):
-            out[f"{rel(f)}:{fx['name']}"] = max(fx["cognitive"], out.get(f"{rel(f)}:{fx['name']}", 0))
+            out[f"{rel(f)}:{fx['name']}"].append((fx["line"], fx["cognitive"]))
     return out
 
 
-def cognitive_of(node: str, metrics: dict) -> int:
-    """The cognitive complexity of a call-graph node `file:Class.method`: by its full name, else by `file:method`."""
-    if node in metrics:
-        return metrics[node]
-    return metrics.get(f"{_file_of(node)}:{node.rsplit(':', 1)[1].split('.')[-1]}", 0)
+def cognitive_of(node: str, metrics: dict, line=None) -> int:
+    """The cognitive complexity of a call-graph node `file:Class.method`: by its full name, else by `file:method`.
+    Two methods of one name in a file (`FlagMap.new`, `Parser.new`) are told apart by `line`, where the node's body
+    opens: the nearest function starting at or above it; without a line, the larger."""
+    found = metrics.get(node) or metrics.get(f"{_file_of(node)}:{node.rsplit(':', 1)[1].split('.')[-1]}") or []
+    above = [c for c in found if line is not None and c[0] <= line]
+    if above:
+        return max(above)[1]
+    return max((c[1] for c in found), default=0)
 
 
 def _file_of(node: str) -> str:
@@ -197,7 +202,7 @@ def priorities(paths: list) -> list:
     code = sorted(n for n in nodes if not is_test(_file_of(n)))
     calls = {(a, b) for a, b in edges if not is_test(_file_of(a))}
     weight, metrics = path_weights(code, calls), _metrics(paths)
-    cog = {n: cognitive_of(n, metrics) for n in code}
+    cog = {n: cognitive_of(n, metrics, LINES.get(n)) for n in code}
     direct = defaultdict(int)
     for a, b in calls:
         direct[b] += 1

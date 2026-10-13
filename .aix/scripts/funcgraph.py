@@ -258,6 +258,7 @@ def _plausible_bare(file: _File, m, owner) -> bool:
 
 
 _DEFS = {}
+LINES = {}   # node -> the line its body opens on, from the last function_graph_tokens (to tell same-named methods apart)
 
 
 def _bare_edges(file: _File, defs: dict, edges: set):
@@ -287,9 +288,11 @@ def function_graph_tokens(paths: list) -> tuple:
     files = {rel(f): _File(f, EXT[f.suffix]) for f in source_files(paths) if EXT.get(f.suffix) in ("js", "rust", "java")}
     java_idx = _java_index([fx.f for fx in files.values() if fx.lang == "java"])
     defs = {}
+    LINES.clear()
     for fx in files.values():
-        for node, name, cls, _, _, _ in fx.functions:
+        for node, name, cls, start, _, _ in fx.functions:
             defs[(fx.rel, f"{cls}.{name}" if cls else name)] = node
+            LINES[node] = fx.clean.count("\n", 0, start) + 1
     for fx in files.values():
         {"js": _js_imports, "rust": _rust_imports, "java": lambda a, b: _java_visible_classes(a, b, java_idx)}[fx.lang](fx, files)
     _DEFS.clear(); _DEFS.update(defs)
